@@ -347,87 +347,43 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
     setBusy(true);
     setResults([]);
     setComplete(false);
-    const output: ResultRow[] = [];
-    let batchId: string | null = null;
-    const order = [
-      'source_register', 'flat_owner_master', 'account_master', 'category_master',
-      'party_master', 'rules_master', 'demand_register',
-      'transactions', 'society_dropdown_options', 'society_correction_log', 'party_category_rules',
-    ];
-    let failed = false;
     try {
       const { data: authData, error: authError } = await supabaseClient.auth.getSession();
       if (authError) throw authError;
-      if (!authData.session) throw new Error('Sign in with a Society Admin account before importing.');
-      const { data: allowed, error: roleError } = await (supabaseClient as any).rpc('is_society_admin');
-      if (roleError) throw roleError;
-      if (allowed !== true) throw new Error('Your current session is not authorized for imports.');
-      const { data: batch, error: batchError } = await (supabaseClient as any)
-        .from('society_import_batches')
-        .insert({
-          source_file: fileName,
-          financial_year: 'FY 2018-19',
-          status: 'Started',
-          row_counts: Object.fromEntries(plan.map(row => [row.table, row.count])),
-        })
-        .select('id')
-        .single();
-      if (batchError) throw new Error(`Could not create import audit batch: ${batchError.message}`);
-      batchId = batch.id;
-      for (const table of order) {
-        let records = payload[table] || [];
-        if (batchId && (table === 'society_correction_log' || table === 'party_category_rules' || table === 'society_dropdown_options')) {
-          records = records.map((record: any) => ({ ...record, import_batch_id: batchId }));
-        }
-        if (!records.length) { output.push({ table, attempted: 0, succeeded: 0 }); continue; }
-        let succeeded = 0;
-        let errorText = '';
-        if (table === 'society_dropdown_options') {
-          for (const group of batches(records)) {
-            const { error } = await (supabaseClient as any).from(table).upsert(group, { onConflict: 'column_name,option_value' });
-            if (error) { errorText = error.message; break; }
-            succeeded += group.length;
+      if (!authData.session) throw new Error('Sign in with Google through Supabase before importing.');
+
+      const { data, error } = await supabaseClient.functions.invoke('import-fy2018-workbook', {
+        body: {
+          fileName,
+          financialYear: 'FY 2018-19',
+          payload,
+        },
+      });
+      if (error) {
+        let detail = error.message || 'Backend import request failed.';
+        try {
+          const context = (error as any).context;
+          if (context && typeof context.json === 'function') {
+            const body = await context.json();
+            if (body?.error) detail = body.error;
           }
-        } else {
-          for (const group of batches(records)) {
-            const conflictKey = table === 'member_opening_balances' ? 'opening_balance_id' :
-              table === 'society_correction_log' ? 'financial_year,rule_item,correction_applied,scope_note' :
-              table === 'party_category_rules' ? 'rule_id' :
-              table === 'society_dropdown_options' ? 'column_name,option_value' :
-              table === 'source_register' ? 'source_id' :
-              table === 'flat_owner_master' ? 'flat_owner_id' :
-              table === 'account_master' ? 'account_id' :
-              table === 'category_master' ? 'category_id' :
-              table === 'party_master' ? 'party_id' :
-              table === 'rules_master' ? 'rule_id' :
-              table === 'balance_register' ? 'balance_register_id' :
-              table === 'demand_register' ? 'demand_id' : 'transaction_id';
-            const query = (supabaseClient as any).from(table);
-            const response = conflictKey ? await query.upsert(group, { onConflict: conflictKey }) : await query.insert(group);
-            if (response.error) { errorText = response.error.message; break; }
-            succeeded += group.length;
-          }
-        }
-        output.push({ table, attempted: records.length, succeeded, error: errorText || undefined });
-        if (errorText) { failed = true; break; }
+        } catch {}
+        throw new Error(detail);
       }
-      setResults(output);
-      setComplete(!failed);
-      if (batchId) {
-        const { error: batchUpdateError } = await (supabaseClient as any).from('society_import_batches')
-          .update({
-            status: failed ? 'Failed' : 'Completed',
-            row_counts: Object.fromEntries(output.map(row => [row.table, { attempted: row.attempted, succeeded: row.succeeded, error: row.error || null }])),
-            error_summary: output.find(row => row.error)?.error || null,
-            completed_at: new Date().toISOString(),
-          })
-          .eq('id', batchId);
-        if (batchUpdateError) output.push({ table: 'society_import_batches', attempted: 1, succeeded: 0, error: batchUpdateError.message });
-        setResults([...output]);
-      }
+      if (data?.error) throw new Error(data.error);
+
+      const serverResults = Array.isArray(data?.results) ? data.results : [];
+      const normalized: ResultRow[] = serverResults.map((row: any) => ({
+        table: String(row.table || 'unknown'),
+        attempted: Number(row.attempted || 0),
+        succeeded: Number(row.succeeded || 0),
+        error: row.error ? String(row.error) : undefined,
+      }));
+      setResults(normalized);
+      const success = data?.success === true && normalized.every(row => !row.error && row.succeeded === row.attempted);
+      setComplete(success);
     } catch (e: any) {
-      output.push({ table: 'import', attempted: 0, succeeded: 0, error: e?.message || String(e) });
-      setResults(output);
+      setResults([{ table: 'import-fy2018-workbook', attempted: 0, succeeded: 0, error: e?.message || String(e) }]);
       setComplete(false);
     } finally {
       setBusy(false);
