@@ -203,31 +203,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
         str(r.Status) ? `Status: ${str(r.Status)}` : null].filter(Boolean).join(' | ') || null,
     })).filter(r => r.demand_id && r.party_id && r.demand_amount !== null);
 
-    const partyById = new Map(partyPayload.map(p => [p.party_id, p]));
-    const balanceRows = rowsFrom(wb, 'BALANCE_REGISTER');
-    const balancePayload = balanceRows.map((r, i) => {
-      const partyId = str(r.Party_ID);
-      const party = partyId ? partyById.get(partyId) : null;
-      return {
-        balance_register_id: str(r.Balance_Register_ID) || `BAL-${String(i + 1).padStart(4, '0')}`,
-        party_id: partyId,
-        name: (party as any)?.party_name || str(r.Name),
-        type: (party as any)?.party_type || str(r.Type),
-        opening_balance: num(r['Opening Balance']),
-        current_fy_demand: num(r.Debit),
-        current_fy_receipts: num(r.Credit),
-        adjustments: null,
-        total_outstanding: num(r.Balance),
-        financial_year: 'FY 2018-19',
-        notes: [
-          str(r.Notes),
-          num(r.Penalty) !== null ? `Penalty: ${num(r.Penalty)}` : null,
-          num(r['Cheque Bounce']) !== null ? `Cheque Bounce: ${num(r['Cheque Bounce'])}` : null,
-          num(r.Other) !== null ? `Other: ${num(r.Other)}` : null,
-        ].filter(Boolean).join(' | ') || null,
-        opening_balance_verification_status: 'Pending',
-      };
-    }).filter(r => r.balance_register_id && r.party_id);
+
 
     const optionPayload: any[] = [];
     const optionWs = wb.Sheets.OPTIONS;
@@ -285,7 +261,6 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       rules_master: rulePayload,
       transactions: transactionPayload,
       demand_register: demandPayload,
-      balance_register: balancePayload,
       society_dropdown_options: optionPayload,
       society_correction_log: correctionPayload,
       party_category_rules: partyRulePayload,
@@ -315,7 +290,6 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
         { table: 'rules_master', count: data.rules_master.length, note: 'Rules and review controls' },
         { table: 'transactions', count: data.transactions.length, note: 'Transaction records, cheque_no and bank_verified' },
         { table: 'demand_register', count: data.demand_register.length, note: 'Source-supported demands only' },
-        { table: 'balance_register', count: data.balance_register.length, note: 'Party-level balance register; unsupported amounts remain blank' },
         { table: 'society_dropdown_options', count: data.society_dropdown_options.length, note: 'Controlled dropdown options, kept separate from application configuration' },
         { table: 'society_correction_log', count: data.society_correction_log.length, note: 'Correction log audit trail' },
         { table: 'party_category_rules', count: data.party_category_rules.length, note: 'Persistent party/category rules' },
@@ -334,7 +308,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
     let batchId: string | null = null;
     const order = [
       'source_register', 'flat_owner_master', 'account_master', 'category_master',
-      'party_master', 'rules_master', 'balance_register', 'demand_register',
+      'party_master', 'rules_master', 'demand_register',
       'transactions', 'society_dropdown_options', 'society_correction_log', 'party_category_rules',
     ];
     let failed = false;
