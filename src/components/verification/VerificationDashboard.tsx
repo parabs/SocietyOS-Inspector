@@ -428,18 +428,6 @@ export const VerificationDashboard: React.FC = () => {
             </span>
           </button>
 
-          <button
-            onClick={() => {
-              setQuickSummaryTab('excel-ingestion');
-              setShowQuickSummaryModal(true);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg cursor-pointer transition-colors shadow-2xs"
-            title="Excel / CSV to Database Tables Ingestion Studio"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span className="hidden sm:inline">Excel ➔ DB Tables</span>
-            <span className="sm:hidden">Upload</span>
-          </button>
 
           <button
             onClick={() => {
