@@ -445,7 +445,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
     }
   };
 
-  const totalRecords = useMemo(() => plan.reduce((sum, row) => sum + row.count, 0), [plan]);
+  const totalRecords = plan.reduce((sum, row) => sum + row.count, 0);
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
