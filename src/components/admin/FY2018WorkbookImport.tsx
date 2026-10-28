@@ -91,29 +91,18 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
     return () => { active = false; listener.subscription.unsubscribe(); };
   }, []);
 
-  const handleSignIn = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleGoogleSignIn = async () => {
     setAuthBusy(true);
     setAuthMessage('');
     try {
-      const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email: loginEmail.trim(),
-        password: loginPassword,
+      const redirectTo = `${window.location.origin}${window.location.pathname}`;
+      const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo, queryParams: { prompt: 'select_account' } },
       });
       if (error) throw error;
-      if (!data.session) throw new Error('Sign-in did not create an active session.');
-      const { data: allowed, error: roleError } = await (supabaseClient as any).rpc('is_society_admin');
-      if (roleError) throw roleError;
-      if (allowed !== true) {
-        await supabaseClient.auth.signOut();
-        throw new Error('This account is not authorized for imports. Ask the Supabase project owner to grant app_metadata.role = society_admin.');
-      }
-      setSessionEmail(data.user.email || loginEmail.trim());
-      setLoginPassword('');
-      setAuthMessage('Signed in with Society Admin access.');
     } catch (e: any) {
-      setAuthMessage(e?.message || 'Sign-in failed.');
-    } finally {
+      setAuthMessage(e?.message || 'Could not start Google sign-in.');
       setAuthBusy(false);
     }
   };
@@ -462,8 +451,8 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
             {sessionEmail ? (
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">Signed in: {sessionEmail}</p>
-                  <p className="text-xs text-emerald-700 mt-1">{authMessage || 'Society Admin access required for import.'}</p>
+                  <p className="text-sm font-semibold text-slate-900">Google account: {sessionEmail}</p>
+                  <p className="text-xs text-emerald-700 mt-1">{authMessage || 'Backend checks Society Admin permissions before writing.'}</p>
                 </div>
                 <button type="button" disabled={busy || authBusy} onClick={async () => {
                   await supabaseClient.auth.signOut();
@@ -472,18 +461,15 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
                 }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">Sign out</button>
               </div>
             ) : (
-              <form onSubmit={handleSignIn} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-                <label className="text-xs font-semibold text-slate-700">Supabase Admin Email
-                  <input type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} autoComplete="username" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal" />
-                </label>
-                <label className="text-xs font-semibold text-slate-700">Password
-                  <input type="password" required value={loginPassword} onChange={e => setLoginPassword(e.target.value)} autoComplete="current-password" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal" />
-                </label>
-                <button type="submit" disabled={authBusy} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{authBusy ? 'Signing in…' : 'Sign in'}</button>
-              </form>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Sign in with your existing Google account</p>
+                  <p className="text-xs text-slate-500 mt-1">Uses the Google provider already configured in Supabase Auth.</p>
+                </div>
+                <button type="button" onClick={() => void handleGoogleSignIn()} disabled={authBusy} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{authBusy ? 'Opening Google…' : 'Continue with Google'}</button>
+              </div>
             )}
-            {authMessage && !sessionEmail && <p className="mt-2 text-xs text-rose-700">{authMessage}</p>}
-            {!sessionEmail && <p className="mt-2 text-[11px] text-slate-500">Use an existing Supabase Auth user whose app_metadata role is society_admin. The importer does not create accounts or store passwords.</p>}
+            {authMessage && <p className="mt-2 text-xs text-rose-700">{authMessage}</p>}
           </div>
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
             <p className="font-semibold">Import order: source register → masters → demands/opening balances → transactions.</p>
