@@ -7,7 +7,6 @@ import {
   RotateCcw,
   Save,
   CheckCircle,
-  FileSpreadsheet,
   Download,
   AlertTriangle,
   Layers,
@@ -28,7 +27,7 @@ export const SettingsView: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showIngestionModal, setShowIngestionModal] = useState(false);
   const [showFy2018Import, setShowFy2018Import] = useState(false);
-  const [ingestionTab, setIngestionTab] = useState<'summary' | 'excel-ingestion' | 'architecture'>('excel-ingestion');
+  const [ingestionTab] = useState<'summary'>('summary');
 
   const handleSaveConfig = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,18 +76,6 @@ export const SettingsView: React.FC = () => {
           </button>
           <button
             onClick={() => {
-              setIngestionTab('excel-ingestion');
-              setShowIngestionModal(true);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer transition-colors shadow-xs"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>Excel ➔ DB Tables Studio</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setIngestionTab('summary');
               setShowIngestionModal(true);
             }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg cursor-pointer transition-colors shadow-2xs"
