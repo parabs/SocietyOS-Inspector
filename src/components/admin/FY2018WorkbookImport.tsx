@@ -224,12 +224,17 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
         name: (party as any)?.party_name || str(r.Name),
         type: (party as any)?.party_type || str(r.Type),
         opening_balance: num(r['Opening Balance']),
-        current_fy_demand: num(r.Credit),
-        current_fy_receipts: num(r.Debit),
-        adjustments: num(r.Adjustments),
+        current_fy_demand: num(r.Debit),
+        current_fy_receipts: num(r.Credit),
+        adjustments: null,
         total_outstanding: num(r.Balance),
         financial_year: 'FY 2018-19',
-        notes: str(r.Notes),
+        notes: [
+          str(r.Notes),
+          num(r.Penalty) !== null ? `Penalty: ${num(r.Penalty)}` : null,
+          num(r['Cheque Bounce']) !== null ? `Cheque Bounce: ${num(r['Cheque Bounce'])}` : null,
+          num(r.Other) !== null ? `Other: ${num(r.Other)}` : null,
+        ].filter(Boolean).join(' | ') || null,
         opening_balance_verification_status: 'Pending',
       };
     }).filter(r => r.balance_register_id && r.party_id);
