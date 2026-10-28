@@ -1,10 +1,13 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
   return {
+    // GitHub Pages hosts this project under /SocietyOS-Inspector/.
+    // Keep root-relative assets for local development and non-Pages hosts.
+    base: process.env.GITHUB_ACTIONS === 'true' ? '/SocietyOS-Inspector/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
