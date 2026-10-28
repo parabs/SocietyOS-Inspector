@@ -137,7 +137,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       source_quality_notes: str(r.Source_Quality_Notes),
       pending_activities: str(r.Pending_Activities),
     })).filter(r => r.source_id && r.original_file_name);
-    const sourceLookup = new Map(sourcePayload.filter(r => r.original_file_name).map(r => [r.original_file_name!, r.source_id!]));
+    const sourceLookup = new Map<string, string>(sourcePayload.filter(r => r.original_file_name).map(r => [r.original_file_name!, r.source_id!] as [string, string]));
 
     const flatRows = rowsFrom(wb, 'FLAT_OWNER_MASTER');
     const flatPayload = flatRows.map(r => ({
@@ -257,7 +257,6 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       const header = matrix[6] || [];
       for (let col = 0; col < header.length; col += 2) {
         const columnName = str(header[col]);
-        const meaningHeader = String(header[col + 1] ?? '');
         if (!columnName || /meaning/i.test(columnName)) continue;
         for (let rowIndex = 7; rowIndex < matrix.length; rowIndex++) {
           const value = str(matrix[rowIndex]?.[col]);
