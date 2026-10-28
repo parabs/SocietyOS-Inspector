@@ -155,27 +155,16 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       notes: str(r.Notes),
     })).filter(r => r.category_id && r.category_name);
 
-    const ruleRows = rowsFrom(wb, 'RULES_MASTER');
-    const rulePayload = ruleRows.map(r => ({
-      rule_id: str(r.Rule_ID),
-      rule_name: str(r.Rule_Name),
-      rule_type: str(r.Rule_Type),
-      applicable_to: str(r.Applicable_To),
-      asset_type: str(r.Asset_Type),
-      regular_charge: num(r.Regular_Charge),
-      penalised_charge: num(r.Penalised_Charge),
-      charge_frequency: str(r.Charge_Frequency),
-      due_day: num(r.Accounting_Treatment),
-      start_date: isoDate(r.Party_Rule),
-      end_date: isoDate(r.Notes),
-      status: str(r.Status),
-      notes: str(r.Notes1) || str(r.Notes),
-      category_id: str(r.Category_ID),
-      demand_creation_rule: str(r.Demand_Creation_Rule),
-      demand_period_rule: str(r.Demand_Period_Rule),
-      payment_matching_rule: str(r.Payment_Matching_Rule),
-      review_required: /^yes/i.test(String(r.Review_Required ?? '')),
-    })).filter(r => r.rule_id && r.rule_name);
+    // RULES_MASTER repeats the "Notes" header, so use fixed positions to preserve dates and notes separately.
+    const ruleMatrix = XLSX.utils.sheet_to_json<any[]>(wb.Sheets.RULES_MASTER, { header: 1, defval: null, raw: true });
+    const rulePayload = ruleMatrix.slice(4).map((r: any[]) => ({
+      rule_id: str(r[0]), rule_name: str(r[1]), rule_type: str(r[2]), applicable_to: str(r[3]),
+      asset_type: str(r[4]), regular_charge: num(r[5]), penalised_charge: num(r[6]),
+      charge_frequency: str(r[7]), due_day: num(r[8]), start_date: isoDate(r[9]), end_date: isoDate(r[10]),
+      status: str(r[11]), notes: str(r[12]), category_id: str(r[13]),
+      demand_creation_rule: str(r[14]), demand_period_rule: str(r[15]),
+      payment_matching_rule: str(r[16]), review_required: /^yes/i.test(String(r[17] ?? '')),
+    })).filter((r: any) => r.rule_id && r.rule_name);
 
     const transactionRows = rowsFrom(wb, 'TRANSACTIONS');
     const transactionPayload = transactionRows.map(r => {
@@ -183,7 +172,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       return {
         transaction_id: str(r.Transaction_ID),
         reporting_month: str(r['Reporting Month']),
-        transaction_date: isoTimestamp(r.Transaction_Date),
+        transaction_date: isoDate(r.Transaction_Date),
         transaction_type: str(r.Transaction_Type),
         voucher_receipt_no: str(r.Voucher_Receipt_No),
         cheque_no: str(r.Cheque_No),
@@ -224,16 +213,26 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
         str(r.Status) ? `Status: ${str(r.Status)}` : null].filter(Boolean).join(' | ') || null,
     })).filter(r => r.demand_id && r.party_id && r.demand_amount !== null);
 
-    const openingRows = rowsFrom(wb, 'BALANCE_REGISTER');
-    const openingPayload = openingRows.map(r => ({
-      opening_balance_id: str(r.Balance_Register_ID),
-      party_id: str(r.Party_ID),
-      financial_year: 'FY 2018-19',
-      opening_balance: num(r['Opening Balance']),
-      source_id: null,
-      verification_status: 'Pending',
-      notes: str(r.Notes),
-    })).filter(r => r.opening_balance_id && r.party_id && r.opening_balance !== null);
+    const partyById = new Map(partyPayload.map(p => [p.party_id, p]));
+    const balanceRows = rowsFrom(wb, 'BALANCE_REGISTER');
+    const balancePayload = balanceRows.map((r, i) => {
+      const partyId = str(r.Party_ID);
+      const party = partyId ? partyById.get(partyId) : null;
+      return {
+        balance_register_id: str(r.Balance_Register_ID) || `BAL-${String(i + 1).padStart(4, '0')}`,
+        party_id: partyId,
+        name: (party as any)?.party_name || str(r.Name),
+        type: (party as any)?.party_type || str(r.Type),
+        opening_balance: num(r['Opening Balance']),
+        current_fy_demand: num(r.Credit),
+        current_fy_receipts: num(r.Debit),
+        adjustments: num(r.Adjustments),
+        total_outstanding: num(r.Balance),
+        financial_year: 'FY 2018-19',
+        notes: str(r.Notes),
+        opening_balance_verification_status: 'Pending',
+      };
+    }).filter(r => r.balance_register_id && r.party_id);
 
     const optionPayload: any[] = [];
     const optionWs = wb.Sheets.OPTIONS;
@@ -280,8 +279,8 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       rules_master: rulePayload,
       transactions: transactionPayload,
       demand_register: demandPayload,
-      member_opening_balances: openingPayload,
-      OPTIONS: optionPayload,
+      balance_register: balancePayload,
+      society_dropdown_options: optionPayload,
       society_correction_log: correctionPayload,
       party_category_rules: partyRulePayload,
     };
@@ -310,8 +309,8 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
         { table: 'rules_master', count: data.rules_master.length, note: 'Rules and review controls' },
         { table: 'transactions', count: data.transactions.length, note: 'Transaction records, cheque_no and bank_verified' },
         { table: 'demand_register', count: data.demand_register.length, note: 'Source-supported demands only' },
-        { table: 'member_opening_balances', count: data.member_opening_balances.length, note: 'Only populated opening balances; blank balances are skipped' },
-        { table: 'OPTIONS', count: data.OPTIONS.length, note: 'Controlled dropdown options; duplicates skipped' },
+        { table: 'balance_register', count: data.balance_register.length, note: 'Party-level balance register; unsupported amounts remain blank' },
+        { table: 'society_dropdown_options', count: data.society_dropdown_options.length, note: 'Controlled dropdown options, kept separate from application configuration' },
         { table: 'society_correction_log', count: data.society_correction_log.length, note: 'Correction log audit trail' },
         { table: 'party_category_rules', count: data.party_category_rules.length, note: 'Persistent party/category rules' },
       ]);
@@ -326,42 +325,56 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
     setResults([]);
     setComplete(false);
     const output: ResultRow[] = [];
-    const batchId = `FY1819-${Date.now()}`;
+    let batchId: string | null = null;
     const order = [
       'source_register', 'flat_owner_master', 'account_master', 'category_master',
-      'party_master', 'rules_master', 'member_opening_balances', 'demand_register',
-      'transactions', 'OPTIONS', 'society_correction_log', 'party_category_rules',
+      'party_master', 'rules_master', 'balance_register', 'demand_register',
+      'transactions', 'society_dropdown_options', 'society_correction_log', 'party_category_rules',
     ];
     let failed = false;
     try {
+      const { data: authData, error: authError } = await supabaseClient.auth.getSession();
+      if (authError) throw authError;
+      if (!authData.session) throw new Error('Please sign in through Supabase Auth using an account granted the society_admin app_metadata role before importing.');
+      const { data: batch, error: batchError } = await (supabaseClient as any)
+        .from('society_import_batches')
+        .insert({
+          source_file: fileName,
+          financial_year: 'FY 2018-19',
+          status: 'Started',
+          row_counts: Object.fromEntries(plan.map(row => [row.table, row.count])),
+        })
+        .select('id')
+        .single();
+      if (batchError) throw new Error(`Could not create import audit batch: ${batchError.message}`);
+      batchId = batch.id;
       for (const table of order) {
-        const records = payload[table] || [];
+        let records = payload[table] || [];
+        if (batchId && (table === 'society_correction_log' || table === 'party_category_rules' || table === 'society_dropdown_options')) {
+          records = records.map((record: any) => ({ ...record, import_batch_id: batchId }));
+        }
         if (!records.length) { output.push({ table, attempted: 0, succeeded: 0 }); continue; }
         let succeeded = 0;
         let errorText = '';
-        if (table === 'OPTIONS') {
-          const { data: existing, error: readError } = await (supabaseClient as any).from('OPTIONS').select('Column_Name,Option_Value');
-          if (readError) errorText = readError.message;
-          else {
-            const keys = new Set((existing || []).map((x: any) => `${x.Column_Name}::${x.Option_Value}`));
-            const missing = records.filter((x: any) => !keys.has(`${x.Column_Name}::${x.Option_Value}`));
-            for (const group of batches(missing)) {
-              const { error } = await (supabaseClient as any).from('OPTIONS').insert(group);
-              if (error) { errorText = error.message; break; }
-              succeeded += group.length;
-            }
-            succeeded += records.length - missing.length;
+        if (table === 'society_dropdown_options') {
+          for (const group of batches(records)) {
+            const { error } = await (supabaseClient as any).from(table).upsert(group, { onConflict: 'column_name,option_value' });
+            if (error) { errorText = error.message; break; }
+            succeeded += group.length;
           }
         } else {
           for (const group of batches(records)) {
             const conflictKey = table === 'member_opening_balances' ? 'opening_balance_id' :
-              table === 'society_correction_log' ? undefined : table === 'party_category_rules' ? 'rule_id' :
+              table === 'society_correction_log' ? 'financial_year,rule_item,correction_applied,scope_note' :
+              table === 'party_category_rules' ? 'rule_id' :
+              table === 'society_dropdown_options' ? 'column_name,option_value' :
               table === 'source_register' ? 'source_id' :
               table === 'flat_owner_master' ? 'flat_owner_id' :
               table === 'account_master' ? 'account_id' :
               table === 'category_master' ? 'category_id' :
               table === 'party_master' ? 'party_id' :
               table === 'rules_master' ? 'rule_id' :
+              table === 'balance_register' ? 'balance_register_id' :
               table === 'demand_register' ? 'demand_id' : 'transaction_id';
             const query = (supabaseClient as any).from(table);
             const response = conflictKey ? await query.upsert(group, { onConflict: conflictKey }) : await query.insert(group);
@@ -374,6 +387,18 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       }
       setResults(output);
       setComplete(!failed);
+      if (batchId) {
+        const { error: batchUpdateError } = await (supabaseClient as any).from('society_import_batches')
+          .update({
+            status: failed ? 'Failed' : 'Completed',
+            row_counts: Object.fromEntries(output.map(row => [row.table, { attempted: row.attempted, succeeded: row.succeeded, error: row.error || null }])),
+            error_summary: output.find(row => row.error)?.error || null,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', batchId);
+        if (batchUpdateError) output.push({ table: 'society_import_batches', attempted: 1, succeeded: 0, error: batchUpdateError.message });
+        setResults([...output]);
+      }
     } catch (e: any) {
       output.push({ table: 'import', attempted: 0, succeeded: 0, error: e?.message || String(e) });
       setResults(output);
