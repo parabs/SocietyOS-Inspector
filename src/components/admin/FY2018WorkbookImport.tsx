@@ -224,22 +224,32 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       }
     }
 
+    const optionMap = new Map<string, any>();
+    optionPayload.forEach(row => optionMap.set(`${row.column_name}::${row.option_value}`, row));
+    optionPayload.splice(0, optionPayload.length, ...optionMap.values());
+
     const correctionRows = rowsFrom(wb, 'CORRECTION_LOG', 3);
-    const correctionPayload = correctionRows.map(r => ({
+    const correctionMap = new Map<string, any>();
+    correctionRows.map(r => ({
       financial_year: 'FY 2018-19',
       rule_item: str(r['Rule / Item']),
       correction_applied: str(r['Correction applied']),
       scope_note: str(r['Scope / note']),
-    })).filter(r => r.rule_item && r.correction_applied);
+    })).filter(r => r.rule_item && r.correction_applied)
+      .forEach(row => correctionMap.set(`${row.financial_year}::${row.rule_item}::${row.correction_applied}::${row.scope_note ?? ''}`, row));
+    const correctionPayload = [...correctionMap.values()];
 
     const mappingRows = rowsFrom(wb, 'PARTY_CATEGORY_RULES');
-    const partyRulePayload = mappingRows.map(r => ({
+    const partyRuleMap = new Map<string, any>();
+    mappingRows.map(r => ({
       rule_id: str(r.Rule_ID),
       rule_area: str(r.Rule_Area),
       rule_text: str(r.Rule),
       implementation_example: str(r['Implementation / Example']),
       review_exception: str(r['Review or Exception Handling']),
-    })).filter(r => r.rule_id && r.rule_text);
+    })).filter(r => r.rule_id && r.rule_text)
+      .forEach(row => partyRuleMap.set(row.rule_id!, row));
+    const partyRulePayload = [...partyRuleMap.values()];
 
     const transactionIds = transactionPayload.map(r => r.transaction_id);
     const duplicateTransactionIds = transactionIds.filter((id, index) => transactionIds.indexOf(id) !== index);
