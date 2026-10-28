@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { AlertTriangle, CheckCircle2, Database, FileSpreadsheet, Loader2, UploadCloud } from 'lucide-react';
 import { supabaseClient } from '../../services/supabaseClient';
@@ -72,6 +72,51 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<ResultRow[]>([]);
   const [complete, setComplete] = useState(false);
+  const [sessionEmail, setSessionEmail] = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authMessage, setAuthMessage] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    void supabaseClient.auth.getSession().then(({ data, error }) => {
+      if (!active) return;
+      if (error) setAuthMessage(error.message);
+      setSessionEmail(data.session?.user.email || '');
+    });
+    const { data: listener } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+      if (active) setSessionEmail(session?.user.email || '');
+    });
+    return () => { active = false; listener.subscription.unsubscribe(); };
+  }, []);
+
+  const handleSignIn = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAuthBusy(true);
+    setAuthMessage('');
+    try {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: loginEmail.trim(),
+        password: loginPassword,
+      });
+      if (error) throw error;
+      if (!data.session) throw new Error('Sign-in did not create an active session.');
+      const { data: allowed, error: roleError } = await (supabaseClient as any).rpc('is_society_admin');
+      if (roleError) throw roleError;
+      if (allowed !== true) {
+        await supabaseClient.auth.signOut();
+        throw new Error('This account is not authorized for imports. Ask the Supabase project owner to grant app_metadata.role = society_admin.');
+      }
+      setSessionEmail(data.user.email || loginEmail.trim());
+      setLoginPassword('');
+      setAuthMessage('Signed in with Society Admin access.');
+    } catch (e: any) {
+      setAuthMessage(e?.message || 'Sign-in failed.');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
 
   const buildPayload = async (chosenFile: File) => {
     const data = await chosenFile.arrayBuffer();
@@ -325,7 +370,10 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
     try {
       const { data: authData, error: authError } = await supabaseClient.auth.getSession();
       if (authError) throw authError;
-      if (!authData.session) throw new Error('Please sign in through Supabase Auth using an account granted the society_admin app_metadata role before importing.');
+      if (!authData.session) throw new Error('Sign in with a Society Admin account before importing.');
+      const { data: allowed, error: roleError } = await (supabaseClient as any).rpc('is_society_admin');
+      if (roleError) throw roleError;
+      if (allowed !== true) throw new Error('Your current session is not authorized for imports.');
       const { data: batch, error: batchError } = await (supabaseClient as any)
         .from('society_import_batches')
         .insert({
@@ -411,6 +459,33 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
           <button onClick={onClose} disabled={busy} className="text-slate-500 hover:text-slate-900 text-sm font-semibold px-3 py-2 rounded-lg border border-slate-200 disabled:opacity-50">Close</button>
         </div>
         <div className="p-5 space-y-5">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            {sessionEmail ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Signed in: {sessionEmail}</p>
+                  <p className="text-xs text-emerald-700 mt-1">{authMessage || 'Society Admin access required for import.'}</p>
+                </div>
+                <button type="button" disabled={busy || authBusy} onClick={async () => {
+                  await supabaseClient.auth.signOut();
+                  setSessionEmail('');
+                  setAuthMessage('Signed out.');
+                }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">Sign out</button>
+              </div>
+            ) : (
+              <form onSubmit={handleSignIn} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+                <label className="text-xs font-semibold text-slate-700">Supabase Admin Email
+                  <input type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} autoComplete="username" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal" />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">Password
+                  <input type="password" required value={loginPassword} onChange={e => setLoginPassword(e.target.value)} autoComplete="current-password" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal" />
+                </label>
+                <button type="submit" disabled={authBusy} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{authBusy ? 'Signing in…' : 'Sign in'}</button>
+              </form>
+            )}
+            {authMessage && !sessionEmail && <p className="mt-2 text-xs text-rose-700">{authMessage}</p>}
+            {!sessionEmail && <p className="mt-2 text-[11px] text-slate-500">Use an existing Supabase Auth user whose app_metadata role is society_admin. The importer does not create accounts or store passwords.</p>}
+          </div>
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
             <p className="font-semibold">Import order: source register → masters → demands/opening balances → transactions.</p>
             <p className="mt-1 text-xs">Blank opening balances are skipped. Import stops at the first table error so you can fix permissions or schema issues before retrying.</p>
@@ -437,8 +512,8 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
             </div>
           )}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="text-[11px] text-slate-500 max-w-2xl">Uses the connected Supabase client and current row-level security policies. No service-role key is used in the browser.</div>
-            <button onClick={() => void runImport()} disabled={busy || !payload || plan.length === 0 || complete} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            <div className="text-[11px] text-slate-500 max-w-2xl">Uses the authenticated Supabase client and admin-only row-level security policies. No service-role key is used in the browser.</div>
+            <button onClick={() => void runImport()} disabled={busy || authBusy || !sessionEmail || !payload || plan.length === 0 || complete} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
               {busy ? <><Loader2 className="w-4 h-4 animate-spin" />Importing…</> : <><FileSpreadsheet className="w-4 h-4" />Import {totalRecords.toLocaleString()} records</>}
             </button>
           </div>
