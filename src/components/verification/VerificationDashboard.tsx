@@ -514,36 +514,14 @@ export const VerificationDashboard: React.FC = () => {
                 </div>
                 <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
                   Your live Supabase database is connected (<code className="bg-white px-1 py-0.5 rounded text-[11px] font-mono border border-blue-200">hklibokniuwurdxndxfd.supabase.co</code>).
-                  All tables are reachable, but currently have <strong>0 rows</strong>. No mock data is presented as live records. You can either import your Excel sheets or populate baseline FY 2018-19 records below.
+                  All tables are reachable, but currently have <strong>0 rows</strong>. No mock data is presented as live records. Use Settings & Data Management to import the approved FY 2018–19 workbook.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0 self-start md:self-center flex-wrap">
-              <button
-                onClick={() => {
-                  setQuickSummaryTab('excel-ingestion');
-                  setShowQuickSummaryModal(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer transition-colors shadow-xs"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                <span>Upload Excel to DB</span>
-              </button>
-
-              <button
-                disabled={isSeedingDatabase}
-                onClick={async () => {
-                  const res = await seedBaselineRecordsToSupabase();
-                  setSeedToast(res.message);
-                  setTimeout(() => setSeedToast(null), 6000);
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-blue-700 bg-white hover:bg-blue-50 border border-blue-300 rounded-lg cursor-pointer transition-colors shadow-2xs disabled:opacity-50"
-              >
-                <Database className="w-4 h-4 text-blue-600" />
-                <span>{isSeedingDatabase ? 'Seeding Database...' : 'Seed Baseline Records into DB'}</span>
-              </button>
-            </div>
+            <span className="text-xs font-semibold text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-2">
+              Import available under Settings &amp; Data Management
+            </span>
           </div>
         </div>
       )}
