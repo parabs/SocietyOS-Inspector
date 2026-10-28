@@ -17,6 +17,7 @@ import {
 import { useVerification } from '../../context/VerificationContext';
 import { APP_CONFIG } from '../../config';
 import { QuickSummaryOverlay } from '../verification/QuickSummaryOverlay';
+import { FY2018WorkbookImport } from './FY2018WorkbookImport';
 
 export const SettingsView: React.FC = () => {
   const { changeLogs, resetAllData, transactions, openingBalances, reconciliations } = useVerification();
@@ -26,6 +27,7 @@ export const SettingsView: React.FC = () => {
   const [tolerance, setTolerance] = useState('0');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showIngestionModal, setShowIngestionModal] = useState(false);
+  const [showFy2018Import, setShowFy2018Import] = useState(false);
   const [ingestionTab, setIngestionTab] = useState<'summary' | 'excel-ingestion' | 'architecture'>('excel-ingestion');
 
   const handleSaveConfig = (e: React.FormEvent) => {
@@ -65,7 +67,14 @@ export const SettingsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowFy2018Import(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg cursor-pointer transition-colors shadow-xs"
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>Import FY 2018–19 to Supabase</span>
+          </button>
           <button
             onClick={() => {
               setIngestionTab('excel-ingestion');
@@ -275,6 +284,7 @@ export const SettingsView: React.FC = () => {
         onClose={() => setShowIngestionModal(false)}
         initialTab={ingestionTab}
       />
+      {showFy2018Import && <FY2018WorkbookImport onClose={() => setShowFy2018Import(false)} />}
     </div>
   );
 };
