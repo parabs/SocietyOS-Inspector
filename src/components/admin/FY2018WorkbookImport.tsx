@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { AlertTriangle, CheckCircle2, Database, FileSpreadsheet, Loader2, UploadCloud } from 'lucide-react';
 import { supabaseClient } from '../../services/supabaseClient';
@@ -34,17 +34,7 @@ const isoDate = (v: unknown): string | null => {
   const d = new Date(String(x));
   return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 };
-const isoTimestamp = (v: unknown): string | null => {
-  const x = clean(v);
-  if (x === null) return null;
-  if (x instanceof Date && !Number.isNaN(x.getTime())) return x.toISOString();
-  if (typeof x === 'number') {
-    const d = XLSX.SSF.parse_date_code(x);
-    if (d) return new Date(Date.UTC(d.y, d.m - 1, d.d, d.H, d.M, Math.floor(d.S))).toISOString();
-  }
-  const d = new Date(String(x));
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-};
+
 const rowsFrom = (wb: XLSX.WorkBook, sheetName: string, headerRow = 4): Record<string, any>[] => {
   const ws = wb.Sheets[sheetName];
   if (!ws) return [];
@@ -247,12 +237,12 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       for (let col = 0; col < header.length; col += 2) {
         const columnName = str(header[col]);
         const meaningHeader = String(header[col + 1] ?? '');
-        if (!columnName || /meaning/i.test(columnName) || /meaning/i.test(meaningHeader)) continue;
+        if (!columnName || /meaning/i.test(columnName)) continue;
         for (let rowIndex = 7; rowIndex < matrix.length; rowIndex++) {
           const value = str(matrix[rowIndex]?.[col]);
           const description = str(matrix[rowIndex]?.[col + 1]);
           if (value && value !== columnName && value !== 'Allowed Value') {
-            optionPayload.push({ Column_Name: columnName, Option_Value: value, Description: description });
+            optionPayload.push({ column_name: columnName, option_value: value, description });
           }
         }
       }
@@ -274,6 +264,17 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       implementation_example: str(r['Implementation / Example']),
       review_exception: str(r['Review or Exception Handling']),
     })).filter(r => r.rule_id && r.rule_text);
+
+    const transactionIds = transactionPayload.map(r => r.transaction_id);
+    const duplicateTransactionIds = transactionIds.filter((id, index) => transactionIds.indexOf(id) !== index);
+    if (duplicateTransactionIds.length) {
+      throw new Error(`Duplicate Transaction_ID values found: ${[...new Set(duplicateTransactionIds)].slice(0, 10).join(', ')}`);
+    }
+    if (transactionPayload.length === 0) throw new Error('No valid transaction rows were found in the TRANSACTIONS sheet.');
+    const missingAmounts = transactionRows.filter(r => str(r.Transaction_ID) && num(r.Amount) === null);
+    if (missingAmounts.length) throw new Error(`${missingAmounts.length} transaction rows have a Transaction_ID but no valid Amount. Correct the workbook before importing.`);
+    const missingSources = transactionPayload.filter(r => r.source_id === null || r.source_row === null);
+    if (missingSources.length) throw new Error(`${missingSources.length} transactions do not resolve to a Source_Register row and source row number. Correct the source notes before importing.`);
 
     return {
       source_register: sourcePayload,
