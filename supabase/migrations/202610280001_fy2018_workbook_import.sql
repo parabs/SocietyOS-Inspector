@@ -66,7 +66,7 @@ DECLARE
   target_tables text[] := ARRAY[
     'source_register', 'flat_owner_master', 'account_master', 'category_master',
     'party_master', 'rules_master', 'transactions', 'demand_register',
-    'balance_register', 'member_opening_balances', 'society_import_batches',
+    'member_opening_balances', 'society_import_batches',
     'society_correction_log', 'party_category_rules', 'society_dropdown_options'
   ];
   policy_name text := 'society_os_admin_all';
