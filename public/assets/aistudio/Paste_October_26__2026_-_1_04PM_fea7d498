@@ -1,0 +1,918 @@
+# Project: Varsha Nivas — Society Financial Verification & Management Platform
+
+## 1. Your Role
+
+Act as a senior full-stack architect, product designer, financial systems analyst, and React/TypeScript developer.
+
+Build a production-oriented web application for **Varsha Nivas Co-operative Housing Society** to verify historical financial records for FY 2018–19, establish reliable financial data, and subsequently provide financial management dashboards, audit evidence tracking, reconciliation, and reports.
+
+This is a new project. There is no existing application source code to reuse.
+
+The application must be modular, responsive, maintainable, secure, and designed for practical use by society office bearers, accountants, and internal reviewers.
+
+Do not build a collection of disconnected dashboard mockups. Build one integrated application with shared navigation, reusable components, a defined data model, and consistent workflows.
+
+---
+
+## 2. Primary Objective
+
+The application has two major functional areas.
+
+### A. Initial Verification
+
+This is the first module users encounter.
+
+Its purpose is to verify the accuracy and completeness of existing financial records before relying on those records for financial analysis and reporting.
+
+It contains four screens:
+
+1. Verification Dashboard
+2. Opening Balance Verification
+3. Transaction Verification
+4. Account-wise Monthly Reconciliation
+
+The Verification Dashboard is the landing page of the application.
+
+### B. Financial Management and Reporting
+
+After verification, the same application will provide the previously planned financial dashboards and reports.
+
+These include:
+- Financial Summary
+- Demand & Collections
+- Payments & Expenses
+- Party-wise Ledger
+- Audit Evidence & Compliance
+- Bank Reconciliation
+- Reports
+- Observations & Actions
+
+Do not implement all financial calculations immediately. Establish the application architecture so these modules can be integrated progressively without redesigning the entire platform.
+
+---
+
+## 3. Technology Stack
+
+Use the following architecture unless a technical limitation requires a clearly documented alternative.
+
+### Frontend
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui where appropriate
+- Recharts for charts
+- Lucide icons
+
+### Source Control and Hosting
+- GitHub repository for source control
+- GitHub Pages for frontend hosting
+- Automated build and deployment through GitHub Actions
+
+### Backend
+- Google Apps Script as the initial backend
+- Google Sheets as the application's working data store
+- Google Drive for the original Excel workbook and supporting references
+
+The frontend must not directly modify financial records in Google Sheets without server-side validation.
+
+All writes must pass through backend functions that validate the requested action and enforce authorisation.
+
+Keep the frontend independent of the backend implementation by using a dedicated API service layer.
+
+Do not hardcode API URLs, spreadsheet IDs, Drive folder IDs, or OAuth client IDs throughout the application.
+
+Create a central configuration module and provide clear setup instructions for the values required in development and production.
+
+### Important hosting consideration
+
+GitHub Pages is a static hosting service. Google Apps Script provides the backend.
+
+Design the integration so authentication, cross-origin requests, deployment URLs, and permissions are handled explicitly. Do not assume that Google authentication automatically secures every backend endpoint.
+
+---
+
+## 4. Application Identity and Design System
+
+Application name:
+
+**Varsha Nivas — Co-operative Housing Society**
+
+Use the following visual direction:
+
+- Primary navy: `#0F172A`
+- Primary blue: `#2563EB`
+- Accent amber: `#F59E0B`
+- Background: light slate or white
+- Typography: Inter or a similar professional sans-serif
+- Cards: subtle borders, restrained shadows, consistent spacing
+- Status indicators: green, amber, red, and neutral grey
+
+The interface should resemble a professional financial operations and audit application.
+
+Design principles:
+- Clear visual hierarchy
+- Compact but readable tables
+- Strong alignment and consistent spacing
+- Responsive layouts
+- Consistent currency formatting in Indian rupees
+- Appropriate use of icons
+- Meaningful empty, loading, error, and success states
+- No excessive gradients, decorative animations, or oversized cards
+- No unnecessary visual clutter
+
+Use the previously established Varsha Nivas dashboard concepts as the design direction. Preserve the same visual language across the verification and financial modules.
+
+Do not invent financial figures for production views.
+
+---
+
+## 5. Global Application Layout
+
+Create a persistent application shell.
+
+### Header
+
+Display:
+- Society name and branding
+- Financial year selector
+- Selected period
+- Data source or last synchronisation status
+- Last updated timestamp
+- Authenticated reviewer
+
+### Primary Navigation
+
+Organise the navigation into the following sections.
+
+**Initial Verification**
+- Verification Dashboard
+- Opening Balance Verification
+- Transaction Verification
+- Account-wise Monthly Reconciliation
+
+**Financial Management**
+- Financial Summary
+- Demand & Collections
+- Payments & Expenses
+- Party-wise Ledger
+
+**Audit & Compliance**
+- Audit Evidence
+- Bank Reconciliation
+- Observations & Actions
+
+**Reports**
+- Reports
+
+**Administration**
+- Settings
+- Data Management
+- Access and permissions, where implemented
+
+Use a sidebar on desktop and a suitable collapsible navigation on smaller screens.
+
+Preserve financial-year, month, and account filters when navigating between related screens.
+
+Clearly distinguish the Initial Verification module from the Financial Management module.
+
+---
+
+# 6. SCREEN 1 — VERIFICATION DASHBOARD
+
+This is the default landing page.
+
+Its purpose is to summarise verification progress across the three verification screens and help the reviewer identify the next action.
+
+### Header
+
+Title: Verification Dashboard
+
+Subtitle:
+
+"Verify opening balances, inspect supporting documents, and reconcile monthly account movements before relying on financial reports."
+
+Display:
+- Financial Year: 2018–19
+- Period: April 2018 – March 2019
+- Overall Status: Not Started / In Progress / Exceptions Outstanding / Verification Complete
+- Last Updated
+
+### KPI Cards
+
+Create the following cards.
+
+1. Opening Balances
+   - Number verified
+   - Total accounts: 3
+
+2. Transactions
+   - Total transactions requiring inspection
+   - Verified or inspected
+   - Pending
+
+3. Evidence Complete
+   - Transactions with all applicable evidence available
+
+4. Evidence Exceptions
+   - Missing documents
+   - Discrepant documents
+
+5. Internal Audit Failures
+   - Number of transactions marked Failed
+
+6. Monthly Reconciliation
+   - Reconciled account-months
+   - Total account-months: 36 for 12 months and 3 accounts
+
+All values must come from actual application data.
+
+### Verification Progress Cards
+
+Create three large cards.
+
+**Opening Balance Verification**
+- Accounts verified
+- Accounts pending
+- Discrepancies
+- Button: Open Opening Balance Verification
+
+**Transaction Verification**
+- Total transactions
+- Inspected
+- Pending
+- Evidence discrepancies
+- Internal audit failures
+- Button: Open Transaction Verification
+
+**Account-wise Monthly Reconciliation**
+- Account-months reconciled
+- Pending reconciliations
+- Discrepancies
+- Button: Open Monthly Reconciliation
+
+Clicking a card must navigate to the appropriate screen.
+
+### Monthly Verification Status
+
+Create a table for April 2018 through March 2019.
+
+Columns:
+- Month
+- Opening Balance Status
+- Transaction Verification Progress
+- Reconciliation Status
+- Open Issues
+- Overall Status
+- Action
+
+The status must reflect actual saved verification records.
+
+### Outstanding Issues
+
+Create a prioritised issue list showing:
+- Issue
+- Related account or transaction
+- Month
+- Issue type
+- Priority
+- Status
+- Action
+
+Examples:
+- Opening balance mismatch
+- Missing voucher or receipt
+- Bill amount discrepancy
+- Internal audit failure
+- Monthly closing balance mismatch
+
+Clicking an issue must open the relevant record with the appropriate filters applied.
+
+### Readiness Indicator
+
+Show reporting readiness separately from verification progress.
+
+Do not enable a report simply because a high percentage of transactions has been checked.
+
+Define readiness rules based on the relevant controls, unresolved material discrepancies, and required checks.
+
+If readiness rules have not yet been configured, display "Readiness Rules Not Configured" rather than claiming the data is verified.
+
+---
+
+# 7. SCREEN 2 — OPENING BALANCE VERIFICATION
+
+Purpose: establish reliable opening balances for all three accounts before transaction verification and monthly reconciliation.
+
+Accounts:
+- Cash
+- TDCC
+- BOM
+
+### Summary Cards
+
+Display:
+- Accounts to Verify: 3
+- Verified
+- Pending
+- Discrepancies
+
+### Opening Balance Register
+
+Columns:
+- Account ID
+- Account Name
+- Previous Audit Closing Balance
+- Recorded Opening Balance
+- Difference
+- Source Reference
+- Supporting Record Inspection
+- Verification Status
+- Remarks
+- Action
+
+The first month's opening balance is April 2018.
+
+The previous audit report provides the reference closing balance. The April opening balance from the monthly source workbook is the recorded opening balance.
+
+The application must not assume that these two values agree.
+
+### Account Detail Panel
+
+When a reviewer selects an account, display:
+- Account name
+- Previous audit closing balance
+- Recorded opening balance
+- Calculated difference
+- Audit report reference
+- Bank statement or cash book reference, where applicable
+- Verification result
+- Reviewer remarks
+
+Allow the reviewer to record whether the relevant supporting records were inspected.
+
+### Rules
+
+- Financial source values must remain read-only during verification.
+- Calculate differences automatically.
+- Highlight discrepancies.
+- Do not silently correct an opening balance.
+- Record reviewer, timestamp, and verification outcome.
+- A discrepancy must remain visible until investigated and resolved or formally accepted under an authorised process.
+- Do not mark an account verified merely because the two values match; required supporting evidence must also have been inspected.
+
+Provide buttons:
+- Save Verification
+- Mark Verified
+- Record Discrepancy
+
+"Mark Verified" must validate that required fields are complete.
+
+---
+
+# 8. SCREEN 3 — TRANSACTION VERIFICATION
+
+Purpose: verify existing transaction records against physical vouchers, receipts, and bills.
+
+The original transaction register already contains voucher and receipt numbers.
+
+All bills, vouchers, and receipts are currently maintained in physical format.
+
+**Do not build document uploads or a digital document repository in the initial version.**
+
+### Filters
+
+Provide:
+- Financial Year
+- Month
+- Date range
+- Account: All / Cash / TDCC / BOM
+- Transaction Type: All / Receipt / Payment
+- Evidence Status
+- Internal Audit Status
+- Search by date, party, description, voucher number, or receipt number
+
+### Summary Cards
+
+Display:
+- Total Transactions
+- Pending Verification
+- Evidence Complete
+- Evidence Discrepancies
+- Missing Documents
+- Internal Audit Failed
+
+### Transaction Register
+
+Display existing financial fields as read-only.
+
+Columns:
+- Transaction ID
+- Date
+- Account
+- Transaction Type
+- Party
+- Description / Particulars
+- Amount
+- Voucher Number
+- Receipt Number
+- Bill Status
+- Voucher / Receipt Status
+- Evidence Status
+- Internal Audit Status
+- Remarks
+- Action
+
+Use the existing transaction reference fields. Do not generate duplicate voucher or receipt numbers.
+
+### Bill Status
+
+Allowed values:
+- Available
+- Discrepancy
+- Missing
+- N/A
+
+### Voucher / Receipt Status
+
+Allowed values:
+- Available
+- Discrepancy
+- Missing
+
+### Evidence Status
+
+Calculate automatically.
+
+Rules:
+- Complete: all applicable documents are available.
+- Missing: at least one applicable document is missing.
+- Discrepancy: at least one applicable document has a discrepancy.
+- Pending: required inspection fields have not been completed.
+- N/A should apply only to document types that are genuinely not required for the transaction.
+
+Define precedence consistently when multiple conditions occur.
+
+For receipts, a purchase bill will normally be N/A. Do not flag a member receipt as missing an expense bill.
+
+### Internal Audit Status
+
+Allowed values:
+- Pending
+- Verified
+- Failed
+
+This is independent of Evidence Status.
+
+A document can be physically available but contain an incorrect amount, date, party name, or purpose.
+
+Such a transaction must be eligible for an Internal Audit result of Failed.
+
+### Transaction Detail Panel
+
+When a reviewer selects a transaction, display:
+- All source transaction details
+- Existing voucher and receipt references
+- Applicable document inspection fields
+- Internal audit result
+- Remarks
+- Reviewer identity
+- Last updated timestamp
+
+The reviewer physically locates the document, checks it against the transaction, and records the result.
+
+### Save Rules
+
+- Never alter the original financial amount through the inspection interface.
+- Never silently modify the original transaction description, date, account, or voucher number.
+- Save inspection fields separately.
+- Require remarks for discrepancies and failures.
+- Record changes in a change log.
+- Prevent unauthorised users from modifying saved inspection results.
+
+---
+
+# 9. SCREEN 4 — ACCOUNT-WISE MONTHLY RECONCILIATION
+
+Purpose: validate account movements month by month.
+
+The three accounts are:
+- Cash
+- TDCC
+- BOM
+
+For 12 months and 3 accounts, the expected reconciliation register contains 36 account-month records.
+
+### Filters
+
+Provide:
+- Financial Year
+- Month
+- Account
+
+### Summary Cards
+
+Display:
+- Total Account-Months
+- Reconciled
+- Pending
+- Discrepancies
+
+### Monthly Reconciliation Register
+
+Columns:
+- Month
+- Account
+- Source Opening Balance
+- Calculated Opening Balance
+- Opening Difference
+- Credits
+- Debits
+- Adjustments
+- Calculated Closing Balance
+- Source Closing Balance
+- Closing Difference
+- Reconciliation Status
+- Remarks
+- Action
+
+### Calculation Rules
+
+For April 2018:
+- Calculated Opening Balance starts from the recorded source opening balance.
+- Compare it with the previous audit report's closing balance.
+
+For subsequent months:
+- Calculated Opening Balance = Previous Month's Calculated Closing Balance.
+
+Calculate:
+
+Calculated Closing Balance = Calculated Opening Balance + Credits − Debits + Adjustments
+
+Credits and debits must be derived from the appropriate transaction records or the defined source data.
+
+Keep adjustments blank by default.
+
+Adjustments must not be used to hide unexplained differences. Any adjustment must require a reason, reviewer identity, and authorisation where applicable.
+
+### Source Comparison
+
+Keep source opening and closing balances separate from calculated balances.
+
+Display:
+- Opening Difference = Calculated Opening Balance − Source Opening Balance
+- Closing Difference = Calculated Closing Balance − Source Closing Balance
+
+Use formula-driven calculations.
+
+Highlight differences using red indicators and show reconciled balances in green.
+
+Pending verification must be visually distinct from a confirmed numerical discrepancy.
+
+### Drill-down
+
+Selecting a month/account record must display the underlying transactions contributing to its credits and debits.
+
+Provide a navigation action to open the selected transactions in Transaction Verification.
+
+---
+
+# 10. Data Model
+
+Design a consistent data model before implementing the backend.
+
+At minimum, define these logical entities.
+
+### A. Account Master
+- Account ID
+- Account Name
+- Account Type
+- Active Status
+
+### B. Transaction Source Records
+- Stable Transaction ID
+- Source File
+- Source Sheet
+- Source Row or source reference
+- Transaction Date
+- Account ID
+- Transaction Type
+- Party ID, if available
+- Description
+- Amount
+- Existing Voucher Number
+- Existing Receipt Number
+- Other existing source fields required for traceability
+
+Preserve the source fields and their original values.
+
+### C. Opening Balance Verification
+- Account ID
+- Financial Year
+- Previous Audit Closing Balance
+- Recorded Opening Balance
+- Calculated Difference
+- Source Reference
+- Evidence Inspected
+- Verification Status
+- Remarks
+- Reviewer
+- Timestamp
+
+### D. Transaction Inspection
+- Transaction ID
+- Bill Status
+- Voucher / Receipt Status
+- Calculated Evidence Status
+- Internal Audit Status
+- Remarks
+- Reviewer
+- Created Timestamp
+- Updated Timestamp
+
+### E. Monthly Account Reconciliation
+- Financial Year
+- Month
+- Account ID
+- Source Opening Balance
+- Calculated Opening Balance
+- Credits
+- Debits
+- Adjustments
+- Calculated Closing Balance
+- Source Closing Balance
+- Opening Difference
+- Closing Difference
+- Reconciliation Status
+- Remarks
+
+### F. Change Log
+- Change ID
+- Entity Type
+- Entity ID
+- Action
+- Previous Values, where appropriate
+- New Values, where appropriate
+- User
+- Timestamp
+
+Use stable record identifiers. Do not depend exclusively on spreadsheet row numbers because rows may move.
+
+Document how existing workbook records will be imported and mapped to these entities.
+
+---
+
+# 11. Data Integrity and Verification Rules
+
+The application must follow these principles.
+
+1. Original financial records must be preserved.
+2. Inspection results must be stored separately from financial source values.
+3. Calculations must be formula-driven or calculated deterministically by the backend.
+4. Source values and calculated values must never be silently overwritten.
+5. Discrepancies must be visible and traceable.
+6. Verification completion must not be inferred from arithmetic alone.
+7. Missing documents and failed internal audits must remain separate statuses.
+8. All significant changes must be attributable to a reviewer.
+9. Avoid duplicate inspection records for the same transaction.
+10. Use stable IDs and validate every backend update.
+11. Prevent accidental concurrent overwrites where practical.
+12. Clearly distinguish imported data from verified data.
+13. Do not invent transaction records, account balances, audit results, or supporting documents.
+14. Use an explicit reconciliation tolerance policy. Do not silently round away discrepancies.
+15. Maintain an auditable correction process for any authorised changes to source data.
+
+---
+
+# 12. Authentication and Security
+
+This is an internal financial application.
+
+Implement a defensible access model.
+
+At minimum:
+- Require authentication for application data access.
+- Validate identity and permissions on the backend.
+- Do not rely on hiding frontend buttons as an access-control mechanism.
+- Do not expose unrestricted spreadsheet access to anonymous users.
+- Keep credentials and sensitive configuration out of source code.
+- Do not commit OAuth secrets, access tokens, or service credentials to GitHub.
+- Validate input types and permitted field values on every write.
+- Log sensitive modifications.
+- Restrict spreadsheet and Drive permissions to authorised accounts.
+
+Before production deployment, document the chosen authentication flow and how it is enforced by the backend.
+
+Do not claim security is complete merely because a Google login button has been added.
+
+---
+
+# 13. Financial Management Modules — Future Integration
+
+Design the navigation and reusable application shell so these modules can be implemented without restructuring the project.
+
+### Financial Summary
+- Total demand
+- Total collections
+- Total payments
+- Contra entries
+- Closing balances
+- Monthly financial summary
+- Demand outstanding
+- Collection efficiency
+- Expense analysis
+
+### Demand & Collections
+- Member and flat-owner receivables
+- Demand raised
+- Collections
+- Outstanding dues
+- Ageing analysis
+- Charge-type analysis
+- Member-wise collection status
+
+### Payments & Expenses
+- Payments by category
+- Expense trends
+- Payment mode analysis
+- Vendor and payee analysis
+- Advance payments
+- Missing bills
+- Pending approvals
+
+### Party-wise Ledger
+- Member / flat-owner ledger
+- Vendor / payee ledger
+- Transaction history
+- Outstanding balances
+- Advances
+- Supporting-document status
+
+### Audit Evidence & Compliance
+- Document coverage
+- Approval tracking
+- Statutory compliance
+- Audit observations
+- Missing evidence
+- Corrective actions
+
+### Bank Reconciliation
+- Opening and closing bank balances
+- Receipts and payments
+- Matched and unmatched transactions
+- Bank statement comparison
+- Reconciliation differences
+- Investigation workflow
+
+### Reports
+- Receipts and Payments Account
+- Income and Expenditure Account
+- Balance Sheet, when the required accounting data is available
+- Trial Balance, when the required accounting data is available
+- Member Ledger
+- Vendor Ledger
+- Receipts Register
+- Payments Register
+- Cash Book
+- Bank Books
+- Monthly Reconciliation Report
+- Missing Document Register
+- Verification Status Report
+
+Do not generate reports using fabricated figures or incomplete mappings.
+
+Use appropriate validation rules before declaring a report ready.
+
+---
+
+# 14. Development Instructions
+
+Build incrementally, but establish the correct overall structure from the beginning.
+
+### Phase 1 — Application Foundation
+- Create the React and TypeScript project.
+- Configure Tailwind CSS.
+- Create the shared layout, sidebar, header, routing, theme, and reusable components.
+- Implement responsive navigation.
+- Establish a central configuration module.
+- Create typed models and mock data fixtures clearly separated from production data.
+- Build the Verification Dashboard.
+- Build the Opening Balance Verification screen.
+- Build the Transaction Verification screen.
+- Build the Account-wise Monthly Reconciliation screen.
+
+At the end of this phase, all four screens should be navigable and visually consistent.
+
+### Phase 2 — Data Integration
+- Define Google Sheets tabs and columns.
+- Implement the Google Apps Script backend.
+- Create a controlled import process for the Excel workbook.
+- Preserve stable transaction identifiers and source references.
+- Implement read operations and server-side validation.
+- Implement save operations for inspection records.
+- Implement change logging.
+
+### Phase 3 — Calculations
+- Implement opening balance comparisons.
+- Implement evidence-status calculations.
+- Implement monthly reconciliation calculations.
+- Implement month-to-month opening balance carry-forward.
+- Implement discrepancy highlighting.
+- Implement drill-down from account reconciliation to individual transactions.
+
+### Phase 4 — Testing
+Test at least these cases:
+- Matching opening balances
+- Mismatched opening balances
+- Missing bill
+- Missing receipt or voucher
+- Available document with incorrect amount
+- Internal audit failure
+- Correctly reconciled month
+- Incorrect closing balance
+- Next month's opening balance not matching the previous calculated closing
+- Blank adjustment
+- Authorised adjustment
+- Duplicate save request
+- Invalid transaction ID
+- Unauthorised write request
+- Missing or unavailable backend configuration
+
+### Phase 5 — Deployment
+- Configure the GitHub repository.
+- Add a suitable `.gitignore`.
+- Configure GitHub Actions.
+- Document environment configuration.
+- Deploy the frontend to GitHub Pages.
+- Deploy the Apps Script backend separately.
+- Document spreadsheet and Drive permissions.
+- Test the deployed application using authorised accounts.
+
+Do not deploy real financial data in public frontend files or GitHub repositories.
+
+---
+
+# 15. Code Quality Requirements
+
+- Use TypeScript types for all domain entities.
+- Separate UI components, business logic, API access, and configuration.
+- Avoid one enormous React component.
+- Avoid hardcoded business rules scattered throughout the code.
+- Reuse table, filter, card, badge, dialog, and status components.
+- Use clear function names.
+- Include useful loading, empty, error, and success states.
+- Keep mock data isolated from production API calls.
+- Do not silently replace failed API requests with mock data.
+- Do not simulate successful saves when the backend is unavailable.
+- Provide understandable validation errors.
+- Keep the build reproducible.
+
+The application must not claim that financial verification has been completed unless the required results have actually been saved and validated.
+
+---
+
+# 16. Expected Deliverables
+
+Produce:
+
+1. Complete React + TypeScript project structure.
+2. Working navigation and shared application shell.
+3. Verification Dashboard.
+4. Opening Balance Verification UI.
+5. Transaction Verification UI.
+6. Account-wise Monthly Reconciliation UI.
+7. Typed data models.
+8. Central configuration module.
+9. Google Apps Script backend structure.
+10. Google Sheets schema.
+11. Controlled Excel import design.
+12. Calculation and validation logic.
+13. Change-log implementation.
+14. GitHub Pages deployment configuration.
+15. Setup instructions for development and production.
+16. Test plan and test results.
+17. A clear list of anything still incomplete.
+
+---
+
+# 17. How to Begin
+
+Start with the architecture and frontend foundation.
+
+First:
+1. Inspect the current project environment and available files.
+2. Propose the project folder structure.
+3. Define the main data models.
+4. Establish routing and the shared application shell.
+5. Implement the Verification Dashboard and all three verification screens.
+6. Use clearly labelled sample data until the real workbook is imported.
+7. Make the screens interactive, including filters, navigation, detail panels, validation, and status changes in the development environment.
+8. Keep backend integration behind a defined API layer.
+9. Ensure the application builds successfully.
+10. Provide a concise summary of files created, features implemented, setup requirements, and remaining tasks.
+
+Do not stop after generating a static screenshot or a single dashboard.
+
+Build a functioning application foundation that can be connected to Google Sheets and Google Drive.
+
+**Prioritise correctness, traceability, financial data integrity, and a usable verification workflow over decorative design.**

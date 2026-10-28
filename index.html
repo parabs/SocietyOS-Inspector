@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function() {
+        // Prevent "TypeError: Cannot set property fetch of #<Window> which has only a getter"
+        // caused when browser extensions or interceptors attempt to assign to window.fetch
+        try {
+          var nativeFetch = window.fetch ? window.fetch.bind(window) : undefined;
+          var customFetch = nativeFetch;
+
+          Object.defineProperty(window, 'fetch', {
+            get: function() {
+              return customFetch;
+            },
+            set: function(newFetch) {
+              customFetch = typeof newFetch === 'function' ? newFetch : nativeFetch;
+            },
+            configurable: true,
+            enumerable: true
+          });
+        } catch (e) {
+          try {
+            var protoFetch = Window.prototype.fetch ? Window.prototype.fetch.bind(window) : undefined;
+            var customProtoFetch = protoFetch;
+            Object.defineProperty(Window.prototype, 'fetch', {
+              get: function() {
+                return customProtoFetch;
+              },
+              set: function(newFetch) {
+                customProtoFetch = newFetch;
+              },
+              configurable: true,
+              enumerable: true
+            });
+          } catch (e2) {}
+        }
+
+        // Filter out errors originating from browser extensions (e.g. chrome-extension://, moz-extension://)
+        window.addEventListener('error', function(event) {
+          if (
+            event.filename &&
+            (event.filename.indexOf('chrome-extension://') !== -1 ||
+             event.filename.indexOf('moz-extension://') !== -1)
+          ) {
+            event.stopImmediatePropagation();
+            event.preventDefault();
+            return true;
+          }
+        }, true);
+      })();
+    </script>
+    <title>Varsha Nivas — Society Financial Verification &amp; Management Platform</title>
+    <meta name="description" content="Financial verification platform for Varsha Nivas Co-operative Housing Society for FY 2018-19, supporting opening balances, transaction evidence audit, and account-wise monthly reconciliation." />
+    <meta property="og:title" content="Varsha Nivas — Society Financial Verification &amp; Management Platform" />
+    <meta property="og:description" content="Financial verification platform for Varsha Nivas Co-operative Housing Society for FY 2018-19, supporting opening balances, transaction evidence audit, and account-wise monthly reconciliation." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

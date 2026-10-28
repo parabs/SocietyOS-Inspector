@@ -1,0 +1,6 @@
+{
+  "name": "Varsha Nivas — Society Financial Verification & Management Platform",
+  "description": "Financial verification platform for Varsha Nivas Co-operative Housing Society for FY 2018-19, supporting opening balances, transaction evidence audit, and account-wise monthly reconciliation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
