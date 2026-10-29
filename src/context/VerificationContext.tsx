@@ -132,12 +132,17 @@ interface VerificationContextType {
     updates: {
       adjustments?: number;
       remarks?: string;
-      status?: 'Reconciled' | 'Difference' | 'Pending';
+      status?: 'Pending' | 'Matched' | 'Mismatch' | 'Mismatch Accepted';
       calculatedOpeningBalance?: number;
       credits?: number;
       debits?: number;
+      contra?: number;
       calculatedClosingBalance?: number;
-      sourceClosingBalance?: number;
+      sourceClosingBalance?: number | null;
+      openingConfirmed?: boolean;
+      transactionsConfirmed?: boolean;
+      closingConfirmed?: boolean;
+      confirmationNotes?: string;
     }
   ) => Promise<void>;
 
@@ -444,7 +449,8 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             rawAcc.includes('CASH') || rawAcc.includes('PETTY') || rawAcc === 'ACC-0003' ? 'CASH' : 'CASH';
           const rawType = row.transaction_type || row.type || (Number(row.amount) >= 0 ? 'Receipt' : 'Payment');
           const rawTypeLower = String(rawType).toLowerCase();
-          const type: 'Receipt' | 'Payment' = rawTypeLower.includes('rec') ? 'Receipt' : rawTypeLower.includes('contra') ? (Number(row.amount || 0) >= 0 ? 'Receipt' : 'Payment') : 'Payment';
+          const transactionClass: 'Receipt' | 'Payment' | 'Contra' = rawTypeLower.includes('contra') ? 'Contra' : rawTypeLower.includes('rec') ? 'Receipt' : 'Payment';
+          const type: 'Receipt' | 'Payment' = transactionClass === 'Receipt' ? 'Receipt' : 'Payment';
           const rawDate = row.transaction_date || row.date || new Date().toISOString().split('T')[0];
           const billRaw = String(row.bill_status || row.bills_available || '').toLowerCase();
           const voucherRaw = String(row.voucher_receipt_status || row.voucher_available || '').toLowerCase();
@@ -456,6 +462,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const voucherRef = row.voucher_no || row.voucher_receipt_no || undefined;
           return {
             id: row.transaction_id || row.id || `TXN-${String(idx + 1).padStart(5, '0')}`,
+            transactionClass,
             isCorrection: Boolean(row.is_correction),
             correctionStatus: row.correction_status || 'Original',
             sourceFile: row.source_file || row.source_id || 'transactions.supabase',
@@ -559,10 +566,11 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const op = Number(row.target_opening_balance ?? row.source_opening_balance ?? 0);
           const credits = Number(row.credits_source ?? 0);
           const debits = Number(row.debits_source ?? 0);
+          const contra = Number(row.contra_source ?? 0);
           const adjustments = Number(row.adjustments ?? 0);
-          const calcClose = Number(row.target_closing_balance ?? (op + credits - debits + adjustments));
+          const calcClose = Number(row.target_closing_balance ?? (op + credits - debits + contra + adjustments));
           const sourceCloseExists = row.source_closing_balance !== null && row.source_closing_balance !== undefined;
-          const srcClose = sourceCloseExists ? Number(row.source_closing_balance) : 0;
+          const srcClose = sourceCloseExists ? Number(row.source_closing_balance) : null;
 
           result[accountId].push({
             id: row.id || `REC-${accountId}-${idx}`,
@@ -574,12 +582,13 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             openingDifference: Number(row.opening_discrepancy ?? 0),
             credits,
             debits,
+            contra,
             adjustments,
             calculatedClosingBalance: calcClose,
             sourceClosingBalance: srcClose,
-            closingDifference: sourceCloseExists ? Number((calcClose - srcClose).toFixed(2)) : 0,
-            status: (row.reconciliation_status as any) || (sourceCloseExists ? (Math.abs(calcClose - srcClose) < 0.01 ? 'Reconciled' : 'Difference') : 'Pending'),
-            remarks: row.remarks || (!sourceCloseExists ? 'Source closing balance not loaded.' : ''),
+            closingDifference: sourceCloseExists ? Number((calcClose - Number(srcClose)).toFixed(2)) : 0,
+            status: (row.reconciliation_status === 'Reconciled' ? 'Matched' : row.reconciliation_status === 'Difference' ? 'Mismatch' : row.reconciliation_status || (sourceCloseExists ? (Math.abs(calcClose - Number(srcClose)) < 0.01 ? 'Matched' : 'Mismatch') : 'Pending')) as any,
+            remarks: row.remarks || '',
             reviewedBy: row.reviewed_by || 'Auditor',
             updatedAt: row.updated_at,
           });
@@ -1098,115 +1107,54 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
    * Update Monthly Reconciliation & persist to Supabase
    */
   const updateReconciliation = async (
-    accountId: AccountId,
-    monthId: string,
+    accountId: AccountId, monthId: string,
     updates: {
-      adjustments?: number;
-      remarks?: string;
-      status?: 'Reconciled' | 'Difference' | 'Pending';
-      calculatedOpeningBalance?: number;
-      credits?: number;
-      debits?: number;
-      calculatedClosingBalance?: number;
-      sourceClosingBalance?: number;
+      adjustments?: number; remarks?: string; status?: 'Pending' | 'Matched' | 'Mismatch' | 'Mismatch Accepted';
+      calculatedOpeningBalance?: number; credits?: number; debits?: number; contra?: number;
+      calculatedClosingBalance?: number; sourceClosingBalance?: number | null;
+      openingConfirmed?: boolean; transactionsConfirmed?: boolean; closingConfirmed?: boolean; confirmationNotes?: string;
     }
   ) => {
-    setReconciliations((prev) => {
-      const accountList = [...(prev[accountId] || [])];
-      let carryForwardClosing = 0;
-
-      const updatedList = accountList.map((rec, idx) => {
-        if (idx === 0) {
-          carryForwardClosing = rec.calculatedClosingBalance;
-        }
-
-        if (rec.id === monthId || rec.month === monthId) {
-          const adjustments = updates.adjustments !== undefined ? updates.adjustments : rec.adjustments;
-          const calculatedClosing = rec.calculatedOpeningBalance + rec.credits - rec.debits + adjustments;
-          const sourceMissing = rec.remarks.includes('Source closing balance not loaded');
-          const closingDiff = sourceMissing ? 0 : calculatedClosing - rec.sourceClosingBalance;
-          const status = sourceMissing ? 'Pending' : (updates.status || (Math.abs(closingDiff) < 0.01 ? 'Reconciled' : 'Difference'));
-
-          carryForwardClosing = calculatedClosing;
-
-          return {
-            ...rec,
-            adjustments,
-            calculatedClosingBalance: calculatedClosing,
-            closingDifference: closingDiff,
-            status,
-            remarks: updates.remarks !== undefined ? updates.remarks : rec.remarks,
-            reviewedBy: APP_CONFIG.currentReviewer.name,
-            updatedAt: new Date().toISOString(),
-          };
-        } else if (idx > 0) {
-          const calculatedOpening = carryForwardClosing;
-          const calculatedClosing = calculatedOpening + rec.credits - rec.debits + rec.adjustments;
-          carryForwardClosing = calculatedClosing;
-          const sourceMissing = rec.remarks.includes('Source closing balance not loaded');
-          const closingDiff = sourceMissing ? 0 : calculatedClosing - rec.sourceClosingBalance;
-
-          return {
-            ...rec,
-            calculatedOpeningBalance: calculatedOpening,
-            openingDifference: calculatedOpening - rec.sourceOpeningBalance,
-            calculatedClosingBalance: calculatedClosing,
-            closingDifference: closingDiff,
-          };
-        }
-        return rec;
-      });
-
-      const targetRec = accountList.find((r) => r.id === monthId || r.month === monthId);
-      const newLog: ChangeLogEntry = {
-        id: `LOG-${Date.now()}`,
-        entityType: 'MonthlyReconciliation',
-        entityId: `${accountId}-${monthId}`,
-        action: `Reconciliation updated for ${targetRec?.month || monthId} (${accountId})`,
-        previousValue: targetRec?.status || 'Pending',
-        newValue: updates.status || 'Reconciled',
-        user: APP_CONFIG.currentReviewer.name,
-        timestamp: new Date().toLocaleString(),
-        reason: updates.remarks || 'Monthly balance movement reconciled',
-      };
-      setChangeLogs((logs) => [newLog, ...logs]);
-
-      return {
-        ...prev,
-        [accountId]: updatedList,
-      };
-    });
-
-    // Persist review notes/adjustments for both existing and calculated month rows.
-    // Source closing balances are deliberately not invented or overwritten.
-    try {
-      const sourceRecord = reconciliations[accountId]?.find((r) => r.id === monthId || r.month === monthId);
-      const dbAccountId = accountId === 'TDCC' ? 'ACC-0001' : accountId === 'BOM' ? 'ACC-0002' : 'ACC-0003';
-      const targetMonth = sourceRecord?.month || monthId;
-      const monthKey = targetMonth.replace(/\s+/, '-');
-      const current = sourceRecord;
-      const payload: Record<string, unknown> = {
-        financial_year: 'FY 2018-19',
-        month: monthKey,
-        account_id: dbAccountId,
-        adjustments: updates.adjustments ?? current?.adjustments ?? 0,
-        remarks: updates.remarks ?? current?.remarks ?? '',
-        reconciliation_status: updates.status ?? current?.status ?? 'Pending',
-        reviewed_by: APP_CONFIG.currentReviewer.name,
-        updated_at: new Date().toISOString(),
-      };
-      payload.target_opening_balance = updates.calculatedOpeningBalance ?? current?.calculatedOpeningBalance ?? null;
-      payload.credits_source = updates.credits ?? current?.credits ?? 0;
-      payload.debits_source = updates.debits ?? current?.debits ?? 0;
-      payload.target_closing_balance = updates.calculatedClosingBalance ?? ((Number(payload.target_opening_balance) || 0) + (Number(payload.credits_source) || 0) - (Number(payload.debits_source) || 0) + Number(payload.adjustments || 0));
-      const sourceClosing = updates.sourceClosingBalance ?? current?.sourceClosingBalance;
-      payload.closing_discrepancy = sourceClosing ? Number(payload.target_closing_balance) - sourceClosing : null;
-      const { error } = await (supabaseClient.from('account_monthly_balance') as any)
-        .upsert(payload, { onConflict: 'financial_year,month,account_id' });
-      if (error) throw error;
-    } catch (e) {
-      console.warn('[SupabaseClient] Error saving reconciliation review to database:', e);
-    }
+    const rec = reconciliations[accountId]?.find(r => r.id === monthId || r.month === monthId);
+    if (!rec) throw new Error('Selected account-month was not found. Refresh and try again.');
+    const adjustments = updates.adjustments ?? rec.adjustments;
+    const contra = updates.contra ?? rec.contra ?? 0;
+    const sourceClosing = updates.sourceClosingBalance !== undefined ? updates.sourceClosingBalance : rec.sourceClosingBalance;
+    const calculatedClosing = (updates.calculatedOpeningBalance ?? rec.calculatedOpeningBalance)
+      + (updates.credits ?? rec.credits) - (updates.debits ?? rec.debits) + contra + adjustments;
+    const difference = sourceClosing === null ? null : Number((calculatedClosing - sourceClosing).toFixed(2));
+    const suggested: 'Pending' | 'Matched' | 'Mismatch' = sourceClosing === null ? 'Pending' : Math.abs(difference || 0) < 0.01 ? 'Matched' : 'Mismatch';
+    const status = updates.status === 'Mismatch Accepted' ? 'Mismatch Accepted' : suggested;
+    const now = new Date().toISOString(), reviewer = APP_CONFIG.currentReviewer.name;
+    const list = (reconciliations[accountId] || []).map(r => r.id !== monthId && r.month !== monthId ? r : ({
+      ...r, adjustments, contra, calculatedClosingBalance: calculatedClosing, sourceClosingBalance: sourceClosing,
+      closingDifference: difference ?? 0, status, remarks: updates.remarks ?? r.remarks,
+      openingConfirmed: updates.openingConfirmed ?? r.openingConfirmed ?? false,
+      transactionsConfirmed: updates.transactionsConfirmed ?? r.transactionsConfirmed ?? false,
+      closingConfirmed: updates.closingConfirmed ?? r.closingConfirmed ?? false,
+      confirmationNotes: updates.confirmationNotes ?? r.confirmationNotes ?? '',
+      reviewedBy: reviewer, updatedAt: now, confirmedBy: status === 'Pending' ? r.confirmedBy : reviewer,
+      confirmedAt: status === 'Pending' ? r.confirmedAt : now,
+    }));
+    setReconciliations(prev => ({...prev, [accountId]: list}));
+    setChangeLogs(logs => [{id:`LOG-${Date.now()}`, entityType:'MonthlyReconciliation', entityId:`${accountId}-${monthId}`,
+      action:`Monthly reconciliation reviewed for ${rec.month} (${accountId})`, previousValue:rec.status, newValue:status,
+      user:reviewer, timestamp:new Date().toLocaleString(), reason:updates.remarks || 'Monthly reconciliation verification updated'}, ...logs]);
+    const dbAccountId = accountId === 'TDCC' ? 'ACC-0001' : accountId === 'BOM' ? 'ACC-0002' : 'ACC-0003';
+    const payload: Record<string, unknown> = {
+      financial_year:'FY 2018-19', month:rec.month.replace(/\s+/, '-'), account_id:dbAccountId,
+      source_opening_balance:rec.sourceOpeningBalance, target_opening_balance:updates.calculatedOpeningBalance ?? rec.calculatedOpeningBalance,
+      credits_source:updates.credits ?? rec.credits, debits_source:updates.debits ?? rec.debits, contra_source:contra,
+      adjustments, target_closing_balance:calculatedClosing, source_closing_balance:sourceClosing, closing_discrepancy:difference,
+      reconciliation_status:status, remarks:updates.remarks ?? rec.remarks ?? '', reviewed_by:reviewer, updated_at:now,
+      opening_confirmed:updates.openingConfirmed ?? rec.openingConfirmed ?? false,
+      transactions_confirmed:updates.transactionsConfirmed ?? rec.transactionsConfirmed ?? false,
+      closing_confirmed:updates.closingConfirmed ?? rec.closingConfirmed ?? false,
+      confirmation_notes:updates.confirmationNotes ?? rec.confirmationNotes ?? '',
+      confirmed_by:status === 'Pending' ? null : reviewer, confirmed_at:status === 'Pending' ? null : now,
+    };
+    const {error}=await (supabaseClient.from('account_monthly_balance') as any).upsert(payload,{onConflict:'financial_year,month,account_id'});
+    if(error){setReconciliationError(error.message);throw error;}
   };
 
   // Aggregated Audit KPIs
