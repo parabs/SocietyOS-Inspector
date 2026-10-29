@@ -378,7 +378,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               bankPassbook: accountId !== 'CASH',
             },
             status: (difference === 0 ? 'Verified' : 'Pending') as VerificationStatus,
-            remarks: acc.remarks || 'Loaded from Supabase database',
+            remarks: acc.remarks || '',
             verifiedBy: acc.verified_by || undefined,
             verifiedOn: acc.verified_at || acc.updated_at?.split('T')[0] || undefined,
           };
