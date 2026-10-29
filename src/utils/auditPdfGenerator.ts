@@ -26,21 +26,21 @@ export interface AuditReportMetadata {
 }
 
 export const DEFAULT_AUDIT_METADATA: AuditReportMetadata = {
-  societyName: 'VARSHA NIVAS CO-OPERATIVE HOUSING SOCIETY LTD.',
-  registrationNo: 'BOM/GEN/1984/CHS (Dated 14-Aug-1984)',
-  address: 'Plot No. 12, D.N. Nagar, Andheri (West), Mumbai - 400053, Maharashtra',
+  societyName: "Pearl Meadows 'C' Type 'C' Wing CHS Ltd.",
+  registrationNo: 'TNA/KLN/HSG(TC) 27051/2014-15 / Year 2014',
+  address: 'Address to be confirmed from society registration records',
   financialYear: '2018–2019',
   auditPeriod: '01-Apr-2018 to 31-Mar-2019',
   auditorName: 'Sachin Parab',
   auditorRole: 'Hon. Treasurer & Internal Audit Lead',
-  statutoryCaFirm: 'M/s R. S. Kulkarni & Associates, Chartered Accountants',
-  statutoryCaFrn: 'FRN: 112048W / M.No: 045920',
+  statutoryCaFirm: 'Appointed statutory auditor details to be confirmed',
+  statutoryCaFrn: 'Not provided',
   generatedDate: new Date().toLocaleDateString('en-IN', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   }),
-  reportRefId: `VNCHS/AUD/2018-19/TXN-VERIF-${Math.floor(100000 + Math.random() * 900000)}`,
+  reportRefId: `PMCHS/AUD/2018-19/TXN-${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}`,
   scopeTitle: 'Verified Transactions & Physical Voucher Verification Schedule',
 };
 
