@@ -121,13 +121,20 @@ export interface DbMemberCumulativeOutstanding {
 
 export interface DbDemandRegister {
   id?: string;
+  demand_id?: string;
+  party_id?: string;
+  party_name?: string;
+  member_name?: string;
+  category_id?: string;
   bill_no?: string;
   flat_no?: string;
   member_id?: string;
   bill_date?: string;
   due_date?: string;
   month?: string;
+  demand_month?: string;
   financial_year?: string;
+  demand_amount?: number;
   maintenance_charge?: number;
   sinking_fund?: number;
   repair_fund?: number;
@@ -143,8 +150,11 @@ export interface DbDemandAdjustment {
   adjustment_id?: string;
   flat_no?: string;
   member_id?: string;
+  member_name?: string;
+  month?: string;
   demand_id?: string;
   adjustment_type?: string;
+  adjustment_amount?: number;
   amount?: number;
   reason?: string;
   approved_by?: string;
