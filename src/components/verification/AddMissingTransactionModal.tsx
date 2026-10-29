@@ -62,7 +62,7 @@ export const AddMissingTransactionModal: React.FC<Props> = ({ onClose, onSaved }
     }
     setBusy(true);
     try {
-      const { data, error: saveError } = await supabaseClient.rpc('add_missing_transaction', {
+      const { data, error: saveError } = await (supabaseClient as any).rpc('add_missing_transaction', {
         p_transaction_date: date,
         p_transaction_type: type,
         p_amount: parsedAmount,
@@ -128,7 +128,7 @@ export const AddMissingTransactionModal: React.FC<Props> = ({ onClose, onSaved }
             </label>
             <label className="text-sm font-medium text-slate-700">Category
               <select className={fieldClass + ' mt-1'} value={categoryId} onChange={e => setCategoryId(e.target.value)}>
-                <option value="">Not mapped / unknown</option>{categoryMaster.map(c => <option key={c.category_id} value={c.category_id}>{c.category_name} ({c.category_id})</option>)}
+                <option value="">Not mapped / unknown</option>{categoryMaster.map(c => { const categoryOptionId = (c as any).category_id || c.category_code || c.id || ''; return <option key={categoryOptionId} value={categoryOptionId}>{c.category_name} ({categoryOptionId})</option>; })}
               </select>
             </label>
             <label className="text-sm font-medium text-slate-700">Voucher / Receipt Reference
