@@ -903,12 +903,13 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       const { error } = await (supabaseClient.from('account_master') as any)
         .update({
-          remarks: updates.remarks,
-          verified_by: APP_CONFIG.currentReviewer.name,
-          verified_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          verification_status: updates.status,
+          verification_remarks: updates.remarks,
+          supporting_records: updates.supportingRecords || { auditReport: false, cashBook: false, bankPassbook: false },
+          verified_by: updates.status === 'Verified' ? APP_CONFIG.currentReviewer.name : null,
+          verified_at: updates.status === 'Verified' ? new Date().toISOString() : null,
         })
-        .ilike('account_name', `%${accountId}%`);
+        .eq('account_id', accountId === 'TDCC' ? 'ACC-0001' : accountId === 'BOM' ? 'ACC-0002' : 'ACC-0003');
 
       if (error) {
         console.warn('[SupabaseClient] Note on account_master update:', error.message);
