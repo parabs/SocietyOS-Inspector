@@ -455,7 +455,9 @@ export const MonthlyReconciliation: React.FC = () => {
                       <td className="py-2.5 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => handleEditOpen(row)}
-                          className="px-2 py-0.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors cursor-pointer"
+                          disabled={row.id.startsWith('CALC-')}
+                          title={row.id.startsWith('CALC-') ? 'Source reconciliation records are not loaded; this calculated row is read-only.' : 'Update reconciliation review'}
+                          className="px-2 py-0.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           View
                         </button>
