@@ -756,7 +756,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     try {
       // Check Supabase connectivity
-      const { error: testErr } = await supabaseClient.from('account_master').select('id').limit(1);
+      const { error: testErr } = await supabaseClient.from('account_master').select('account_id').limit(1);
       if (testErr) {
         setSupabaseSync((prev) => ({
           ...prev,
