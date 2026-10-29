@@ -452,7 +452,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             sourceSheet: row.source_sheet || 'transactions',
             sourceRow: row.source_row ?? idx + 1,
             date: rawDate,
-            month: row.month || row.reporting_month || (rawDate ? new Date(rawDate).toLocaleString('en-US', { month: 'short', year: 'numeric' }) : 'Apr 2018'),
+            month: (() => { const sourceMonth = String(row.month || row.reporting_month || ''); const normalized = sourceMonth.match(/^([A-Za-z]{3,})[- ](\\d{4})$/); return normalized ? `${normalized[1].slice(0, 3)} ${normalized[2]}` : (sourceMonth || (rawDate ? new Date(rawDate).toLocaleString('en-US', { month: 'short', year: 'numeric' }) : 'Apr 2018')); })(),
             accountId,
             type,
             party: row.party_name || row.party_id || 'Sundry Member / Vendor',
