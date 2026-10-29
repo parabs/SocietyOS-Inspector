@@ -104,6 +104,12 @@ export interface MonthlyReconciliationRecord {
   remarks: string;
   reviewedBy?: string;
   updatedAt?: string;
+  openingConfirmed?: boolean;
+  transactionsConfirmed?: boolean;
+  closingConfirmed?: boolean;
+  confirmationNotes?: string;
+  confirmedBy?: string;
+  confirmedAt?: string;
 }
 
 export interface ChangeLogEntry {
