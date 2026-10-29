@@ -1,21 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  Landmark,
-  Wallet,
-  CheckCircle,
-  AlertTriangle,
-  HelpCircle,
-  ExternalLink,
-  ChevronRight,
-  TrendingUp,
-  X,
-  Save,
-  ArrowRight,
-  Layers,
-  Edit2,
-  FileSpreadsheet,
-  BarChart3,
-} from 'lucide-react';
+import { Landmark, Wallet, CheckCircle, AlertTriangle, HelpCircle, ExternalLink, ChevronRight, TrendingUp, X, Save, ArrowRight, Layers, Edit2, BarChart3 } from 'lucide-react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -237,17 +221,7 @@ export const MonthlyReconciliation: React.FC = () => {
               </p>
             </div>
 
-            <button
-              onClick={() => {
-                if (!showAllAccounts) setSelectedAccountId(activeAccount);
-                setSelectedMonthFilter(drillDownMonth);
-                setCurrentScreen('transaction-verification');
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg cursor-pointer transition-colors"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>View Transactions</span>
-            </button>
+
           </div>
 
           <div className="overflow-x-auto">
@@ -586,7 +560,7 @@ export const MonthlyReconciliation: React.FC = () => {
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-800 mb-1">Source Closing Balance (₹) — passbook / cash book</label>
-                <input type="number" step="0.01" value={editSourceClosing} onChange={(e) => { const v=e.target.value; setEditSourceClosing(v); const n=v.trim()===''?null:Number(v); const calc=editingRecord.calculatedOpeningBalance+editingRecord.credits-editingRecord.debits+(editingRecord.contra||0)+(Number(editAdjustments)||0); setEditStatus(n===null?'Pending':Math.abs(calc-n)<0.01?'Matched':'Mismatch'); }} placeholder="Enter month-end source balance" className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono" />
+                <input type="number" step="0.01" value={editSourceClosing} onChange={(e) => { const v=e.target.value; setEditSourceClosing(v); }} placeholder="Enter month-end source balance" className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono" />
                 <div className="grid grid-cols-2 gap-2 mt-2"><div><label className="block text-[11px] font-semibold mb-1">Calculated Closing</label><div className="p-2 rounded bg-slate-50 border font-mono">{formatINR(editingRecord.calculatedOpeningBalance+editingRecord.credits-editingRecord.debits+(editingRecord.contra||0)+(Number(editAdjustments)||0))}</div></div><div><label className="block text-[11px] font-semibold mb-1">Difference</label><div className="p-2 rounded bg-slate-50 border font-mono">{editSourceClosing.trim()===''?'—':formatINR(editingRecord.calculatedOpeningBalance+editingRecord.credits-editingRecord.debits+(editingRecord.contra||0)+(Number(editAdjustments)||0)-Number(editSourceClosing))}</div></div></div>
               </div>
               <div><label className="block text-[11px] font-semibold text-slate-800 mb-1">Status</label><select value={editStatus} onChange={e=>setEditStatus(e.target.value as typeof editStatus)} className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2"><option>Pending</option><option>Matched</option><option>Mismatch</option><option>Mismatch Accepted</option></select>{editStatus==='Mismatch Accepted' && <p className="text-[10px] text-amber-700 mt-1">Explain the accepted difference in remarks.</p>}</div>
