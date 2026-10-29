@@ -97,7 +97,7 @@ export interface MonthlyReconciliationRecord {
   openingDifference: number; // (B - A)
   credits: number; // Receipts
   debits: number; // Payments
-  contra: number; // Net signed contra movement
+  contra?: number; // Net signed contra movement (optional for legacy records)
   adjustments: number; // default 0
   calculatedClosingBalance: number; // (C) = B + Credits - Debits + Adjustments
   sourceClosingBalance: number | null; // (D), null until entered from source
