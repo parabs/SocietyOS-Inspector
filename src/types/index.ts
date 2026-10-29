@@ -19,7 +19,7 @@ export interface AccountMaster {
 export type TransactionType = 'Receipt' | 'Payment';
 
 export type BillStatus = 'Available' | 'Discrepancy' | 'Missing' | 'N/A';
-export type VoucherReceiptStatus = 'Available' | 'Discrepancy' | 'Missing';
+export type VoucherReceiptStatus = 'Available' | 'Discrepancy' | 'Missing' | 'Pending';
 export type EvidenceStatus = 'Complete' | 'Discrepancy' | 'Missing' | 'Pending' | 'N/A';
 export type InternalAuditStatus = 'Pending' | 'Verified' | 'Failed';
 
