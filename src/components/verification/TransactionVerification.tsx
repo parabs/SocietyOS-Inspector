@@ -999,6 +999,11 @@ export const TransactionVerification: React.FC = () => {
                           )}
                         </div>
                         <div className="text-[11px] text-slate-500 truncate">{t.description}</div>
+                        {t.isCorrection && (
+                          <span className="mt-1 inline-flex rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
+                            CORRECTION · {t.correctionStatus || "Pending Review"}
+                          </span>
+                        )}
                       </td>
 
                       <td className="py-2.5 px-3 text-right font-mono font-bold whitespace-nowrap text-slate-900">
