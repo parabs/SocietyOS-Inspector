@@ -57,13 +57,6 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
       }
     }
 
-    // Default to at least verified items if empty
-    if (list.length === 0) {
-      list = transactions.filter(
-        (t) => t.evidenceStatus === 'Complete' || t.internalAuditStatus === 'Verified'
-      );
-    }
-
     return list;
   }, [transactions, scopeFilter, selectedAccountId]);
 
@@ -127,7 +120,7 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
 
   // Copy Verification Stamp
   const handleCopyStamp = () => {
-    const stampText = `[CERTIFIED AUDIT STAMP]\nSociety: ${metadata.societyName}\nRegn: ${metadata.registrationNo}\nRef: ${metadata.reportRefId}\nTransactions: ${targetTransactions.length} | Amount: ₹${formatINR(totalAmount)}\nAuditor: Sachin Parab (Hon. Treasurer)\nStatutory Reference: Rule 69, MCS Rules 1961 & Bye-Law 152`;
+    const stampText = `[FINANCIAL VERIFICATION REPORT]\nSociety: ${metadata.societyName}\nRegn: ${metadata.registrationNo}\nRef: ${metadata.reportRefId}\nTransactions: ${targetTransactions.length} | Amount: ₹${formatINR(totalAmount)}\nReviewer: Sachin Parab (Treasurer / Verification)\nScope: Internal transaction verification; statutory auditor to review`;
     navigator.clipboard.writeText(stampText);
     setCopiedHash(true);
     setTimeout(() => setCopiedHash(false), 3000);
@@ -147,14 +140,14 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                  Official Society Audit Verification Certificate & Schedule
+                  Society Financial Verification Report
                 </h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  MCS Act Compliant
+                  Internal Review
                 </span>
               </div>
               <p className="text-xs text-slate-300">
-                Print-ready official housing society audit documentation (FY 2018–19)
+                Transaction evidence and verification findings for FY 2018–19; not a statutory audit certificate
               </p>
             </div>
           </div>
@@ -378,7 +371,7 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
           {/* Schedule Table */}
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <div className="bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-200 flex items-center justify-between">
-              <span>Schedule of Verified Transactions (Physical Vouching Record)</span>
+              <span>Transaction Verification Schedule</span>
               <span className="text-[10px] font-mono text-slate-500 lowercase">
                 all amounts in inr (₹)
               </span>
@@ -485,7 +478,7 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
                       ₹{formatINR(totalAmount)}
                     </td>
                     <td colSpan={3} className="py-2 px-2 text-center text-[10px] text-slate-500">
-                      100% physically inspected
+                      See individual verification statuses
                     </td>
                   </tr>
                 </tfoot>
@@ -496,14 +489,10 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
           {/* Statutory Verification Declaration */}
           <div className="bg-slate-50 border border-slate-300 rounded-lg p-3 text-[11px] text-slate-700 leading-relaxed">
             <h4 className="font-bold text-blue-950 uppercase text-xs mb-1">
-              Statutory Auditor Declaration & Rule 69 Compliance Affirmation:
+              Verification Scope and Limitation:
             </h4>
             <p>
-              I/We hereby certify that every transaction listed in the above schedule for the Financial Year 2018–2019
-              has been personally and physically examined with corresponding physical counterfoils, cash vouchers, passed
-              invoices, and stamped payment receipts. The books of accounts are kept in accordance with the provisions of the
-              Maharashtra Co-operative Societies Act 1960 and the Bye-Laws of the society. Zero discrepancy threshold has
-              been applied, and the closing cash and bank balances reflect true reconciliation with respective passbooks.
+                            This report is generated from the records and verification findings currently saved in Society OS. It does not certify that physical documents were examined or that account balances reconcile. Pending items, discrepancies, missing source balances and correction entries must be reviewed before submission to the appointed statutory auditor.
             </p>
           </div>
 
@@ -518,7 +507,7 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
               <div>
                 <div className="font-bold text-xs text-slate-900">{metadata.auditorName}</div>
                 <div className="text-[10px] text-slate-500">Hon. Treasurer / Lead Auditor</div>
-                <div className="text-[9px] text-slate-400">Varsha Nivas CHS Ltd.</div>
+                <div className="text-[9px] text-slate-400">Pearl Meadows 'C' Type 'C' Wing CHS Ltd.</div>
               </div>
             </div>
 
@@ -565,8 +554,8 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
           {/* Tamper-evident footer */}
           <div className="text-center text-[10px] text-slate-400 font-mono pt-2 border-t border-slate-100 flex items-center justify-between">
             <span>Doc ID: {metadata.reportRefId}</span>
-            <span>Generated on {metadata.generatedDate} | Varsha Nivas Internal Audit Engine</span>
-            <span>Page 1 of 1 (Certified Schedule)</span>
+            <span>Generated on {metadata.generatedDate} | Society OS Financial Verification</span>
+            <span>Generated schedule — not a statutory audit certificate</span>
           </div>
         </div>
       </div>
