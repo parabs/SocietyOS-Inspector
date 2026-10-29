@@ -76,12 +76,16 @@ export const OpeningBalanceVerification: React.FC = () => {
   };
 
   const handleSave = async () => {
-    await updateOpeningBalance(activeAccount, {
+    const result = await updateOpeningBalance(activeAccount, {
       status: formStatus,
       remarks: formRemarks,
       supportingRecords: formSupporting,
     });
-    setSuccessToast(`Verification for ${selectedRecord.accountName} saved to Supabase!`);
+    if (!result.success) {
+      window.alert(`Could not save verification: ${result.error || 'Unknown database error'}`);
+      return;
+    }
+    setSuccessToast(`Verification for ${selectedRecord.accountName} saved to Supabase.`);
     setTimeout(() => setSuccessToast(null), 3500);
   };
 
