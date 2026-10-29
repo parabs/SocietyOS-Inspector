@@ -178,12 +178,6 @@ export const OpeningBalanceVerification: React.FC = () => {
             No mock data is presented as real records. You can import your Excel workbooks or click below to populate the baseline accounts into Supabase.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
-            <button
-              onClick={() => fetchOpeningBalances()}
-              className="px-4 py-2 text-xs font-semibold bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg cursor-pointer transition-colors shadow-2xs"
-            >
-              Refresh from Supabase
-            </button>
           </div>
         </div>
       )}
