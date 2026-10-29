@@ -27,6 +27,7 @@ import {
   Printer,
   Download,
   Award,
+  PlusCircle,
 } from 'lucide-react';
 import { useVerification } from '../../context/VerificationContext';
 import { formatINR, formatNumber } from '../../config';
@@ -42,6 +43,7 @@ import {
 import { scanTransactionsForAnomalies } from '../../utils/anomalyDetection';
 import { AnomalyDetectionModal } from './AnomalyDetectionModal';
 import { AuditCertificatePDFModal } from './AuditCertificatePDFModal';
+import { AddMissingTransactionModal } from './AddMissingTransactionModal';
 
 export const TransactionVerification: React.FC = () => {
   const {
@@ -88,6 +90,7 @@ export const TransactionVerification: React.FC = () => {
   const [showHowToModal, setShowHowToModal] = useState<boolean>(false);
   const [showAnomalyModal, setShowAnomalyModal] = useState<boolean>(false);
   const [showPdfModal, setShowPdfModal] = useState<boolean>(false);
+  const [showAddMissingTransaction, setShowAddMissingTransaction] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Anomaly scan across all current transactions
@@ -391,6 +394,15 @@ export const TransactionVerification: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
+          <button
+            onClick={() => setShowAddMissingTransaction(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 border border-indigo-700 rounded-lg cursor-pointer transition-colors shadow-2xs"
+            title="Record a missing FY 2018–19 transaction without changing imported source records"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Add Missing Transaction</span>
+          </button>
+
           {/* Anomaly Detection Button */}
           <button
             onClick={() => setShowAnomalyModal(true)}
@@ -1542,6 +1554,21 @@ export const TransactionVerification: React.FC = () => {
           </div>
         </div>
       )}
+
+      <AddMissingTransactionModal
+        isOpen={showAddMissingTransaction}
+        onClose={() => setShowAddMissingTransaction(false)}
+        onSaved={async (transactionId) => {
+          setToastMessage(`Added correction ${transactionId}. Status: Pending Review.`);
+          setShowAddMissingTransaction(false);
+          setActiveTxnId(transactionId);
+          setSelectedTransactionId(transactionId);
+          setFilterAccount('All');
+          setFilterMonth('All Months');
+          setCurrentPage(1);
+          setTimeout(() => setToastMessage(null), 5000);
+        }}
+      />
 
       {/* Anomaly Detection Modal */}
       <AnomalyDetectionModal
