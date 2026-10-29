@@ -51,14 +51,14 @@ export const OpeningBalanceVerification: React.FC = () => {
 
   // Local editing state for the active account verification form
   const [formStatus, setFormStatus] = useState<VerificationStatus>(selectedRecord.status);
-  const [formRemarks, setFormRemarks] = useState(selectedRecord.remarks);
+  const [formRemarks, setFormRemarks] = useState(selectedRecord.remarks === 'Loaded from Supabase database' ? '' : selectedRecord.remarks);
   const [formSupporting, setFormSupporting] = useState({ ...selectedRecord.supportingRecords });
 
   // Update form fields when selected record or balances load
   React.useEffect(() => {
     if (selectedRecord) {
       setFormStatus(selectedRecord.status);
-      setFormRemarks(selectedRecord.remarks);
+      setFormRemarks(selectedRecord.remarks === 'Loaded from Supabase database' ? '' : selectedRecord.remarks);
       setFormSupporting({ ...selectedRecord.supportingRecords });
     }
   }, [selectedRecord.accountId, selectedRecord.status, selectedRecord.remarks]);
@@ -70,7 +70,7 @@ export const OpeningBalanceVerification: React.FC = () => {
     const rec = openingBalances.find((a) => a.accountId === id);
     if (rec) {
       setFormStatus(rec.status);
-      setFormRemarks(rec.remarks);
+      setFormRemarks(rec.remarks === 'Loaded from Supabase database' ? '' : rec.remarks);
       setFormSupporting({ ...rec.supportingRecords });
     }
   };
