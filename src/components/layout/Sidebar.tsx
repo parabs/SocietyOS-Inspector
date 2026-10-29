@@ -95,6 +95,18 @@ export const Sidebar: React.FC = () => {
             <span>Dashboard</span>
           </button>
 
+          {/* Role-specific dashboards */}
+          <div>
+            <div className="px-2 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Role Dashboards</div>
+            <div className="mt-1 space-y-1 pl-1">
+              <button onClick={() => handleNavClick('treasurer-dashboard')} className={navItemClass('treasurer-dashboard')}><span className="flex items-center gap-2.5"><CreditCard className="w-4 h-4"/><span>Treasurer</span></span></button>
+              <button onClick={() => handleNavClick('secretary-dashboard')} className={navItemClass('secretary-dashboard')}><span className="flex items-center gap-2.5"><FileText className="w-4 h-4"/><span>Secretary</span></span></button>
+              <button onClick={() => handleNavClick('chairman-dashboard')} className={navItemClass('chairman-dashboard')}><span className="flex items-center gap-2.5"><ShieldCheck className="w-4 h-4"/><span>Chairman</span></span></button>
+              <button onClick={() => handleNavClick('member-dashboard')} className={navItemClass('member-dashboard')}><span className="flex items-center gap-2.5"><Users className="w-4 h-4"/><span>Members</span></span></button>
+              <button onClick={() => handleNavClick('auditor-dashboard')} className={navItemClass('auditor-dashboard')}><span className="flex items-center gap-2.5"><BadgeCheck className="w-4 h-4"/><span>Statutory Auditor</span></span></button>
+            </div>
+          </div>
+
           {/* Group 1: INITIAL VERIFICATION (PRIMARY) */}
           <div>
             <button
