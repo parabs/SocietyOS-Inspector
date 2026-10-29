@@ -131,7 +131,7 @@ export const TransactionVerification: React.FC = () => {
   const filteredTransactions = useMemo(() => {
     return transactions.filter((t) => {
       // Month
-      if (filterMonth !== 'All Months' && t.month !== filterMonth) return false;
+      if (filterMonth !== 'All Months' && String(t.reportingMonth || t.month).replace('-', ' ') !== filterMonth) return false;
       // Account
       if (filterAccount !== 'All' && t.accountId !== filterAccount) return false;
       // Type
@@ -746,7 +746,7 @@ export const TransactionVerification: React.FC = () => {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Party, voucher, receipt..."
+                placeholder="Party, description, voucher, cheque..."
                 className="w-full text-xs bg-slate-50 border border-slate-200 rounded pl-7 pr-2 py-1.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
@@ -901,35 +901,29 @@ export const TransactionVerification: React.FC = () => {
         </div>
 
         <div className="text-[11px] text-slate-500">
-          Tip: Check boxes to bulk-verify or flag items, click any row to inspect details.
+          Select a transaction row to open its verification details.
         </div>
       </div>
 
       {/* Main Content Area: Table (Left) + Detail Panel (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 gap-6 items-start">
         {/* Table Area (8 Cols when detail open) */}
-        <div className="lg:col-span-8 bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="lg:col-span-12 bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200 whitespace-nowrap">
-                  <th className="py-2.5 px-3 w-9 text-center">
-                    <input
-                      type="checkbox"
-                      ref={masterCheckboxRef}
-                      checked={isAllPageSelected}
-                      onChange={toggleSelectAllPage}
-                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-                      title={isAllPageSelected ? 'Deselect all on this page' : 'Select all on this page'}
-                    />
-                  </th>
                   <th className="py-2.5 px-2">Date</th>
+                  <th className="py-2.5 px-2">Reporting Month</th>
                   <th className="py-2.5 px-2">Account</th>
                   <th className="py-2.5 px-2">Type</th>
                   <th className="py-2.5 px-3">Party / Description</th>
+                  <th className="py-2.5 px-3">Category Group</th>
+                  <th className="py-2.5 px-3">Category</th>
                   <th className="py-2.5 px-3 text-right">Amount (₹)</th>
-                  <th className="py-2.5 px-2 text-center">Voucher No.</th>
-                  <th className="py-2.5 px-2 text-center">Receipt No.</th>
+                  <th className="py-2.5 px-2">Payment Mode</th>
+                  <th className="py-2.5 px-2 text-center">Voucher / Receipt No.</th>
+                  <th className="py-2.5 px-2 text-center">Cheque No.</th>
                   <th className="py-2.5 px-2 text-center">Bill Status</th>
                   <th className="py-2.5 px-2 text-center">Voucher / Receipt</th>
                   <th className="py-2.5 px-2 text-center">Evidence Status</th>
@@ -941,7 +935,7 @@ export const TransactionVerification: React.FC = () => {
               <tbody className="divide-y divide-slate-100">
                 {paginatedTransactions.map((t) => {
                   const isActiveTxn = activeTxn && activeTxn.id === t.id;
-                  const isRowChecked = selectedTxnIds.has(t.id);
+                  const isRowChecked = false;
                   return (
                     <tr
                       key={t.id}
@@ -954,22 +948,14 @@ export const TransactionVerification: React.FC = () => {
                           : ''
                       }`}
                     >
-                      <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={isRowChecked}
-                          onChange={() => toggleSelectTxn(t.id)}
-                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer transition-transform active:scale-95"
-                          title={`Select transaction ${t.id}`}
-                        />
+                      <td className="py-2.5 px-2 whitespace-nowrap font-medium text-slate-700">
+                        {new Date(t.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
 
-                      <td className="py-2.5 px-2 whitespace-nowrap font-medium text-slate-700">
-                        {t.date}
-                      </td>
+                      <td className="py-2.5 px-2 whitespace-nowrap">{t.reportingMonth || t.month}</td>
 
                       <td className="py-2.5 px-2 font-semibold text-slate-800">
-                        {t.accountId}
+                        {t.accountName || t.accountId}
                       </td>
 
                       <td className="py-2.5 px-2">
