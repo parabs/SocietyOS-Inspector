@@ -15,7 +15,11 @@ export const AddMissingTransactionModal: React.FC<Props> = ({ onClose, onSaved }
   const [type, setType] = useState<'Receipt' | 'Payment'>('Payment');
   const [amount, setAmount] = useState('');
   const [accountId, setAccountId] = useState('');
+  const [partyType, setPartyType] = useState('');
+  const [partySearch, setPartySearch] = useState('');
   const [partyId, setPartyId] = useState('');
+  const [categoryGroup, setCategoryGroup] = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
   const [voucher, setVoucher] = useState('');
@@ -45,6 +49,21 @@ export const AddMissingTransactionModal: React.FC<Props> = ({ onClose, onSaved }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Read the actual master classifications without assuming every member is a flat/parking owner.
+  const partyTypes = Array.from(new Set(partyMaster.map(p => String(p.party_type || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  const filteredParties = partyMaster.filter(p =>
+    (!partyType || String(p.party_type || '') === partyType) &&
+    (!partySearch.trim() || String(p.party_name || '').toLowerCase().includes(partySearch.trim().toLowerCase()) || String(p.party_id || '').toLowerCase().includes(partySearch.trim().toLowerCase()))
+  ).sort((a, b) => String(a.party_name || '').localeCompare(String(b.party_name || '')));
+
+  const getCategoryId = (c: any) => String(c.category_id || c.category_code || c.id || '');
+  const getCategoryGroup = (c: any) => String(c.category_group || c.category_group_name || c.group_name || c.category || '').trim();
+  const categoryGroups = Array.from(new Set(categoryMaster.map(c => getCategoryGroup(c)).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  const filteredCategories = categoryMaster.filter(c =>
+    (!categoryGroup || getCategoryGroup(c) === categoryGroup) &&
+    (!categorySearch.trim() || String(c.category_name || '').toLowerCase().includes(categorySearch.trim().toLowerCase()) || getCategoryId(c).toLowerCase().includes(categorySearch.trim().toLowerCase()))
+  ).sort((a, b) => String(a.category_name || '').localeCompare(String(b.category_name || '')));
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -123,16 +142,30 @@ export const AddMissingTransactionModal: React.FC<Props> = ({ onClose, onSaved }
                 <option value="">Select account</option>{accounts.map(a => <option key={a.account_id} value={a.account_id}>{a.account_name} ({a.account_id})</option>)}
               </select>
             </label>
-            <label className="text-sm font-medium text-slate-700">Party / Member / Vendor
-              <select className={fieldClass + ' mt-1'} value={partyId} onChange={e => setPartyId(e.target.value)}>
-                <option value="">Not mapped / unknown</option>{partyMaster.map(p => <option key={p.party_id} value={p.party_id}>{p.party_name} ({p.party_id})</option>)}
+            <div className="text-sm font-medium text-slate-700">
+              <label htmlFor="correction-party-type">Party Type</label>
+              <select id="correction-party-type" className={fieldClass + ' mt-1'} value={partyType} onChange={e => { setPartyType(e.target.value); setPartyId(''); setPartySearch(''); }}>
+                <option value="">All party types</option>{partyTypes.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
-            </label>
-            <label className="text-sm font-medium text-slate-700">Category
-              <select className={fieldClass + ' mt-1'} value={categoryId} onChange={e => setCategoryId(e.target.value)}>
-                <option value="">Not mapped / unknown</option>{categoryMaster.map(c => { const categoryOptionId = (c as any).category_id || c.category_code || c.id || ''; return <option key={categoryOptionId} value={categoryOptionId}>{c.category_name} ({categoryOptionId})</option>; })}
+              <label htmlFor="correction-party-search" className="mt-2 block">Party / Member / Vendor</label>
+              <input id="correction-party-search" className={fieldClass + ' mt-1'} value={partySearch} onChange={e => { setPartySearch(e.target.value); setPartyId(''); }} placeholder="Search party name or ID…" />
+              <select aria-label="Select party" className={fieldClass + ' mt-1'} value={partyId} onChange={e => setPartyId(e.target.value)}>
+                <option value="">Not mapped / unknown</option>{filteredParties.map(p => <option key={p.party_id} value={p.party_id}>{p.party_name} ({p.party_id})</option>)}
               </select>
-            </label>
+              <p className="mt-1 text-xs font-normal text-slate-500">{filteredParties.length} matching parties</p>
+            </div>
+            <div className="text-sm font-medium text-slate-700">
+              <label htmlFor="correction-category-group">Category Group</label>
+              <select id="correction-category-group" className={fieldClass + ' mt-1'} value={categoryGroup} onChange={e => { setCategoryGroup(e.target.value); setCategoryId(''); setCategorySearch(''); }}>
+                <option value="">All category groups</option>{categoryGroups.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+              <label htmlFor="correction-category-search" className="mt-2 block">Category</label>
+              <input id="correction-category-search" className={fieldClass + ' mt-1'} value={categorySearch} onChange={e => { setCategorySearch(e.target.value); setCategoryId(''); }} placeholder="Search category name or ID…" />
+              <select aria-label="Select category" className={fieldClass + ' mt-1'} value={categoryId} onChange={e => setCategoryId(e.target.value)}>
+                <option value="">Not mapped / unknown</option>{filteredCategories.map(c => { const id = getCategoryId(c); return <option key={id} value={id}>{c.category_name} ({id})</option>; })}
+              </select>
+              <p className="mt-1 text-xs font-normal text-slate-500">{filteredCategories.length} matching categories</p>
+            </div>
             <label className="text-sm font-medium text-slate-700">Voucher / Receipt Reference
               <input className={fieldClass + ' mt-1'} value={voucher} onChange={e => setVoucher(e.target.value)} placeholder="Reference number, if available" />
             </label>
