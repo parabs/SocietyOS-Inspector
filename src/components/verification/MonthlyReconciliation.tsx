@@ -114,7 +114,7 @@ export const MonthlyReconciliation: React.FC = () => {
 
   const openingApr = showAllAccounts ? accountList.filter(r => r.monthIndex === 0).reduce((sum, r) => sum + r.calculatedOpeningBalance, 0) : accountList[0]?.calculatedOpeningBalance || 0;
   const closingMarCalc = showAllAccounts ? accountList.filter(r => r.monthIndex === 11).reduce((sum, r) => sum + r.calculatedClosingBalance, 0) : accountList[accountList.length - 1]?.calculatedClosingBalance || 0;
-  const closingMarSource = showAllAccounts ? accountList.filter(r => r.monthIndex === 11).reduce((sum, r) => sum + r.sourceClosingBalance, 0) : accountList[accountList.length - 1]?.sourceClosingBalance || 0;
+  const closingMarSource = showAllAccounts ? accountList.filter(r => r.monthIndex === 11).reduce((sum, r) => sum + (r.sourceClosingBalance ?? 0), 0) : accountList[accountList.length - 1]?.sourceClosingBalance || 0;
   const finalDifference = closingMarCalc - closingMarSource;
   const sourceClosingUnavailable = accountList.some((row) => row.remarks.includes('Source closing balance not loaded'));
 
