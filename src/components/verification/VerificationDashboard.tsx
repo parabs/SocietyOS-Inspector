@@ -78,6 +78,8 @@ export const VerificationDashboard: React.FC = () => {
     setSelectedMonthFilter,
     setSelectedTransactionId,
     stats,
+    transactions,
+    openingBalances,
     issues,
     monthlySummaries,
     changeLogs,
@@ -1537,6 +1539,62 @@ export const VerificationDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Data Quality: live checks on imported records and verification completeness */}
+      {(() => {
+        const transactionCount = transactions.length;
+        const receipts = transactions.filter(t => t.transactionClass === 'Receipt').length;
+        const payments = transactions.filter(t => t.transactionClass === 'Payment').length;
+        const contra = transactions.filter(t => t.transactionClass === 'Contra').length;
+        const partyMissing = transactions.filter(t => !String(t.party || '').trim() || /unknown|unmapped|not mapped/i.test(String(t.party))).length;
+        const categoryMissing = transactions.filter(t => !String(t.categoryName || '').trim()).length;
+        const monthKey = (t: any) => String(t.reportingMonth || t.month || '').trim();
+        const monthsPresent = new Set(transactions.map(monthKey).filter(Boolean));
+        const expectedMonths = ['Apr-2018','May-2018','Jun-2018','Jul-2018','Aug-2018','Sep-2018','Oct-2018','Nov-2018','Dec-2018','Jan-2019','Feb-2019','Mar-2019'];
+        const normalizedMonths = new Set(Array.from(monthsPresent).map(m => m.replace(/ /g, '-')));
+        const missingMonths = expectedMonths.filter(m => !normalizedMonths.has(m));
+        const openingVerified = openingBalances.filter(b => b.status === 'Verified').length;
+        const openingPending = openingBalances.filter(b => b.status !== 'Verified' && b.recordedOpeningBalance !== null && b.recordedOpeningBalance !== undefined && Number.isFinite(Number(b.recordedOpeningBalance))).length;
+        const openingMissing = openingBalances.filter(b => b.recordedOpeningBalance === null || b.recordedOpeningBalance === undefined || !Number.isFinite(Number(b.recordedOpeningBalance))).length;
+        const checks = [
+          { title: 'Transaction classification', value: transactionCount ? `${receipts} receipts · ${payments} payments · ${contra} contra` : 'No transaction data loaded', detail: 'Counts by transaction class; contra entries must not be treated as income or expense.', count: transactionCount && receipts + payments + contra === transactionCount ? 0 : 1, target: 'transaction-verification' as const },
+          { title: 'Reporting period completeness', value: `${monthsPresent.size} of 12 months present`, detail: missingMonths.length ? `Missing: ${missingMonths.join(', ')}` : 'All expected FY 2018–19 months are represented.', count: missingMonths.length, target: 'transaction-verification' as const },
+          { title: 'Party mapping', value: `${partyMissing} transactions need party review`, detail: 'Transactions with blank or explicitly unmapped party names.', count: partyMissing, target: 'transaction-verification' as const },
+          { title: 'Category mapping', value: `${categoryMissing} transactions need category review`, detail: 'Transactions without a category name in the loaded transaction data.', count: categoryMissing, target: 'transaction-verification' as const },
+          { title: 'Opening balances', value: `${openingVerified} verified · ${openingPending} pending · ${openingMissing} missing`, detail: 'Opening balance completeness and verification status across loaded accounts.', count: openingPending + openingMissing, target: 'opening-balances' as const },
+          { title: 'Transaction verification', value: `${stats.inspectedTransactions} inspected · ${stats.pendingTransactions} pending`, detail: 'Based on application inspection/evidence status, not the raw transactions.verified column.', count: stats.pendingTransactions + stats.evidenceDiscrepancy + stats.evidenceMissing + stats.internalAuditFailed, target: 'transaction-verification' as const },
+        ];
+        return (
+          <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Database size={19} className="text-indigo-600" /> Data Quality</h2>
+                <p className="mt-1 text-sm text-slate-500">Live checks on imported records and verification completeness. A passing check does not mean the year is audited.</p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">FY 2018–19</span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {checks.map((check) => {
+                const passed = check.count === 0;
+                return (
+                  <button key={check.title} type="button" onClick={() => setCurrentScreen(check.target)} className="rounded-xl border border-slate-200 p-4 text-left transition hover:border-indigo-300 hover:bg-slate-50">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-slate-800">{check.title}</span>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${passed ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                        {passed ? <CheckCircle size={13} /> : <AlertTriangle size={13} />}
+                        {passed ? 'Check passed' : 'Review needed'}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-base font-bold text-slate-900">{check.value}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">{check.detail}</p>
+                    <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-indigo-600">Open verification <ChevronRight size={13} /></div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Lower Row: Left Monthly Table, Right Outstanding Issues + Readiness */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
