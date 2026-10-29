@@ -228,13 +228,13 @@ export const AnomalyDetectionModal: React.FC<AnomalyDetectionModalProps> = ({
         <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs">
             <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-              Total Anomalies
+              Potential Flags
             </div>
             <div className="text-2xl font-bold text-slate-900 mt-0.5">
               {scanResult.totalAnomaliesCount}
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
-              Across {scanResult.totalTransactionsScanned} transactions
+              Rule-based scan across {scanResult.totalTransactionsScanned} live transactions
             </div>
           </div>
 
@@ -270,13 +270,13 @@ export const AnomalyDetectionModal: React.FC<AnomalyDetectionModalProps> = ({
 
           <div className="bg-white rounded-xl border border-indigo-200 p-3 shadow-2xs bg-indigo-50/20">
             <div className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wider">
-              Exposure Amount
+              Flagged Amounts
             </div>
             <div className="text-xl sm:text-2xl font-bold text-indigo-700 mt-0.5">
               ₹{formatINR(scanResult.totalExposureAmount)}
             </div>
             <div className="text-[10px] text-indigo-600 font-medium mt-0.5">
-              Total sum of flagged items
+              Sum of flagged transaction amounts; may overlap
             </div>
           </div>
         </div>
