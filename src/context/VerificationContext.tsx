@@ -407,6 +407,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     } catch (err: any) {
       console.error('[SupabaseClient] Error fetching opening balances:', err);
+      setSupabaseSync((prev) => ({ ...prev, error: `account data: ${err.message || 'fetch failed'}` }));
       setOpeningBalancesError(err.message || 'Failed to fetch opening balances from Supabase');
     } finally {
       setIsLoadingOpeningBalances(false);
@@ -506,6 +507,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     } catch (err: any) {
       console.error('[SupabaseClient] Error fetching transactions:', err);
+      setSupabaseSync((prev) => ({ ...prev, error: `transactions: ${err.message || 'fetch failed'}` }));
       setTransactionsError(err.message || 'Failed to fetch transactions from Supabase');
     } finally {
       setIsLoadingTransactions(false);
@@ -613,6 +615,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     } catch (err: any) {
       console.error('[SupabaseClient] Error fetching monthly reconciliation:', err);
+      setSupabaseSync((prev) => ({ ...prev, error: `monthly reconciliation: ${err.message || 'fetch failed'}` }));
       setReconciliationError(err.message || 'Failed to fetch monthly reconciliation');
     } finally {
       setIsLoadingReconciliation(false);
@@ -654,6 +657,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }));
     } catch (err: any) {
       console.error('[SupabaseClient] Error fetching member balances:', err);
+      setSupabaseSync((prev) => ({ ...prev, error: `member balances: ${err.message || 'fetch failed'}` }));
       setMemberBalancesError(err.message || 'Failed to fetch member balances');
       setMemberOpeningBalances([]);
       setBalanceRegister([]);
@@ -692,6 +696,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }));
     } catch (err: any) {
       console.error('[SupabaseClient] Error fetching demand register:', err);
+      setSupabaseSync((prev) => ({ ...prev, error: `demand register: ${err.message || 'fetch failed'}` }));
       setDemandRegisterError(err.message || 'Failed to fetch demand register');
       setDemandRegister([]);
       setDemandAdjustments([]);
@@ -737,6 +742,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }));
     } catch (err: any) {
       console.error('[SupabaseClient] Error fetching master tables:', err);
+      setSupabaseSync((prev) => ({ ...prev, error: `master tables: ${err.message || 'fetch failed'}` }));
       setMastersError(err.message || 'Failed to fetch master tables');
       setPartyMaster([]);
       setFlatOwnerMaster([]);
@@ -780,7 +786,8 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         ...prev,
         isConnected: true,
         isLoading: false,
-        error: null,
+        // Preserve any table-level fetch error instead of reporting a false clean sync.
+        error: prev.error,
         lastSyncedAt: new Date().toLocaleTimeString(),
       }));
     } catch (err: any) {
