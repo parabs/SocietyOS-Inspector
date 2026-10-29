@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { useVerification } from '../../context/VerificationContext';
 import { formatINR } from '../../config';
-import { StepTabs } from '../layout/StepTabs';
 import { Badge } from '../common/Badge';
 import { AccountId, VerificationStatus } from '../../types';
 
@@ -30,8 +29,6 @@ export const OpeningBalanceVerification: React.FC = () => {
     updateOpeningBalance,
     selectedAccountId,
     setSelectedAccountId,
-    isSeedingDatabase,
-    seedBaselineRecordsToSupabase,
   } = useVerification();
 
   const [activeAccount, setActiveAccount] = useState<AccountId>(selectedAccountId || 'BOM');
@@ -92,9 +89,6 @@ export const OpeningBalanceVerification: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* 3 Step Navigation Tabs */}
-      <StepTabs activeStep={1} />
-
       {/* Header & Subtitle */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -189,17 +183,6 @@ export const OpeningBalanceVerification: React.FC = () => {
               className="px-4 py-2 text-xs font-semibold bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg cursor-pointer transition-colors shadow-2xs"
             >
               Refresh from Supabase
-            </button>
-            <button
-              onClick={async () => {
-                const res = await seedBaselineRecordsToSupabase();
-                setSuccessToast(res.message);
-                setTimeout(() => setSuccessToast(null), 5000);
-              }}
-              disabled={isSeedingDatabase}
-              className="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer transition-colors shadow-xs disabled:opacity-50"
-            >
-              {isSeedingDatabase ? 'Seeding Database...' : 'Seed Baseline Accounts into Database'}
             </button>
           </div>
         </div>
