@@ -833,7 +833,7 @@ export const TransactionVerification: React.FC = () => {
                         {new Date(t.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
 
-                      <td className="py-2.5 px-2 whitespace-nowrap">{t.reportingMonth || t.month}</td>
+                      <td className="py-2.5 px-2 whitespace-nowrap">{t.month}</td>
 
                       <td className="py-2.5 px-2 font-semibold text-slate-800">
                         {t.accountName || t.accountId}
