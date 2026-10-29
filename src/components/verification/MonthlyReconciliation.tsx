@@ -29,7 +29,6 @@ import {
 } from 'recharts';
 import { useVerification } from '../../context/VerificationContext';
 import { formatINR, formatNumber } from '../../config';
-import { StepTabs } from '../layout/StepTabs';
 import { Badge } from '../common/Badge';
 import { AccountId, MonthlyReconciliationRecord, EnrichedTransaction } from '../../types';
 
@@ -123,8 +122,6 @@ export const MonthlyReconciliation: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 3 Step Navigation Tabs */}
-      <StepTabs activeStep={3} />
-
       {/* Header & Subtitle */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
