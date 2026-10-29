@@ -875,16 +875,17 @@ export const TransactionVerification: React.FC = () => {
                         )}
                       </td>
 
+                      <td className="py-2.5 px-3">{t.categoryGroup || '—'}</td>
+                      <td className="py-2.5 px-3">{t.categoryName || '—'}</td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold whitespace-nowrap text-slate-900">
-                        {formatINR(t.amount)}
+                        {formatINR(Math.abs(t.amount))}
                       </td>
-
+                      <td className="py-2.5 px-2 whitespace-nowrap">{t.paymentMode || '—'}</td>
                       <td className="py-2.5 px-2 text-center font-mono text-slate-600 whitespace-nowrap">
                         {t.voucherNo || '—'}
                       </td>
-
                       <td className="py-2.5 px-2 text-center font-mono text-slate-600 whitespace-nowrap">
-                        {t.receiptNo || '—'}
+                        {t.chequeNo || '—'}
                       </td>
 
                       {/* Bill Status */}
