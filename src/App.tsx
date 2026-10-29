@@ -11,7 +11,7 @@ import { VerificationDashboard } from './components/verification/VerificationDas
 import { OpeningBalanceVerification } from './components/verification/OpeningBalanceVerification';
 import { TransactionVerification } from './components/verification/TransactionVerification';
 import { MonthlyReconciliation } from './components/verification/MonthlyReconciliation';
-import { SocietyRoleDashboards } from './components/financial/SocietyRoleDashboards';
+import { SocietyFinancialDashboards } from './components/financial/SocietyFinancialDashboards';
 import { SettingsView } from './components/admin/SettingsView';
 
 const MainContent: React.FC = () => {
@@ -38,12 +38,7 @@ const MainContent: React.FC = () => {
     case 'bank-reconciliation':
     case 'observations-actions':
     case 'reports':
-    case 'treasurer-dashboard':
-    case 'secretary-dashboard':
-    case 'chairman-dashboard':
-    case 'member-dashboard':
-    case 'auditor-dashboard':
-      return <SocietyRoleDashboards screen={currentScreen} />;
+      return <SocietyFinancialDashboards screen={currentScreen} />;
 
     case 'settings':
     case 'data-management':
