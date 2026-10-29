@@ -588,7 +588,7 @@ export const MonthlyReconciliation: React.FC = () => {
                   1
                 </span>
                 <p>
-                  Jul 2018 closing balance difference of ₹ 3,800. Verify payment dated 28 Jul.
+                  {sourceClosingUnavailable ? 'Source monthly closing balances are not loaded. Calculated movements are preliminary and cannot yet be marked reconciled.' : 'Review months with non-zero differences against the source bank statement or cash book.'}
                 </p>
               </div>
 
@@ -604,7 +604,7 @@ export const MonthlyReconciliation: React.FC = () => {
                   3
                 </span>
                 <p>
-                  Opening balance verified with previous audit report and bank passbook.
+                  Opening balance verification status is taken from the saved account verification record.
                 </p>
               </div>
 
