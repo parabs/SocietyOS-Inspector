@@ -1112,8 +1112,9 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         if (rec.id === monthId || rec.month === monthId) {
           const adjustments = updates.adjustments !== undefined ? updates.adjustments : rec.adjustments;
           const calculatedClosing = rec.calculatedOpeningBalance + rec.credits - rec.debits + adjustments;
-          const closingDiff = calculatedClosing - rec.sourceClosingBalance;
-          const status = updates.status || (closingDiff === 0 ? 'Reconciled' : 'Difference');
+          const sourceMissing = rec.remarks.includes('Source closing balance not loaded');
+          const closingDiff = sourceMissing ? 0 : calculatedClosing - rec.sourceClosingBalance;
+          const status = sourceMissing ? 'Pending' : (updates.status || (Math.abs(closingDiff) < 0.01 ? 'Reconciled' : 'Difference'));
 
           carryForwardClosing = calculatedClosing;
 
@@ -1131,7 +1132,8 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const calculatedOpening = carryForwardClosing;
           const calculatedClosing = calculatedOpening + rec.credits - rec.debits + rec.adjustments;
           carryForwardClosing = calculatedClosing;
-          const closingDiff = calculatedClosing - rec.sourceClosingBalance;
+          const sourceMissing = rec.remarks.includes('Source closing balance not loaded');
+          const closingDiff = sourceMissing ? 0 : calculatedClosing - rec.sourceClosingBalance;
 
           return {
             ...rec,
@@ -1164,9 +1166,12 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       };
     });
 
-    // Persist to Supabase account_monthly_balance
+    // Persist only an actual source reconciliation row. Derived CALC-* rows are display-only.
     try {
-      await (supabaseClient.from('account_monthly_balance') as any)
+      const sourceRecord = reconciliations[accountId]?.find((r) => r.id === monthId || r.month === monthId);
+      if (!sourceRecord || sourceRecord.id.startsWith('CALC-')) return;
+      const dbAccountId = accountId === 'TDCC' ? 'ACC-0001' : accountId === 'BOM' ? 'ACC-0002' : 'ACC-0003';
+      const { error } = await (supabaseClient.from('account_monthly_balance') as any)
         .update({
           adjustments: updates.adjustments,
           remarks: updates.remarks,
@@ -1174,7 +1179,10 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           reviewed_by: APP_CONFIG.currentReviewer.name,
           updated_at: new Date().toISOString(),
         })
-        .match({ id: monthId });
+        .eq('account_id', dbAccountId)
+        .eq('month', sourceRecord.month.replace(' ', '-'))
+        .eq('financial_year', 'FY 2018-19');
+      if (error) throw error;
     } catch (e) {
       console.warn('[SupabaseClient] Error updating reconciliation in database:', e);
     }
