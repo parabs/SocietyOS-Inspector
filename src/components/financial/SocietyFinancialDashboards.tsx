@@ -284,7 +284,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
       const expectedAnnual=maintenanceCategory==='CAT-0001'?30000:maintenanceCategory==='CAT-0021'?2400:null;
       const recordedMaintenance=maintenanceDemands.reduce((s,d)=>s+Number(d.total_demand??d.demand_amount??0),0);
       const coverage=expectedAnnual===null?'Not applicable':Math.min(12,demandMonths.size);
-      const last=receipts.map(t=>String(t.date||'')).filter(Boolean).sort().at(-1)||'—';
+      const receiptDates=receipts.map(t=>String(t.date||'')).filter(Boolean).sort();const last=receiptDates.length?receiptDates[receiptDates.length-1]:'—';
       const status=expectedAnnual!==null&&coverage<12?'Demand coverage incomplete ('+coverage+'/12)':closing>0?'Outstanding':closing<0?'Credit balance':'Cleared';
       return {key:String(p.party_id||p.party_name||''),partyType:p.party_type||'Unclassified',name:p.party_name||owner?.owner_name||'Unidentified party',contact:p.contact_person||owner?.owner_name||'Not recorded',flat:flat||'Not recorded',opening,billed,paid,adjustment,closing,last,status,expectedAnnual,recordedMaintenance,coverage,unraised:expectedAnnual===null?null:Math.max(0,expectedAnnual-recordedMaintenance)};
     }).filter(x=>!query||[x.name,x.contact,x.flat,x.partyType].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).filter(x=>partyTypeFilter==='All party types'||x.partyType===partyTypeFilter).sort((a,b)=>b.closing-a.closing);
