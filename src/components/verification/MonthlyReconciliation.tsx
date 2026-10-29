@@ -160,12 +160,18 @@ export const MonthlyReconciliation: React.FC = () => {
     setEditRemarks(rec.remarks === '-' ? '' : rec.remarks);
   };
 
-  const handleEditSave = () => {
+  const handleEditSave = async () => {
     if (!editingRecord) return;
-    updateReconciliation(activeAccount, editingRecord.id, {
+    await updateReconciliation(editingRecord.accountId, editingRecord.month, {
       adjustments: Number(editAdjustments) || 0,
-      remarks: editRemarks || '-',
+      remarks: editRemarks.trim(),
+      calculatedOpeningBalance: editingRecord.calculatedOpeningBalance,
+      credits: editingRecord.credits,
+      debits: editingRecord.debits,
+      calculatedClosingBalance: editingRecord.calculatedOpeningBalance + editingRecord.credits - editingRecord.debits + (Number(editAdjustments) || 0),
+      sourceClosingBalance: editingRecord.sourceClosingBalance,
     });
+    await fetchMonthlyReconciliation();
     setEditingRecord(null);
   };
 
@@ -356,17 +362,26 @@ export const MonthlyReconciliation: React.FC = () => {
                       </td>
 
                       <td className="py-2.5 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => {
-                            setSelectedAccountId(row.accountId);
-                            setSelectedMonthFilter(row.month);
-                            setCurrentScreen('transaction-verification');
-                          }}
-                          title={`Open ${row.month} transactions to review credits, debits and supporting evidence before confirming reconciliation.`}
-                          className="px-2 py-1 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors cursor-pointer"
-                        >
-                          Review Transactions
-                        </button>
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              setSelectedAccountId(row.accountId);
+                              setSelectedMonthFilter(row.month);
+                              setCurrentScreen('transaction-verification');
+                            }}
+                            title={`Open ${row.month} transactions to review credits, debits and supporting evidence.`}
+                            className="px-2 py-1 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors cursor-pointer"
+                          >
+                            Review Transactions
+                          </button>
+                          <button
+                            onClick={() => handleEditOpen(row)}
+                            title="Add or update monthly reconciliation remarks and adjustments"
+                            className="px-2 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded transition-colors cursor-pointer"
+                          >
+                            Remarks
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
