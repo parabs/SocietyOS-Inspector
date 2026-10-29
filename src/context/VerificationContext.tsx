@@ -408,14 +408,20 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setTransactionsError(null);
 
     try {
-      const { data, error } = await supabaseClient
-        .from('transactions')
-        .select('*', { count: 'exact' });
-
-      if (error) {
-        throw new Error(`transactions query failed: ${error.message}`);
-      }
-
+      const [txnRes, accountRes, partyRes, categoryRes] = await Promise.all([
+        supabaseClient.from('transactions').select('*', { count: 'exact' }),
+        supabaseClient.from('account_master').select('account_id, account_name'),
+        supabaseClient.from('party_master').select('party_id, party_name'),
+        supabaseClient.from('category_master').select('category_id, category_name, category_group'),
+      ]);
+      if (txnRes.error) throw new Error(`transactions query failed: ${txnRes.error.message}`);
+      if (accountRes.error) throw new Error(`account_master query failed: ${accountRes.error.message}`);
+      if (partyRes.error) throw new Error(`party_master query failed: ${partyRes.error.message}`);
+      if (categoryRes.error) throw new Error(`category_master query failed: ${categoryRes.error.message}`);
+      const accountNames = new Map((accountRes.data || []).map((x: any) => [x.account_id, x.account_name]));
+      const partyNames = new Map((partyRes.data || []).map((x: any) => [x.party_id, x.party_name]));
+      const categoryDetails = new Map((categoryRes.data || []).map((x: any) => [x.category_id, x]));
+      const data = txnRes.data;
       const rawRows = (data as any[]) || [];
 
       if (rawRows.length === 0) {
@@ -438,11 +444,11 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const rawDate = row.transaction_date || row.date || new Date().toISOString().split('T')[0];
           const billRaw = String(row.bill_status || row.bills_available || '').toLowerCase();
           const voucherRaw = String(row.voucher_receipt_status || row.voucher_available || '').toLowerCase();
-          const billStatus = (row.bill_status || (billRaw.includes('miss') ? 'Missing' : billRaw.includes('discrep') ? 'Discrepancy' : billRaw.includes('n/a') ? 'N/A' : 'Available')) as BillStatus;
-          const voucherReceiptStatus = (row.voucher_receipt_status || (voucherRaw.includes('miss') ? 'Missing' : voucherRaw.includes('discrep') ? 'Discrepancy' : 'Available')) as VoucherReceiptStatus;
+          const billStatus = (row.bill_status || (billRaw.includes('miss') ? 'Missing' : billRaw.includes('discrep') ? 'Discrepancy' : billRaw.includes('n/a') ? 'N/A' : billRaw.includes('avail') ? 'Available' : 'Pending')) as BillStatus;
+          const voucherReceiptStatus = (row.voucher_receipt_status || (voucherRaw.includes('miss') ? 'Missing' : voucherRaw.includes('discrep') ? 'Discrepancy' : voucherRaw.includes('avail') ? 'Available' : 'Pending')) as VoucherReceiptStatus;
           const evidenceStatus = (row.evidence_status || calculateEvidenceStatus(type, billStatus, voucherReceiptStatus)) as EvidenceStatus;
           const auditRaw = String(row.internal_audit_status || row.verified || '').toLowerCase();
-          const internalAuditStatus = (row.internal_audit_status || (auditRaw.includes('fail') || auditRaw.includes('discrep') ? 'Failed' : auditRaw.includes('verif') ? 'Verified' : 'Pending')) as InternalAuditStatus;
+          const internalAuditStatus = (row.internal_audit_status || (auditRaw.includes('fail') || auditRaw.includes('discrep') ? 'Failed' : auditRaw === 'true' || auditRaw.includes('verif') ? 'Verified' : 'Pending')) as InternalAuditStatus;
           const voucherRef = row.voucher_no || row.voucher_receipt_no || undefined;
           return {
             id: row.transaction_id || row.id || `TXN-${String(idx + 1).padStart(5, '0')}`,
@@ -451,15 +457,21 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             sourceFile: row.source_file || row.source_id || 'transactions.supabase',
             sourceSheet: row.source_sheet || 'transactions',
             sourceRow: row.source_row ?? idx + 1,
-            date: rawDate,
+            date: String(rawDate).slice(0, 10),
             month: (() => { const sourceMonth = String(row.month || row.reporting_month || ''); const normalized = sourceMonth.match(/^([A-Za-z]{3,})[- ](\\d{4})$/); return normalized ? `${normalized[1].slice(0, 3)} ${normalized[2]}` : (sourceMonth || (rawDate ? new Date(rawDate).toLocaleString('en-US', { month: 'short', year: 'numeric' }) : 'Apr 2018')); })(),
             accountId,
             type,
-            party: row.party_name || row.party_id || 'Sundry Member / Vendor',
+            party: (row.party_id && partyNames.get(row.party_id)) || row.party_name || row.party_id || 'Sundry Member / Vendor',
             description: row.description || 'Society transaction record',
-            amount: Math.abs(Number(row.amount || 0)),
+            accountName: accountNames.get(row.account_id) || row.account_id || 'Unknown account',
+            categoryName: (row.category_id && (categoryDetails.get(row.category_id) as any)?.category_name) || '',
+            categoryGroup: (row.category_id && (categoryDetails.get(row.category_id) as any)?.category_group) || '',
+            paymentMode: row.payment_mode || '',
+            chequeNo: row.cheque_no || undefined,
+            reportingMonth: row.reporting_month || '',
+            amount: Number(row.amount || 0),
             voucherNo: voucherRef,
-            receiptNo: row.receipt_no || (type === 'Receipt' ? voucherRef : undefined),
+            receiptNo: undefined,
             billStatus,
             voucherReceiptStatus,
             evidenceStatus,
