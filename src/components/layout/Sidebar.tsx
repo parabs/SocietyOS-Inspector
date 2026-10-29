@@ -103,7 +103,7 @@ export const Sidebar: React.FC = () => {
               <button onClick={() => handleNavClick('secretary-dashboard')} className={navItemClass('secretary-dashboard')}><span className="flex items-center gap-2.5"><FileText className="w-4 h-4"/><span>Secretary</span></span></button>
               <button onClick={() => handleNavClick('chairman-dashboard')} className={navItemClass('chairman-dashboard')}><span className="flex items-center gap-2.5"><ShieldCheck className="w-4 h-4"/><span>Chairman</span></span></button>
               <button onClick={() => handleNavClick('member-dashboard')} className={navItemClass('member-dashboard')}><span className="flex items-center gap-2.5"><Users className="w-4 h-4"/><span>Members</span></span></button>
-              <button onClick={() => handleNavClick('auditor-dashboard')} className={navItemClass('auditor-dashboard')}><span className="flex items-center gap-2.5"><BadgeCheck className="w-4 h-4"/><span>Statutory Auditor</span></span></button>
+              <button onClick={() => handleNavClick('auditor-dashboard')} className={navItemClass('auditor-dashboard')}><span className="flex items-center gap-2.5"><ShieldCheck className="w-4 h-4"/><span>Statutory Auditor</span></span></button>
             </div>
           </div>
 
