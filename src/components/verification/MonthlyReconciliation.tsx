@@ -323,7 +323,8 @@ export const MonthlyReconciliation: React.FC = () => {
 
             <button
               onClick={() => {
-                setSelectedAccountId(activeAccount);
+                if (!showAllAccounts) setSelectedAccountId(activeAccount);
+                setSelectedMonthFilter(drillDownMonth);
                 setCurrentScreen('transaction-verification');
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg cursor-pointer transition-colors"
@@ -512,7 +513,7 @@ export const MonthlyReconciliation: React.FC = () => {
           {/* Monthly Balance Trend Chart */}
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
             <h3 className="font-bold text-sm text-slate-900 mb-2">
-              Monthly Balance Trend – {activeAccount}
+              Monthly Balance Trend – {showAllAccounts ? 'All Accounts' : activeAccount}
             </h3>
 
             <div className="h-48 w-full pt-2">
