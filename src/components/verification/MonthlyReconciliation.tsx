@@ -56,6 +56,11 @@ export const MonthlyReconciliation: React.FC = () => {
   const [showHowToModal, setShowHowToModal] = useState<boolean>(false);
   const [editingRecord, setEditingRecord] = useState<MonthlyReconciliationRecord | null>(null);
   const [editAdjustments, setEditAdjustments] = useState<number>(0);
+  const [editSourceClosing, setEditSourceClosing] = useState<string>('');
+  const [editStatus, setEditStatus] = useState<'Pending' | 'Matched' | 'Mismatch' | 'Mismatch Accepted'>('Pending');
+  const [editOpeningConfirmed, setEditOpeningConfirmed] = useState(false);
+  const [editTransactionsConfirmed, setEditTransactionsConfirmed] = useState(false);
+  const [editClosingConfirmed, setEditClosingConfirmed] = useState(false);
   const [editRemarks, setEditRemarks] = useState<string>('');
 
   const accountList = useMemo(() => {
@@ -70,32 +75,29 @@ export const MonthlyReconciliation: React.FC = () => {
       let carry = openingRecord?.recordedOpeningBalance || 0;
       return months.map((month, monthIndex) => {
         const monthRows = transactions.filter(t => t.month === month && t.accountId === accountId);
-        const credits = monthRows.filter(t => t.type === 'Receipt').reduce((sum,t) => sum + Math.abs(Number(t.amount) || 0),0);
-        const debits = monthRows.filter(t => t.type === 'Payment').reduce((sum,t) => sum + Math.abs(Number(t.amount) || 0),0);
+        const credits = monthRows.filter(t => t.transactionClass !== 'Contra' && t.type === 'Receipt').reduce((sum,t) => sum + Math.abs(Number(t.amount) || 0),0);
+        const debits = monthRows.filter(t => t.transactionClass !== 'Contra' && t.type === 'Payment').reduce((sum,t) => sum + Math.abs(Number(t.amount) || 0),0);
+        const contra = monthRows.filter(t => t.transactionClass === 'Contra').reduce((sum,t) => sum + Number(t.amount || 0),0);
         const stored = storedRows.find(row => row.month === month);
         const opening = carry;
         const adjustments = stored?.adjustments || 0;
-        const closing = opening + credits - debits + adjustments;
+        const closing = opening + credits - debits + contra + adjustments;
         carry = closing;
-        const sourceClosing = stored?.sourceClosingBalance || 0;
-        const hasSourceClosing = !!stored && sourceClosing !== 0;
-        const difference = hasSourceClosing ? closing - sourceClosing : 0;
+        const sourceClosing = stored?.sourceClosingBalance ?? null;
+        const hasSourceClosing = sourceClosing !== null && sourceClosing !== undefined;
+        const difference = hasSourceClosing ? closing - Number(sourceClosing) : 0;
         return {
           id: stored?.id || 'CALC-' + accountId + '-' + monthIndex,
           month, monthIndex, accountId,
           sourceOpeningBalance: opening,
           calculatedOpeningBalance: opening,
           openingDifference: 0,
-          credits, debits, adjustments,
+          credits, debits, contra, adjustments,
           calculatedClosingBalance: closing,
           sourceClosingBalance: sourceClosing,
           closingDifference: difference,
-          status: (hasSourceClosing ? (difference === 0 ? 'Reconciled' : 'Difference') : 'Pending') as MonthlyReconciliationRecord['status'],
-          remarks: stored?.remarks && stored.remarks !== 'Loaded from Supabase database'
-            ? stored.remarks
-            : (accountId === 'CASH'
-              ? 'Calculated from cash transactions; verify against the cash book.'
-              : 'Calculated from transactions; verify against the bank passbook.'),
+          status: (stored?.status || (hasSourceClosing ? (Math.abs(difference) < 0.01 ? 'Matched' : 'Mismatch') : 'Pending')) as MonthlyReconciliationRecord['status'],
+          remarks: stored?.remarks || '',
         };
       });
     });
@@ -110,7 +112,7 @@ export const MonthlyReconciliation: React.FC = () => {
   const calculatedClosing = (accountId: AccountId) => {
     const opening = openingBalances.find((o) => o.accountId === accountId)?.recordedOpeningBalance || 0;
     const movement = transactions.filter(t => t.accountId === accountId).reduce((sum, t) =>
-      sum + (t.type === 'Receipt' ? Math.abs(t.amount) : -Math.abs(t.amount)), 0);
+      sum + (t.transactionClass === 'Contra' ? Number(t.amount || 0) : t.type === 'Receipt' ? Math.abs(t.amount) : -Math.abs(t.amount)), 0);
     return reconciliations[accountId]?.[reconciliations[accountId].length - 1]?.calculatedClosingBalance ?? opening + movement;
   };
   const tdccClosing = calculatedClosing('TDCC');
@@ -157,19 +159,27 @@ export const MonthlyReconciliation: React.FC = () => {
   const handleEditOpen = (rec: MonthlyReconciliationRecord) => {
     setEditingRecord(rec);
     setEditAdjustments(rec.adjustments);
+    setEditSourceClosing(rec.sourceClosingBalance == null ? '' : String(rec.sourceClosingBalance));
+    setEditStatus(rec.status);
+    setEditOpeningConfirmed(Boolean(rec.openingConfirmed));
+    setEditTransactionsConfirmed(Boolean(rec.transactionsConfirmed));
+    setEditClosingConfirmed(Boolean(rec.closingConfirmed));
     setEditRemarks(rec.remarks === '-' ? '' : rec.remarks);
   };
 
   const handleEditSave = async () => {
     if (!editingRecord) return;
+    const sourceClosing = editSourceClosing.trim() === '' ? null : Number(editSourceClosing);
+    const calculated = editingRecord.calculatedOpeningBalance + editingRecord.credits - editingRecord.debits + (editingRecord.contra || 0) + (Number(editAdjustments) || 0);
+    const diff = sourceClosing === null ? null : calculated - sourceClosing;
+    const suggested: 'Pending' | 'Matched' | 'Mismatch' = sourceClosing === null ? 'Pending' : Math.abs(diff || 0) < 0.01 ? 'Matched' : 'Mismatch';
     await updateReconciliation(editingRecord.accountId, editingRecord.month, {
-      adjustments: Number(editAdjustments) || 0,
-      remarks: editRemarks.trim(),
-      calculatedOpeningBalance: editingRecord.calculatedOpeningBalance,
-      credits: editingRecord.credits,
-      debits: editingRecord.debits,
-      calculatedClosingBalance: editingRecord.calculatedOpeningBalance + editingRecord.credits - editingRecord.debits + (Number(editAdjustments) || 0),
-      sourceClosingBalance: editingRecord.sourceClosingBalance,
+      adjustments: Number(editAdjustments) || 0, remarks: editRemarks.trim(),
+      status: editStatus === 'Mismatch Accepted' ? 'Mismatch Accepted' : suggested,
+      calculatedOpeningBalance: editingRecord.calculatedOpeningBalance, credits: editingRecord.credits,
+      debits: editingRecord.debits, contra: editingRecord.contra || 0, calculatedClosingBalance: calculated,
+      sourceClosingBalance: sourceClosing, openingConfirmed: editOpeningConfirmed,
+      transactionsConfirmed: editTransactionsConfirmed, closingConfirmed: editClosingConfirmed, confirmationNotes: editRemarks.trim(),
     });
     await fetchMonthlyReconciliation();
     setEditingRecord(null);
@@ -261,6 +271,7 @@ export const MonthlyReconciliation: React.FC = () => {
                   <th className="py-2.5 px-2 text-right">
                     Debits (Payments)
                   </th>
+                  <th className="py-2.5 px-2 text-right">Contra (+/-)</th>
                   <th className="py-2.5 px-2 text-right">
                     Adjustments (+/-)
                   </th>
@@ -322,6 +333,7 @@ export const MonthlyReconciliation: React.FC = () => {
                         {formatNumber(row.debits)}
                       </td>
 
+                      <td className="py-2.5 px-2 text-right font-mono text-indigo-700">{row.contra !== 0 ? formatNumber(row.contra) : '—'}</td>
                       <td className="py-2.5 px-2 text-right font-mono text-slate-500">
                         {row.adjustments !== 0 ? formatNumber(row.adjustments) : '—'}
                       </td>
@@ -345,11 +357,8 @@ export const MonthlyReconciliation: React.FC = () => {
                       <td className="py-2.5 px-2 text-center whitespace-nowrap">
                         <Badge
                           variant={
-                            row.status === 'Reconciled'
-                              ? 'reconciled'
-                              : row.status === 'Difference'
-                              ? 'difference'
-                              : 'pending'
+                            row.status === 'Matched' || row.status === 'Reconciled' ? 'reconciled' :
+                            row.status === 'Mismatch' || row.status === 'Mismatch Accepted' || row.status === 'Difference' ? 'difference' : 'pending'
                           }
                           label={row.status}
                           showIcon={false}
@@ -363,24 +372,8 @@ export const MonthlyReconciliation: React.FC = () => {
 
                       <td className="py-2.5 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="inline-flex items-center gap-1.5">
-                          <button
-                            onClick={() => {
-                              setSelectedAccountId(row.accountId);
-                              setSelectedMonthFilter(row.month);
-                              setCurrentScreen('transaction-verification');
-                            }}
-                            title={`Open ${row.month} transactions to review credits, debits and supporting evidence.`}
-                            className="px-2 py-1 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors cursor-pointer"
-                          >
-                            Review Transactions
-                          </button>
-                          <button
-                            onClick={() => handleEditOpen(row)}
-                            title="Add or update monthly reconciliation remarks and adjustments"
-                            className="px-2 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded transition-colors cursor-pointer"
-                          >
-                            Remarks
-                          </button>
+                          <button onClick={() => handleEditOpen(row)} title="Verify opening, transaction movements and source closing balance" className="px-2 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded transition-colors cursor-pointer">Verify</button>
+                          <button onClick={() => { setSelectedAccountId(row.accountId); setSelectedMonthFilter(row.month); setCurrentScreen('transaction-verification'); }} title={`Drill down to ${row.month} transactions`} className="px-2 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded transition-colors cursor-pointer">Transactions</button>
                         </div>
                       </td>
                     </tr>
@@ -558,7 +551,7 @@ export const MonthlyReconciliation: React.FC = () => {
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
               <div>
                 <h3 className="font-bold text-base text-slate-900">
-                  Reconciliation Review – {editingRecord.month}
+                  Verify Monthly Reconciliation – {editingRecord.month}
                 </h3>
                 <span className="text-xs text-slate-500 font-medium">
                   {activeAccount === 'TDCC' ? 'TDCC Main Account' : activeAccount}
@@ -586,12 +579,16 @@ export const MonthlyReconciliation: React.FC = () => {
                   <span className="text-slate-500 block text-[11px]">Debits:</span>
                   <span className="font-mono font-bold text-rose-600">-{formatINR(editingRecord.debits)}</span>
                 </div>
-                <div>
-                  <span className="text-slate-500 block text-[11px]">Source Closing:</span>
-                  <span className="font-mono font-bold">{formatINR(editingRecord.sourceClosingBalance)}</span>
-                </div>
+                <div><span className="text-slate-500 block text-[11px]">Net Contra:</span><span className="font-mono font-bold text-indigo-700">{formatINR(editingRecord.contra || 0)}</span></div>
               </div>
 
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-800 mb-1">Source Closing Balance (₹) — passbook / cash book</label>
+                <input type="number" step="0.01" value={editSourceClosing} onChange={(e) => { const v=e.target.value; setEditSourceClosing(v); const n=v.trim()===''?null:Number(v); const calc=editingRecord.calculatedOpeningBalance+editingRecord.credits-editingRecord.debits+(editingRecord.contra||0)+(Number(editAdjustments)||0); setEditStatus(n===null?'Pending':Math.abs(calc-n)<0.01?'Matched':'Mismatch'); }} placeholder="Enter month-end source balance" className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono" />
+                <div className="grid grid-cols-2 gap-2 mt-2"><div><label className="block text-[11px] font-semibold mb-1">Calculated Closing</label><div className="p-2 rounded bg-slate-50 border font-mono">{formatINR(editingRecord.calculatedOpeningBalance+editingRecord.credits-editingRecord.debits+(editingRecord.contra||0)+(Number(editAdjustments)||0))}</div></div><div><label className="block text-[11px] font-semibold mb-1">Difference</label><div className="p-2 rounded bg-slate-50 border font-mono">{editSourceClosing.trim()===''?'—':formatINR(editingRecord.calculatedOpeningBalance+editingRecord.credits-editingRecord.debits+(editingRecord.contra||0)+(Number(editAdjustments)||0)-Number(editSourceClosing))}</div></div></div>
+              </div>
+              <div><label className="block text-[11px] font-semibold text-slate-800 mb-1">Status</label><select value={editStatus} onChange={e=>setEditStatus(e.target.value as typeof editStatus)} className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2"><option>Pending</option><option>Matched</option><option>Mismatch</option><option>Mismatch Accepted</option></select>{editStatus==='Mismatch Accepted' && <p className="text-[10px] text-amber-700 mt-1">Explain the accepted difference in remarks.</p>}</div>
+              <div className="space-y-2 rounded-lg border p-3 bg-slate-50"><p className="font-semibold">Reviewer confirmations</p><label className="flex items-center gap-2"><input type="checkbox" checked={editOpeningConfirmed} onChange={e=>setEditOpeningConfirmed(e.target.checked)}/> Opening balance checked</label><label className="flex items-center gap-2"><input type="checkbox" checked={editTransactionsConfirmed} onChange={e=>setEditTransactionsConfirmed(e.target.checked)}/> Transaction movements checked</label><label className="flex items-center gap-2"><input type="checkbox" checked={editClosingConfirmed} onChange={e=>setEditClosingConfirmed(e.target.checked)}/> Source closing balance checked</label></div>
               <div>
                 <label className="block text-[11px] font-semibold text-slate-800 mb-1">
                   Adjustments (+/- ₹)
@@ -634,7 +631,7 @@ export const MonthlyReconciliation: React.FC = () => {
                 className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>Save Record</span>
+                <span>Save Verification</span>
               </button>
             </div>
           </div>
@@ -659,7 +656,7 @@ export const MonthlyReconciliation: React.FC = () => {
 
             <div className="text-xs text-slate-600 space-y-3">
               <p>
-                <strong>Formula:</strong> Calculated Closing Balance = Calculated Opening Balance + Credits − Debits + Adjustments.
+                <strong>Formula:</strong> Calculated Closing Balance = Opening Balance + Credits − Debits + Net Contra Movement + Adjustments.
               </p>
               <p>
                 <strong>Month-to-Month Carry Forward:</strong> In May 2018, the calculated opening balance automatically inherits April’s calculated closing balance. Any unresolved difference in July cascades directly into August.
