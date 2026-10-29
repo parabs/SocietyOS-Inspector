@@ -310,7 +310,7 @@ export const MonthlyReconciliation: React.FC = () => {
                       </td>
 
                       <td className="py-2.5 px-2 text-right font-mono text-slate-700">
-                        {sourceBalancesUnavailable ? 'Not loaded' : formatNumber(row.sourceOpeningBalance)}
+                        {formatNumber(row.sourceOpeningBalance)}
                       </td>
 
                       <td className="py-2.5 px-2 text-right font-mono text-slate-900 font-medium">
@@ -343,7 +343,7 @@ export const MonthlyReconciliation: React.FC = () => {
                       </td>
 
                       <td className="py-2.5 px-2 text-right font-mono text-slate-700">
-                        {sourceBalancesUnavailable ? 'Not loaded' : formatNumber(row.sourceClosingBalance)}
+                        {row.sourceClosingBalance === null || row.sourceClosingBalance === undefined ? 'Not entered' : formatNumber(row.sourceClosingBalance)}
                       </td>
 
                       <td
@@ -351,7 +351,7 @@ export const MonthlyReconciliation: React.FC = () => {
                           hasClosingDiff ? 'text-rose-600' : 'text-slate-700'
                         }`}
                       >
-                        {sourceBalancesUnavailable ? '—' : formatNumber(row.closingDifference)}
+                        {row.sourceClosingBalance === null || row.sourceClosingBalance === undefined ? '—' : formatNumber(row.closingDifference)}
                       </td>
 
                       <td className="py-2.5 px-2 text-center whitespace-nowrap">
@@ -405,6 +405,8 @@ export const MonthlyReconciliation: React.FC = () => {
                   </td>
                   <td className="py-2.5 px-2 text-right font-mono">
                     {formatNumber(totalDebits)}
+                  </td>
+                  <td className="py-2.5 px-2 text-right font-mono">{formatNumber(accountList.reduce((sum, row) => sum + row.contra, 0))}
                   </td>
                   <td className="py-2.5 px-2 text-right font-mono">
                     {totalAdjustments !== 0 ? formatNumber(totalAdjustments) : '—'}
