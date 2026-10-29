@@ -217,7 +217,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
    </div>
   </>}
 
-  {screen!=='reports'&&<Panel title="Transaction Summary & Source Traceability" action={<span className="text-[10px] text-slate-500">{num(filtered.length)} rows</span>}><Table headers={['Date','Transaction ID','Party / Payee','Category','Type','Amount','Voucher / receipt','Evidence','Source file / row']} rows={filtered.slice(0,100).map(t=>[t.date||'—',t.id||'—',t.party||'Unmapped',t.categoryName||'Unclassified',t.transactionClass||t.type,currencyCell(Number(t.amount)||0),t.voucherNo||t.receiptNo||'—',statusPill(t.evidenceStatus||'Pending'),(t.sourceFile||'Source not recorded')+(t.sourceRow?' · row '+t.sourceRow:'')])}/Panel>}
+  {screen!=='reports'&&<Panel title="Transaction Summary & Source Traceability" action={<span className="text-[10px] text-slate-500">{num(filtered.length)} rows</span>}><Table headers={['Date','Transaction ID','Party / Payee','Category','Type','Amount','Voucher / receipt','Evidence','Source file / row']} rows={filtered.slice(0,100).map(t=>[t.date||'—',t.id||'—',t.party||'Unmapped',t.categoryName||'Unclassified',t.transactionClass||t.type,currencyCell(Number(t.amount)||0),t.voucherNo||t.receiptNo||'—',statusPill(t.evidenceStatus||'Pending'),(t.sourceFile||'Source not recorded')+(t.sourceRow?' · row '+t.sourceRow:'')])}</Panel>}
   <footer className="flex flex-wrap items-center justify-between gap-2 px-1 text-[10px] text-slate-500"><span>Society OS · data is derived from connected records; missing fields are labelled rather than estimated.</span><span>Showing {Math.min(100,filtered.length)} of {num(filtered.length)} filtered transactions · CSV exports all filtered rows.</span></footer>
  </div>;
 };
