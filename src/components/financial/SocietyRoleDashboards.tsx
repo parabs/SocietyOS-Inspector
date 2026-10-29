@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
-  AlertTriangle, ArrowDownRight, ArrowUpRight, BadgeCheck, Banknote, ClipboardCheck,
-  Download, FileText, Landmark, RefreshCw, ShieldCheck, Users, Wallet, CalendarDays,
+  AlertTriangle, ArrowDownRight, ArrowUpRight, Banknote,
+  Download, FileText, Landmark, RefreshCw, ShieldCheck, Users, Wallet,
   CheckCircle2, CircleHelp, Search, ChevronRight
 } from 'lucide-react';
 import { useVerification, ScreenId } from '../../context/VerificationContext';
