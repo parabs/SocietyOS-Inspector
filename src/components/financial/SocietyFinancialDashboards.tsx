@@ -189,7 +189,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
       const periodDs=ds.filter(d=>period==='All months'||String(d.month||'').trim().toLowerCase()===period.toLowerCase()||String(d.month||'').trim().toLowerCase().startsWith(period.slice(0,3).toLowerCase()));
       const tx=transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&(String(t.party||'').trim().toLowerCase()===name.toLowerCase()||String(t.party||'').trim().toLowerCase()===key.toLowerCase())&&(period==='All months'||String(t.reportingMonth||t.month||'').replace(/\\n/g,' ').trim().toLowerCase()===period.toLowerCase()));
       const demand=periodDs.reduce((s,d)=>s+Number(d.total_demand||0),0),paid=tx.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
-      const adjustments=demandAdjustments.filter(a=>(String(a.flat_no||a.member_id||'')===key||String(a.member_name||'')===name)&&(period==='All months'||String(a.month||'').trim().toLowerCase()===period.toLowerCase())).reduce((s,a)=>s+Number(a.amount||0),0);
+      const adjustments=demandAdjustments.filter(a=>(String(a.flat_no||a.member_id||'')===key||String(a.member_name||'')===name)&&a.is_approved===true&&(period==='All months'||String(a.month||'').trim().toLowerCase()===period.toLowerCase())).reduce((s,a)=>s+Number(a.amount||0),0);
       const opening=Number(bal?.opening_balance)||0,closing=Number(cum?.net_outstanding??bal?.closing_balance)||0;
       return {key,name,type:p?.party_type||'Member / Owner',flat:owner?.flat_no||bal?.flat_no||p?.flat_no||'Not recorded',opening,demand,paid,adjustments,uncollected:Math.max(0,demand-paid-adjustments),collection:demand>0?Math.min(100,paid/demand*100):0,closing};
     }).filter(x=>(partyTypeFilter==='All party types'||x.type===partyTypeFilter)&&(!query||[x.name,x.flat].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase())))).sort((a,b)=>b.uncollected-a.uncollected);
@@ -275,7 +275,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
       const name=owner?.owner_name||bal?.member_name||cum?.member_name||partyMaster.find(p=>p.flat_no===key)?.party_name||key;
       const billed=Number(cum?.total_billed??bal?.billed_amount) || ds.reduce((s,d)=>s+Number(d.total_demand||0),0);
       const paid=Number(cum?.total_received??bal?.received_amount) || 0;
-      const adjustment=Number(cum?.total_adjustments??bal?.adjusted_amount) || demandAdjustments.filter(a=>String(a.flat_no||a.member_id||'')===key).reduce((s,a)=>s+Number(a.amount||0),0);
+      const adjustment=Number(cum?.total_adjustments??bal?.adjusted_amount) || demandAdjustments.filter(a=>String(a.flat_no||a.member_id||'')===key&&a.is_approved===true).reduce((s,a)=>s+Number(a.amount||0),0);
       const opening=Number(bal?.opening_balance)||0;
       const savedClosing=cum?.net_outstanding??bal?.closing_balance;
       const closing=savedClosing!==undefined&&savedClosing!==null?Number(savedClosing):(opening+billed-paid-adjustment);
