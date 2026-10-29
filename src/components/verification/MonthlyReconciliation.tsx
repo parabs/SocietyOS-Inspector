@@ -120,6 +120,7 @@ export const MonthlyReconciliation: React.FC = () => {
   const closingMarCalc = accountList[accountList.length - 1]?.calculatedClosingBalance || 0;
   const closingMarSource = accountList[accountList.length - 1]?.sourceClosingBalance || 0;
   const finalDifference = closingMarCalc - closingMarSource;
+  const sourceClosingUnavailable = accountList.some((row) => row.remarks.includes('Source closing balance not loaded'));
 
   // Chart data
   const chartData = useMemo(() => {
@@ -565,13 +566,13 @@ export const MonthlyReconciliation: React.FC = () => {
 
               <div className="flex justify-between py-1 text-slate-600">
                 <span>Source Closing Balance (Mar 2019)</span>
-                <span className="font-bold font-mono text-slate-900">{formatINR(closingMarSource)}</span>
+                <span className="font-bold font-mono text-slate-900">{sourceClosingUnavailable ? 'Not loaded' : formatINR(closingMarSource)}</span>
               </div>
 
               <div className="flex justify-between py-1.5 border-t border-slate-200 font-bold">
                 <span>Difference</span>
                 <span className={`font-mono ${finalDifference === 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {formatINR(finalDifference)}
+                  {sourceClosingUnavailable ? '—' : formatINR(finalDifference)}
                 </span>
               </div>
             </div>
@@ -595,7 +596,7 @@ export const MonthlyReconciliation: React.FC = () => {
                 <span className="w-4 h-4 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
                   2
                 </span>
-                <p>All other months reconcile with source records.</p>
+                <p>Reconciliation status is based on saved source records and reviewer findings.</p>
               </div>
 
               <div className="flex items-start gap-2">
@@ -612,7 +613,7 @@ export const MonthlyReconciliation: React.FC = () => {
                   4
                 </span>
                 <p>
-                  Monthly credits and debits match transaction records for verified transactions.
+                  Monthly credits and debits are calculated from transaction records; confirm against source records.
                 </p>
               </div>
 
