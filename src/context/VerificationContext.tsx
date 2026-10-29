@@ -133,6 +133,11 @@ interface VerificationContextType {
       adjustments?: number;
       remarks?: string;
       status?: 'Reconciled' | 'Difference' | 'Pending';
+      calculatedOpeningBalance?: number;
+      credits?: number;
+      debits?: number;
+      calculatedClosingBalance?: number;
+      sourceClosingBalance?: number;
     }
   ) => Promise<void>;
 
@@ -1099,6 +1104,11 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       adjustments?: number;
       remarks?: string;
       status?: 'Reconciled' | 'Difference' | 'Pending';
+      calculatedOpeningBalance?: number;
+      credits?: number;
+      debits?: number;
+      calculatedClosingBalance?: number;
+      sourceClosingBalance?: number;
     }
   ) => {
     setReconciliations((prev) => {
@@ -1186,11 +1196,12 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         updated_at: new Date().toISOString(),
       };
       if (current) {
-        payload.target_opening_balance = current.calculatedOpeningBalance;
-        payload.credits_source = current.credits;
-        payload.debits_source = current.debits;
-        payload.target_closing_balance = current.calculatedOpeningBalance + current.credits - current.debits + Number(payload.adjustments || 0);
-        payload.closing_discrepancy = current.sourceClosingBalance ? Number(payload.target_closing_balance) - current.sourceClosingBalance : null;
+        payload.target_opening_balance = updates.calculatedOpeningBalance ?? current?.calculatedOpeningBalance;
+      payload.credits_source = updates.credits ?? current?.credits ?? 0;
+      payload.debits_source = updates.debits ?? current?.debits ?? 0;
+      payload.target_closing_balance = updates.calculatedClosingBalance ?? ((Number(payload.target_opening_balance) || 0) + (Number(payload.credits_source) || 0) - (Number(payload.debits_source) || 0) + Number(payload.adjustments || 0));
+      const sourceClosing = updates.sourceClosingBalance ?? current?.sourceClosingBalance;
+      payload.closing_discrepancy = sourceClosing ? Number(payload.target_closing_balance) - sourceClosing : null;
       }
       const { error } = await (supabaseClient.from('account_monthly_balance') as any)
         .upsert(payload, { onConflict: 'financial_year,month,account_id' });
