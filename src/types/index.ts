@@ -34,6 +34,12 @@ export interface TransactionSourceRecord {
   type: TransactionType;
   party: string;
   description: string;
+  accountName?: string;
+  categoryName?: string;
+  categoryGroup?: string;
+  paymentMode?: string;
+  chequeNo?: string;
+  reportingMonth?: string;
   amount: number;
   voucherNo?: string;
   receiptNo?: string;
