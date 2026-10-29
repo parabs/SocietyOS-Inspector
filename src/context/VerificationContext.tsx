@@ -801,31 +801,35 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   ]);
 
   // ==========================================
-  // Dedicated useEffect Hooks for each verification module
+  // Automatic live-data refresh
+  // Load every database-backed collection on startup, when the
+  // user returns to the tab, and periodically while the app is open.
   // ==========================================
   useEffect(() => {
-    fetchOpeningBalances();
-  }, [fetchOpeningBalances]);
+    void refetchAll();
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void refetchAll();
+      }
+    };
 
-  useEffect(() => {
-    fetchMonthlyReconciliation();
-  }, [fetchMonthlyReconciliation]);
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
 
-  useEffect(() => {
-    fetchMemberBalances();
-  }, [fetchMemberBalances]);
+    // Keep dashboards and registers current without requiring manual refresh.
+    const refreshTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void refetchAll();
+      }
+    }, 60_000);
 
-  useEffect(() => {
-    fetchDemandRegister();
-  }, [fetchDemandRegister]);
-
-  useEffect(() => {
-    fetchMasters();
-  }, [fetchMasters]);
+    return () => {
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.clearInterval(refreshTimer);
+    };
+  }, [refetchAll]);
 
   // Persist locally for session resumption
   useEffect(() => {
