@@ -26,12 +26,11 @@ export const Header: React.FC = () => {
             <Building2 className="w-6 h-6" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-lg tracking-tight text-white">Varsha</span>
-              <span className="font-bold text-lg text-blue-400">निवास</span>
+            <div className="font-bold text-sm sm:text-base tracking-tight text-white leading-tight max-w-[330px]">
+              {APP_CONFIG.societyName}
             </div>
-            <div className="text-xs text-slate-400 font-medium leading-none">
-              Co-operative Housing Society
+            <div className="text-[10px] sm:text-xs text-slate-400 font-medium leading-tight mt-0.5 max-w-[340px]">
+              Regd. No. {APP_CONFIG.registrationNo}
             </div>
             <div className="text-[10px] text-slate-500 font-mono tracking-wider mt-0.5">
               Financial Management | Transaction Verification
