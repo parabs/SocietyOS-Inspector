@@ -35,6 +35,31 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const [accountFilter,setAccountFilter]=useState<'TDCC'|'BOM'|'CASH'|'ALL'>('TDCC');
  const [activeTab,setActiveTab]=useState('Overview');
  const [selectedReport,setSelectedReport]=useState('party-balances');
+ const [reportCategory,setReportCategory]=useState('All Reports');
+ const reportCatalog=[
+  {id:'party-balances',name:'Debtors — All Parties',category:'Debtors & Parties',description:'All member receivables and closing dues'},
+  {id:'demand-summary',name:'Demand Summary by Party',category:'Demands & Payments',description:'Opening, demand, receipts, adjustments and dues'},
+  {id:'monthly-demands',name:'Monthly Demand Matrix',category:'Demands & Payments',description:'Opening balance and each month’s demand'},
+  {id:'monthly-payments',name:'Monthly Payment / Collection Matrix',category:'Demands & Payments',description:'Opening balance and each month’s member receipts'},
+  {id:'member-ledger',name:'Member / Flat Owner Ledger',category:'Debtors & Parties',description:'Party-wise balances with demand and collection history'},
+  {id:'vendor-ledger',name:'Vendor / Payee Ledger',category:'Debtors & Parties',description:'Payments and evidence gaps by payee'},
+  {id:'receipts-payments',name:'Receipts & Payments Account',category:'Financial Statements',description:'Cash movement from available transactions'},
+  {id:'income-expense',name:'Income & Expenditure Analysis',category:'Financial Statements',description:'Category-wise income and expense movements'},
+  {id:'balance-sheet',name:'Balance Sheet Readiness',category:'Financial Statements',description:'Assets, liabilities, funds and readiness checks'},
+  {id:'trial-balance',name:'Trial Balance Readiness',category:'Financial Statements',description:'Opening balances, mappings and double-entry prerequisites'},
+  {id:'cashbook',name:'Cash Book & Bank Books',category:'Registers',description:'Account-wise receipts, payments and net movement'},
+  {id:'receipts',name:'Receipts Register',category:'Registers',description:'Receipt transactions and references'},
+  {id:'payments',name:'Payments & Expense Register',category:'Registers',description:'Payments, vouchers and supporting evidence'},
+  {id:'bank-recon',name:'Bank Reconciliation Register',category:'Registers',description:'Monthly book-to-bank reconciliation status'},
+  {id:'expense-analysis',name:'Expense Analysis by Category',category:'Registers',description:'Expense category totals and evidence gaps'},
+  {id:'missing-docs',name:'Missing Document / Evidence Register',category:'Audit & Governance',description:'Missing bills, vouchers and transaction evidence'},
+  {id:'statutory',name:'Statutory & Governance Register',category:'Audit & Governance',description:'AGM, committee, approvals and complaints controls'},
+  {id:'rectification',name:'Audit Observations & Rectification',category:'Audit & Governance',description:'Open observations and corrective actions'},
+  {id:'monthly-summary',name:'Monthly Financial Control Summary',category:'Financial Statements',description:'Monthly receipts, payments, contra and evidence gaps'}
+ ];
+ const reportCategories=['All Reports','Debtors & Parties','Demands & Payments','Financial Statements','Registers','Audit & Governance'];
+ const visibleReports=reportCatalog.filter(r=>reportCategory==='All Reports'||r.category===reportCategory);
+ const reportCounts=reportCategories.map(cat=>({name:cat,count:cat==='All Reports'?reportCatalog.length:reportCatalog.filter(r=>r.category===cat).length}));
  const loading=isLoadingTransactions||isLoadingDemandRegister||isLoadingMasters;
  const titles:Record<string,{title:string;sub:string}> = {
   'financial-summary':{title:'Financial Summary',sub:'Consolidated financial position, collections, payments, demand and control exceptions.'},
@@ -99,6 +124,75 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   const txRows = (kind:'Receipt'|'Payment') => filtered.filter(t=>t.type===kind&&t.transactionClass!=='Contra').map(t=>[t.date||'—',t.id||'—',t.party||'Unmapped',t.categoryName||'Unclassified',t.accountName||'Unmapped',currencyCell(Math.abs(Number(t.amount)||0)),t.voucherNo||t.receiptNo||'—',statusPill(t.evidenceStatus||'Pending')]);
   const partyPayments = Object.entries(filtered.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra').reduce((a:Record<string,{count:number;amount:number;gaps:number}>,t)=>{const k=t.party||'Unmapped payee';a[k]??={count:0,amount:0,gaps:0};a[k].count++;a[k].amount+=Math.abs(Number(t.amount)||0);if(t.evidenceStatus!=='Complete')a[k].gaps++;return a;},{})).sort((a,b)=>b[1].amount-a[1].amount).map(([k,v])=>[k,num(v.count),currencyCell(v.amount),currencyCell(v.amount/Math.max(1,v.count)),num(v.gaps)]);
   switch(selectedReport) {
+   case 'demand-summary': {
+    const keys=new Set<string>();
+    flatOwnerMaster.forEach(x=>keys.add(String(x.flat_no||x.owner_name||'')));
+    memberFinancialBalances.forEach(x=>keys.add(String(x.flat_no||'')));
+    cumulativeOutstanding.forEach(x=>keys.add(String(x.flat_no||'')));
+    demandRegister.forEach(x=>keys.add(String(x.flat_no||x.member_id||'')));
+    const rows=Array.from(keys).filter(Boolean).map(key=>{
+      const owner=flatOwnerMaster.find(x=>String(x.flat_no||'')===key);
+      const bal=memberFinancialBalances.find(x=>String(x.flat_no||'')===key);
+      const cum=cumulativeOutstanding.find(x=>String(x.flat_no||'')===key);
+      const demands=demandRegister.filter(d=>String(d.flat_no||d.member_id||'')===key);
+      const tx=transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&(
+       String(t.party||'').trim().toLowerCase()===String(owner?.owner_name||bal?.member_name||cum?.member_name||'').trim().toLowerCase() ||
+       String(t.party||'').trim().toLowerCase()===key.toLowerCase()
+      ));
+      const opening=Number(bal?.opening_balance)||0;
+      const demand=demands.reduce((s,d)=>s+Number(d.total_demand||0),0);
+      const paid=tx.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
+      const adjustments=demandAdjustments.filter(a=>String(a.flat_no||a.member_id||'')===key).reduce((s,a)=>s+Number(a.amount||0),0);
+      const closing=opening+demand-paid-adjustments;
+      const name=owner?.owner_name||bal?.member_name||cum?.member_name||partyMaster.find(p=>p.flat_no===key)?.party_name||key;
+      return {key,name,opening,demand,paid,adjustments,closing};
+    }).filter(x=>!query||[x.key,x.name].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).sort((a,b)=>b.closing-a.closing);
+    return {title:'Demand Summary by Party',note:'Party-level demand and receipt matching uses available flat/member names. Where receipt allocation is not explicit, verify the party mapping before relying on closing dues. Adjustments are shown separately; opening balances require verification.',headers:['Flat / Party ID','Party / Member Name','Opening Balance','Demand Raised','Payments / Receipts','Adjustments','Closing Dues'],rows:rows.map(x=>[x.key,x.name,currencyCell(x.opening),currencyCell(x.demand),currencyCell(x.paid),currencyCell(x.adjustments),currencyCell(x.closing)])};
+   }
+   case 'monthly-demands': {
+    const monthLabels=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
+    const keys=new Set<string>();
+    flatOwnerMaster.forEach(x=>keys.add(String(x.flat_no||x.owner_name||'')));
+    memberFinancialBalances.forEach(x=>keys.add(String(x.flat_no||'')));
+    demandRegister.forEach(x=>keys.add(String(x.flat_no||x.member_id||'')));
+    const rows=Array.from(keys).filter(Boolean).map(key=>{
+      const owner=flatOwnerMaster.find(x=>String(x.flat_no||'')===key);
+      const bal=memberFinancialBalances.find(x=>String(x.flat_no||'')===key);
+      const ds=demandRegister.filter(d=>String(d.flat_no||d.member_id||'')===key);
+      const monthValues=monthLabels.map(m=>ds.filter(d=>String(d.month||'').trim().toLowerCase()===m.toLowerCase()||String(d.month||'').trim().toLowerCase().startsWith(m.slice(0,3).toLowerCase())).reduce((s,d)=>s+Number(d.total_demand||0),0));
+      const opening=Number(bal?.opening_balance)||0;
+      const total=monthValues.reduce((s,n)=>s+n,0);
+      const name=owner?.owner_name||bal?.member_name||partyMaster.find(p=>p.flat_no===key)?.party_name||key;
+      return {key,name,opening,monthValues,total,closing:opening+total};
+    }).filter(x=>!query||[x.key,x.name].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).sort((a,b)=>a.name.localeCompare(b.name));
+    const totalRow=['TOTAL','',currencyCell(rows.reduce((s,x)=>s+x.opening,0)),...monthLabels.map((_,i)=>currencyCell(rows.reduce((s,x)=>s+x.monthValues[i],0))),currencyCell(rows.reduce((s,x)=>s+x.total,0)),currencyCell(rows.reduce((s,x)=>s+x.closing,0))];
+    return {title:'Monthly Demand Matrix — Party-wise',note:'Shows demands raised per party for each month. Closing here is opening balance plus demands only; it is not the net debtor balance until payments and adjustments are applied. Months without source demand rows show zero.',headers:['Flat / Party ID','Party / Member Name','Opening Balance',...monthLabels,'Total Demand','Balance Before Payments'],rows:[...rows.map(x=>[x.key,x.name,currencyCell(x.opening),...x.monthValues.map(currencyCell),currencyCell(x.total),currencyCell(x.closing)]),totalRow]};
+   }
+   case 'monthly-payments': {
+    const monthLabels=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
+    const keys=new Set<string>();
+    flatOwnerMaster.forEach(x=>keys.add(String(x.flat_no||x.owner_name||'')));
+    memberFinancialBalances.forEach(x=>keys.add(String(x.flat_no||'')));
+    cumulativeOutstanding.forEach(x=>keys.add(String(x.flat_no||'')));
+    const rows=Array.from(keys).filter(Boolean).map(key=>{
+      const owner=flatOwnerMaster.find(x=>String(x.flat_no||'')===key);
+      const bal=memberFinancialBalances.find(x=>String(x.flat_no||'')===key);
+      const cum=cumulativeOutstanding.find(x=>String(x.flat_no||'')===key);
+      const name=owner?.owner_name||bal?.member_name||cum?.member_name||partyMaster.find(p=>p.flat_no===key)?.party_name||key;
+      const matches=(t:any)=>String(t.party||'').trim().toLowerCase()===String(name||'').trim().toLowerCase()||String(t.party||'').trim().toLowerCase()===key.toLowerCase();
+      const monthly=monthLabels.map(m=>transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&matches(t)&&String(t.reportingMonth||t.month||'').replace(/\\n/g,' ').trim().toLowerCase()===m.toLowerCase()).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0));
+      const opening=Number(bal?.opening_balance)||0;
+      const total=monthly.reduce((s,n)=>s+n,0);
+      const billed=Number(cum?.total_billed??bal?.billed_amount)||demandRegister.filter(d=>String(d.flat_no||'')===key).reduce((s,d)=>s+Number(d.total_demand||0),0);
+      const adjustments=Number(cum?.total_adjustments??bal?.adjusted_amount)||0;
+      return {key,name,opening,monthly,total,closing:opening+billed-total-adjustments};
+    }).filter(x=>!query||[x.key,x.name].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).sort((a,b)=>a.name.localeCompare(b.name));
+    const totalRow=['TOTAL','',currencyCell(rows.reduce((s,x)=>s+x.opening,0)),...monthLabels.map((_,i)=>currencyCell(rows.reduce((s,x)=>s+x.monthly[i],0))),currencyCell(rows.reduce((s,x)=>s+x.total,0)),currencyCell(rows.reduce((s,x)=>s+x.closing,0))];
+    return {title:'Monthly Payment / Collection Matrix — Party-wise',note:'Payments here means receipts collected by the society from members, excluding contra transfers. Receipt matching is by exact member/flat label; unmatched receipts must be reconciled. Closing dues are provisional and use available total billed/adjustment balances where present.',headers:['Flat / Party ID','Party / Member Name','Opening Balance',...monthLabels,'Total Payments','Calculated Closing Dues'],rows:[...rows.map(x=>[x.key,x.name,currencyCell(x.opening),...x.monthly.map(currencyCell),currencyCell(x.total),currencyCell(x.closing)]),totalRow]};
+   }
+   case 'receipts-payments': return {title:'Receipts & Payments Account (Preliminary)',note:'Cash movement from available receipt and payment transactions, excluding contra transfers. This is not an audited statement.',headers:['Particulars','Amount'],rows:[['Opening balances','Requires verified opening balances'],['Receipts',currencyCell(receipts)],['Payments',currencyCell(payments)],['Net movement',currencyCell(receipts-payments)],['Closing cash/bank position','Requires account-wise reconciliation']]};
+   case 'party-balances': return {title:'Debtors — All Parties',note:'Party-wise debtor position from the cumulative outstanding register. This is the operational receivables control; verify opening balances, demand allocations and member mapping before finalising.',headers:['Flat No','Member / Owner','Opening Balance','Total Demand','Total Received','Adjustments','Closing Receivable','Last Payment','Status'],rows:[...cumulativeOutstanding].sort((a,b)=>Number(b.net_outstanding||0)-Number(a.net_outstanding||0)).filter(r=>!query||[r.flat_no,r.member_name].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).map(r=>{const b=memberFinancialBalances.find(x=>x.flat_no===r.flat_no);return [r.flat_no||'—',r.member_name||'Unmapped',currencyCell(Number(b?.opening_balance)||0),currencyCell(Number(r.total_billed)||0),currencyCell(Number(r.total_received)||0),currencyCell(Number(r.total_adjustments)||0),currencyCell(Number(r.net_outstanding)||0),r.last_payment_date||'—',statusPill(r.status||'Not assessed')]})};
+
    case 'party-balances': return {title:'Party-wise Outstanding Balance — Members / Flat Owners',note:'This is the primary report for member balances. Positive balances indicate dues receivable; verify opening balances and demand allocations before treating amounts as final.',headers:['Flat No','Member / Owner','Total billed','Total received','Adjustments','Net outstanding','Last payment','Status'],rows:[...cumulativeOutstanding].sort((a,b)=>Number(b.net_outstanding||0)-Number(a.net_outstanding||0)).filter(r=>!query||[r.flat_no,r.member_name].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).map(r=>[r.flat_no||'—',r.member_name||'Unmapped',currencyCell(Number(r.total_billed)||0),currencyCell(Number(r.total_received)||0),currencyCell(Number(r.total_adjustments)||0),currencyCell(Number(r.net_outstanding)||0),r.last_payment_date||'—',statusPill(r.status||'Not assessed')])};
    case 'member-ledger': return {title:'Member / Flat Owner Ledger',note:'Combines available FY balance records with cumulative member balances. Demand-to-receipt matching is provisional where allocations are incomplete.',headers:['Flat No','Member','Opening balance','Billed','Received','Adjustments','Closing / outstanding'],rows:cumulativeOutstanding.filter(r=>!query||[r.flat_no,r.member_name].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).map(r=>{const b=memberFinancialBalances.find(x=>x.flat_no===r.flat_no);return [r.flat_no||'—',r.member_name||'Unmapped',currencyCell(Number(b?.opening_balance)||0),currencyCell(Number(r.total_billed??b?.billed_amount)||0),currencyCell(Number(r.total_received??b?.received_amount)||0),currencyCell(Number(r.total_adjustments??b?.adjusted_amount)||0),currencyCell(Number(r.net_outstanding??b?.closing_balance)||0)]})};
    case 'vendor-ledger': return {title:'Vendor / Payee Ledger',note:'Transaction-based payments ledger. Opening payable, bills outstanding and advances need verified vendor opening balances and bill data.',headers:['Vendor / Payee','Payment entries','Total paid','Average payment','Evidence gaps'],rows:partyPayments};
@@ -167,13 +261,21 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
    <div className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
     <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><h2 className="text-base font-bold text-blue-950">Financial Reports & Operational Registers</h2><p className="mt-1 text-xs text-slate-600">Select a report to view calculated results from connected records. Provisional reports are clearly labelled.</p></div>
      <div className="flex flex-wrap items-center gap-2"><label htmlFor="society-report-select" className="text-xs font-semibold text-slate-600">Select report</label><select id="society-report-select" value={selectedReport} onChange={e=>setSelectedReport(e.target.value)} className="min-w-[260px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs">
-      <optgroup label="Financial statements"><option value="receipts-payments">Receipts & Payments Account</option><option value="income-expense">Income & Expenditure Analysis</option><option value="balance-sheet">Balance Sheet Readiness</option><option value="trial-balance">Trial Balance Readiness</option><option value="cashbook">Cash Book & Bank Books</option></optgroup>
-      <optgroup label="Member & party reports"><option value="party-balances">Party-wise Outstanding Balance</option><option value="member-ledger">Member / Flat Owner Ledger</option><option value="vendor-ledger">Vendor / Payee Ledger</option><option value="demand">Demand vs Collections</option></optgroup>
-      <optgroup label="Registers"><option value="receipts">Receipts Register</option><option value="payments">Payments & Expense Register</option><option value="bank-recon">Bank Reconciliation Register</option><option value="expense-analysis">Expense Analysis by Category</option><option value="missing-docs">Missing Document / Evidence Register</option></optgroup>
-      <optgroup label="Operations & governance"><option value="statutory">Statutory & Governance Register</option><option value="rectification">Audit Observations & Rectification</option><option value="monthly-summary">Monthly Financial Control Summary</option></optgroup>
+      {reportCategories.slice(1).map(cat=><optgroup key={cat} label={cat}>{reportCatalog.filter(r=>r.category===cat).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</optgroup>)}
      </select><button onClick={()=>downloadCsv('society-report-transactions.csv',[['Date','Transaction ID','Party','Category','Type','Amount','Voucher','Evidence'],...filtered.map(t=>[t.date,t.id,t.party,t.categoryName,t.transactionClass||t.type,t.amount,t.voucherNo||t.receiptNo,t.evidenceStatus].map(v=>String(v??'')))])} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Export transactions CSV</button></div>
     </div>
    </div>
+   <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label="Report categories">
+     {reportCounts.map(cat=><button key={cat.name} role="tab" aria-selected={reportCategory===cat.name} onClick={()=>setReportCategory(cat.name)} className={'inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition '+(reportCategory===cat.name?'border-blue-600 bg-blue-600 text-white shadow-sm':'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50')}><span>{cat.name}</span><span className={'rounded-full px-1.5 py-0.5 text-[10px] '+(reportCategory===cat.name?'bg-white/20 text-white':'bg-slate-100 text-slate-600')}>{cat.count}</span></button>)}
+    </div>
+    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+     {visibleReports.map(r=><button key={r.id} onClick={()=>setSelectedReport(r.id)} className={'rounded-lg border p-3 text-left transition '+(selectedReport===r.id?'border-blue-500 bg-blue-50 ring-1 ring-blue-200':'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50')}>
+      <div className="flex items-start justify-between gap-2"><span className="text-xs font-bold text-slate-900">{r.name}</span>{selectedReport===r.id&&<span className="rounded-full bg-blue-600 px-2 py-0.5 text-[9px] font-bold text-white">Selected</span>}</div>
+      <p className="mt-1 text-[11px] leading-4 text-slate-500">{r.description}</p>
+     </button>)}
+    </div>
+   </section>
    {selectedReport==='party-balances'&&<div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><Card label="Member balance records" value={num(cumulativeOutstanding.length)} detail="Cumulative outstanding register" icon={Users}/><Card label="Members with dues" value={num(cumulativeOutstanding.filter(r=>Number(r.net_outstanding||0)>0).length)} detail="Positive outstanding balance" icon={AlertTriangle} tone="amber"/><Card label="Net outstanding" value={fmt(cumulativeOutstanding.reduce((s,r)=>s+Number(r.net_outstanding||0),0))} detail="Verify opening balances and allocations" icon={Wallet} tone="red"/></div>}
    <Panel title={reportData.title} action={<button onClick={()=>downloadCsv('society-report-'+selectedReport+'.csv',[[reportData.title],reportData.headers,...reportData.rows.map(row=>row.map(v=>typeof v==='object'&&v!==null&&'props' in v?String((v as any).props.children??''):String(v??'')))])} className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Export this report</button>}>
     <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{reportData.note}</p>
