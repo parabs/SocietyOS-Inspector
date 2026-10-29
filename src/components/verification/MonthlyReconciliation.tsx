@@ -366,6 +366,7 @@ export const MonthlyReconciliation: React.FC = () => {
               <tbody className="divide-y divide-slate-100">
                 {accountList.map((row) => {
                   const isDrillDown = row.month === drillDownMonth;
+                  const sourceBalancesUnavailable = row.remarks.includes('Source closing balance not loaded');
                   const hasOpeningDiff = row.openingDifference !== 0;
                   const hasClosingDiff = row.closingDifference !== 0;
 
@@ -382,7 +383,7 @@ export const MonthlyReconciliation: React.FC = () => {
                       </td>
 
                       <td className="py-2.5 px-2 text-right font-mono text-slate-700">
-                        {formatNumber(row.sourceOpeningBalance)}
+                        {sourceBalancesUnavailable ? 'Not loaded' : formatNumber(row.sourceOpeningBalance)}
                       </td>
 
                       <td className="py-2.5 px-2 text-right font-mono text-slate-900 font-medium">
@@ -394,7 +395,7 @@ export const MonthlyReconciliation: React.FC = () => {
                           hasOpeningDiff ? 'text-rose-600' : 'text-slate-700'
                         }`}
                       >
-                        {formatNumber(row.openingDifference)}
+                        {sourceBalancesUnavailable ? '—' : formatNumber(row.openingDifference)}
                       </td>
 
                       <td className="py-2.5 px-2 text-right font-mono text-emerald-700 font-medium">
@@ -414,7 +415,7 @@ export const MonthlyReconciliation: React.FC = () => {
                       </td>
 
                       <td className="py-2.5 px-2 text-right font-mono text-slate-700">
-                        {formatNumber(row.sourceClosingBalance)}
+                        {sourceBalancesUnavailable ? 'Not loaded' : formatNumber(row.sourceClosingBalance)}
                       </td>
 
                       <td
@@ -422,7 +423,7 @@ export const MonthlyReconciliation: React.FC = () => {
                           hasClosingDiff ? 'text-rose-600' : 'text-slate-700'
                         }`}
                       >
-                        {formatNumber(row.closingDifference)}
+                        {sourceBalancesUnavailable ? '—' : formatNumber(row.closingDifference)}
                       </td>
 
                       <td className="py-2.5 px-2 text-center whitespace-nowrap">
