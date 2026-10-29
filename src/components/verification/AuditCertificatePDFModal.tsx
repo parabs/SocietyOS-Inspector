@@ -203,7 +203,7 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Verified Only ({transactions.filter((t) => t.evidenceStatus === 'Complete' || t.internalAuditStatus === 'Verified').length})
+                Complete / Reviewed ({transactions.filter((t) => t.evidenceStatus === 'Complete' || t.internalAuditStatus === 'Verified').length})
               </button>
               <button
                 onClick={() => setScopeFilter('all')}
@@ -336,7 +336,7 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="border border-slate-200 rounded-lg p-2.5 bg-white">
               <span className="text-[10px] font-bold text-slate-500 uppercase">
-                Audited Transactions
+                Transactions in Scope
               </span>
               <div className="text-lg font-bold text-slate-900">
                 {targetTransactions.length} Items
@@ -344,7 +344,7 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
             </div>
             <div className="border border-emerald-200 rounded-lg p-2.5 bg-emerald-50/30">
               <span className="text-[10px] font-bold text-emerald-700 uppercase">
-                Total Audited Value
+                Total Amount in Scope
               </span>
               <div className="text-lg font-bold text-emerald-700">
                 ₹{formatINR(totalAmount)}
@@ -461,9 +461,8 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
                         </span>
                       </td>
                       <td className="py-1.5 px-2 text-center whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                          <CheckCircle className="w-2.5 h-2.5 text-emerald-600" />
-                          <span>Verified</span>
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border ${t.internalAuditStatus === 'Verified' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : t.internalAuditStatus === 'Failed' ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
+                          {t.internalAuditStatus}
                         </span>
                       </td>
                     </tr>
@@ -472,7 +471,7 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
                 <tfoot>
                   <tr className="bg-slate-100 font-bold border-t-2 border-slate-300 text-xs">
                     <td colSpan={8} className="py-2 px-3 text-right text-slate-700 uppercase">
-                      Total Verified Amount ({targetTransactions.length} Transactions):
+                      Total Amount in Selected Scope ({targetTransactions.length} Transactions):
                     </td>
                     <td className="py-2 px-2 text-right font-mono text-emerald-800 text-sm">
                       ₹{formatINR(totalAmount)}
@@ -520,7 +519,7 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
               <div>
                 <div className="font-bold text-xs text-slate-900">Hon. Secretary</div>
                 <div className="text-[10px] text-slate-500">Managing Committee</div>
-                <div className="text-[9px] text-slate-400">Varsha Nivas CHS Ltd.</div>
+                <div className="text-[9px] text-slate-400">Pearl Meadows 'C' Type 'C' Wing CHS Ltd.</div>
               </div>
             </div>
 
