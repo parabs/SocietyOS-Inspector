@@ -788,123 +788,6 @@ export const TransactionVerification: React.FC = () => {
         </div>
       </div>
 
-      {/* Bulk Actions Floating / Sticky Banner */}
-      {selectedTxnIds.size > 0 && (
-        <div className="bg-slate-900 text-white rounded-xl p-3.5 shadow-xl border border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-200">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs font-mono shadow-xs shrink-0">
-              {selectedTxnIds.size}
-            </div>
-            <div>
-              <div className="text-xs font-bold text-white flex items-center gap-2">
-                <span>{selectedTxnIds.size} transaction(s) selected</span>
-                <span className="text-slate-400 font-normal">•</span>
-                <span className="text-emerald-400 font-mono font-bold">
-                  Total: {formatINR(selectedAmountSum)}
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400">
-                Perform bulk audit actions across all selected transactions simultaneously
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={handleBulkMarkVerified}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg cursor-pointer transition-colors shadow-xs"
-              title="Mark all selected transactions as physically verified with complete evidence"
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-              <span>Mark as Verified</span>
-            </button>
-
-            <button
-              onClick={() => setShowBulkFlagModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 rounded-lg cursor-pointer transition-colors shadow-xs"
-              title="Flag all selected transactions for review, rate difference, or audit observation"
-            >
-              <AlertTriangle className="w-4 h-4 text-amber-200" />
-              <span>Flag for Review</span>
-            </button>
-
-            <button
-              onClick={handleBulkMarkMissing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-300 bg-rose-950/60 hover:bg-rose-900/80 border border-rose-800 rounded-lg cursor-pointer transition-colors"
-              title="Mark selected vouchers as missing physical evidence"
-            >
-              <FolderX className="w-3.5 h-3.5 text-rose-400" />
-              <span className="hidden sm:inline">Mark Missing</span>
-            </button>
-
-            <button
-              onClick={handleBulkResetPending}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg cursor-pointer transition-colors"
-              title="Reset selected to pending inspection"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-              <span className="hidden sm:inline">Reset</span>
-            </button>
-
-            <button
-              onClick={clearSelection}
-              className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-              title="Deselect all"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Selection Helpers Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            Multi-Select:
-          </span>
-          <button
-            onClick={toggleSelectAllPage}
-            className={`px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer border transition-colors ${
-              isAllPageSelected
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-200'
-            }`}
-          >
-            {isAllPageSelected ? 'Deselect Page' : `Select Page (${paginatedTransactions.length})`}
-          </button>
-
-          <button
-            onClick={selectAllFiltered}
-            className="px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer transition-colors"
-          >
-            Select All Filtered ({filteredTransactions.length})
-          </button>
-
-          {pendingFilteredCount > 0 && (
-            <button
-              onClick={selectAllPending}
-              className="px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 cursor-pointer transition-colors"
-            >
-              Select All Pending ({pendingFilteredCount})
-            </button>
-          )}
-
-          {selectedTxnIds.size > 0 && (
-            <button
-              onClick={clearSelection}
-              className="text-xs text-rose-600 hover:text-rose-800 font-semibold cursor-pointer underline ml-1"
-            >
-              Clear Selection ({selectedTxnIds.size})
-            </button>
-          )}
-        </div>
-
-        <div className="text-[11px] text-slate-500">
-          Select a transaction row to open its verification details.
-        </div>
-      </div>
-
       {/* Main Content Area: Table (Left) + Detail Panel (Right) */}
       <div className="grid grid-cols-1 gap-6 items-start">
         {/* Table Area (8 Cols when detail open) */}
@@ -1196,7 +1079,7 @@ export const TransactionVerification: React.FC = () => {
 
         {/* Side Detail Panel: "Transaction Details" (4 Cols) */}
         {activeTxn && (
-          <div className="lg:col-span-4 bg-white rounded-xl border border-slate-200 p-5 shadow-xs sticky top-20">
+          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-xl overflow-y-auto bg-white rounded-l-xl border-l border-slate-200 p-5 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h2 className="font-bold text-sm text-slate-900">Transaction Details</h2>
               <button
