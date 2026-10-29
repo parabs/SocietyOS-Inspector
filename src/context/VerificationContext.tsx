@@ -547,32 +547,33 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         };
 
         sortedRows.forEach((row: any, idx: number) => {
-          const rawAcc = (row.account_id || '').toUpperCase();
-          const accountId: AccountId = rawAcc.includes('TDCC') ? 'TDCC' : rawAcc.includes('BOM') ? 'BOM' : 'CASH';
+          const rawAcc = String(row.account_id || '').toUpperCase();
+          const accountId: AccountId = rawAcc.includes('TDCC') || rawAcc === 'ACC-0001' ? 'TDCC' : rawAcc.includes('BOM') || rawAcc === 'ACC-0002' ? 'BOM' : 'CASH';
 
-          const op = Number(row.opening_balance || 0);
-          const credits = Number(row.total_credits || 0);
-          const debits = Number(row.total_debits || 0);
-          const adjustments = Number(row.adjustments || 0);
-          const calcClose = op + credits - debits + adjustments;
-          const srcClose = Number(row.closing_balance ?? calcClose);
+          const op = Number(row.target_opening_balance ?? row.source_opening_balance ?? 0);
+          const credits = Number(row.credits_source ?? 0);
+          const debits = Number(row.debits_source ?? 0);
+          const adjustments = Number(row.adjustments ?? 0);
+          const calcClose = Number(row.target_closing_balance ?? (op + credits - debits + adjustments));
+          const sourceCloseExists = row.source_closing_balance !== null && row.source_closing_balance !== undefined;
+          const srcClose = sourceCloseExists ? Number(row.source_closing_balance) : 0;
 
           result[accountId].push({
             id: row.id || `REC-${accountId}-${idx}`,
-            month: row.month || `Month ${idx + 1}`,
+            month: (() => { const m = String(row.month || ''); const normalized = m.match(/^([A-Za-z]{3,})[- ](\\d{4})$/); return normalized ? normalized[1].slice(0,3) + ' ' + normalized[2] : (m || `Month ${idx + 1}`); })(),
             monthIndex: row.month_index ?? idx,
             accountId,
-            sourceOpeningBalance: op,
+            sourceOpeningBalance: Number(row.source_opening_balance ?? op),
             calculatedOpeningBalance: op,
-            openingDifference: 0,
+            openingDifference: Number(row.opening_discrepancy ?? 0),
             credits,
             debits,
             adjustments,
             calculatedClosingBalance: calcClose,
             sourceClosingBalance: srcClose,
-            closingDifference: Number((calcClose - srcClose).toFixed(2)),
-            status: (row.reconciliation_status as any) || (Math.abs(calcClose - srcClose) < 0.01 ? 'Reconciled' : 'Difference'),
-            remarks: row.remarks || '',
+            closingDifference: sourceCloseExists ? Number((calcClose - srcClose).toFixed(2)) : 0,
+            status: (row.reconciliation_status as any) || (sourceCloseExists ? (Math.abs(calcClose - srcClose) < 0.01 ? 'Reconciled' : 'Difference') : 'Pending'),
+            remarks: row.remarks || (!sourceCloseExists ? 'Source closing balance not loaded.' : ''),
             reviewedBy: row.reviewed_by || 'Auditor',
             updatedAt: row.updated_at,
           });
