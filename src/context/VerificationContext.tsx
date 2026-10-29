@@ -979,12 +979,17 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         .update({
           bill_status: updates.billStatus,
           voucher_receipt_status: updates.voucherReceiptStatus,
+          evidence_status: calculateEvidenceStatus(
+            transactions.find((t) => t.id === id)?.type || 'Payment',
+            updates.billStatus,
+            updates.voucherReceiptStatus
+          ),
           internal_audit_status: updates.internalAuditStatus,
           remarks: updates.remarks,
           reviewer: APP_CONFIG.currentReviewer.name,
-          updated_at: new Date().toISOString(),
+          verified_at: new Date().toISOString(),
         })
-        .eq('id', id);
+        .eq('transaction_id', id);
 
       if (error) {
         console.warn('[SupabaseClient] Warning saving transaction to Supabase:', error.message);
