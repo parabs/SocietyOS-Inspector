@@ -175,7 +175,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
     </div>
    </div>
    {selectedReport==='party-balances'&&<div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><Card label="Member balance records" value={num(cumulativeOutstanding.length)} detail="Cumulative outstanding register" icon={Users}/><Card label="Members with dues" value={num(cumulativeOutstanding.filter(r=>Number(r.net_outstanding||0)>0).length)} detail="Positive outstanding balance" icon={AlertTriangle} tone="amber"/><Card label="Net outstanding" value={fmt(cumulativeOutstanding.reduce((s,r)=>s+Number(r.net_outstanding||0),0))} detail="Verify opening balances and allocations" icon={Wallet} tone="red"/></div>}
-   <Panel title={reportData.title} action={<button onClick={()=>downloadCsv('society-report-'+selectedReport+'.csv',[[reportData.title],reportData.headers,...reportData.rows.map(row=>row.map(v=>typeof v==='string'?v:String(v??'')))])} className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Export this report</button>}>
+   <Panel title={reportData.title} action={<button onClick={()=>downloadCsv('society-report-'+selectedReport+'.csv',[[reportData.title],reportData.headers,...reportData.rows.map(row=>row.map(v=>typeof v==='object'&&v!==null&&'props' in v?String((v as any).props.children??''):String(v??'')))])} className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Export this report</button>}>
     <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{reportData.note}</p>
     <Table headers={reportData.headers} rows={reportData.rows}/>
    </Panel>
