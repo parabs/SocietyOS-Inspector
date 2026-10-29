@@ -35,7 +35,9 @@ export const AddMissingTransactionModal: React.FC<Props> = ({ onClose, onSaved }
       if (cancelled) return;
       if (loadError) setError('Unable to load accounts: ' + loadError.message);
       else {
-        const rows = (data || []) as AccountOption[];
+        // Transaction Verification currently supports the three FY 2018–19 cash/bank ledgers only.
+        // Exclude fixed-deposit accounts until the account model/reconciliation screens support them.
+        const rows = ((data || []) as AccountOption[]).filter(a => ['ACC-0001', 'ACC-0002', 'ACC-0003'].includes(a.account_id) || /tdcc|bom|petty cash/i.test(a.account_name));
         setAccounts(rows);
         const firstCashBank = rows.find(a => /tdcc|bom|petty|cash/i.test(a.account_name));
         if (firstCashBank) setAccountId(firstCashBank.account_id);
