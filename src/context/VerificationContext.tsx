@@ -427,36 +427,42 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }));
       } else {
         const mappedTransactions: EnrichedTransaction[] = rawRows.map((row: any, idx: number) => {
-          const rawAcc = (row.account_id || 'CASH').toUpperCase();
-          const accountId: AccountId = rawAcc.includes('TDCC') ? 'TDCC' : rawAcc.includes('BOM') ? 'BOM' : 'CASH';
-          const rawType = row.transaction_type || row.type || (row.amount >= 0 ? 'Receipt' : 'Payment');
+          const rawAcc = String(row.account_id || '').toUpperCase();
+          // The workbook import uses ACC-0001/0002/0003; older UI code expected names in account_id.
+          const accountId: AccountId =
+            rawAcc.includes('TDCC') || rawAcc === 'ACC-0001' ? 'TDCC' :
+            rawAcc.includes('BOM') || rawAcc === 'ACC-0002' ? 'BOM' :
+            rawAcc.includes('CASH') || rawAcc.includes('PETTY') || rawAcc === 'ACC-0003' ? 'CASH' : 'CASH';
+          const rawType = row.transaction_type || row.type || (Number(row.amount) >= 0 ? 'Receipt' : 'Payment');
           const type: 'Receipt' | 'Payment' = String(rawType).toLowerCase().includes('rec') ? 'Receipt' : 'Payment';
           const rawDate = row.transaction_date || row.date || new Date().toISOString().split('T')[0];
-
-          const billStatus = (row.bill_status || 'Available') as BillStatus;
-          const voucherReceiptStatus = (row.voucher_receipt_status || 'Available') as VoucherReceiptStatus;
+          const billRaw = String(row.bill_status || row.bills_available || '').toLowerCase();
+          const voucherRaw = String(row.voucher_receipt_status || row.voucher_available || '').toLowerCase();
+          const billStatus = (row.bill_status || (billRaw.includes('miss') ? 'Missing' : billRaw.includes('discrep') ? 'Discrepancy' : billRaw.includes('n/a') ? 'N/A' : 'Available')) as BillStatus;
+          const voucherReceiptStatus = (row.voucher_receipt_status || (voucherRaw.includes('miss') ? 'Missing' : voucherRaw.includes('discrep') ? 'Discrepancy' : 'Available')) as VoucherReceiptStatus;
           const evidenceStatus = (row.evidence_status || calculateEvidenceStatus(type, billStatus, voucherReceiptStatus)) as EvidenceStatus;
-          const internalAuditStatus = (row.internal_audit_status || 'Verified') as InternalAuditStatus;
-
+          const auditRaw = String(row.internal_audit_status || row.verified || '').toLowerCase();
+          const internalAuditStatus = (row.internal_audit_status || (auditRaw.includes('fail') || auditRaw.includes('discrep') ? 'Failed' : auditRaw.includes('verif') ? 'Verified' : 'Pending')) as InternalAuditStatus;
+          const voucherRef = row.voucher_no || row.voucher_receipt_no || undefined;
           return {
             id: row.transaction_id || row.id || `TXN-${String(idx + 1).padStart(5, '0')}`,
-            sourceFile: row.source_file || 'transactions.supabase',
+            sourceFile: row.source_file || row.source_id || 'transactions.supabase',
             sourceSheet: row.source_sheet || 'transactions',
             sourceRow: row.source_row ?? idx + 1,
             date: rawDate,
-            month: row.month || (rawDate ? new Date(rawDate).toLocaleString('default', { month: 'short', year: 'numeric' }) : 'Apr 2018'),
+            month: row.month || row.reporting_month || (rawDate ? new Date(rawDate).toLocaleString('en-US', { month: 'short', year: 'numeric' }) : 'Apr 2018'),
             accountId,
             type,
             party: row.party_name || row.party_id || 'Sundry Member / Vendor',
             description: row.description || 'Society transaction record',
             amount: Math.abs(Number(row.amount || 0)),
-            voucherNo: row.voucher_no || undefined,
-            receiptNo: row.receipt_no || undefined,
+            voucherNo: voucherRef,
+            receiptNo: row.receipt_no || (type === 'Receipt' ? voucherRef : undefined),
             billStatus,
             voucherReceiptStatus,
             evidenceStatus,
             internalAuditStatus,
-            remarks: row.remarks || '',
+            remarks: row.remarks || row.audit_notes || '',
             reviewer: row.reviewer || undefined,
             updatedAt: row.updated_at || row.created_at,
           };
