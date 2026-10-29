@@ -11,7 +11,7 @@ import { VerificationDashboard } from './components/verification/VerificationDas
 import { OpeningBalanceVerification } from './components/verification/OpeningBalanceVerification';
 import { TransactionVerification } from './components/verification/TransactionVerification';
 import { MonthlyReconciliation } from './components/verification/MonthlyReconciliation';
-import { FinancialPlaceholder } from './components/financial/FinancialPlaceholder';
+import { SocietyRoleDashboards } from './components/financial/SocietyRoleDashboards';
 import { SettingsView } from './components/admin/SettingsView';
 
 const MainContent: React.FC = () => {
@@ -31,68 +31,19 @@ const MainContent: React.FC = () => {
       return <MonthlyReconciliation />;
 
     case 'financial-summary':
-      return (
-        <FinancialPlaceholder
-          moduleName="Financial Summary Dashboard"
-          moduleDescription="Demand, collections, expense analysis, and closing balance summaries"
-        />
-      );
-
     case 'demand-collections':
-      return (
-        <FinancialPlaceholder
-          moduleName="Demand & Collections"
-          moduleDescription="Flat-owner receivables, maintenance demands, collection efficiency, and ageing analysis"
-        />
-      );
-
     case 'payments-expenses':
-      return (
-        <FinancialPlaceholder
-          moduleName="Payments & Expenses"
-          moduleDescription="Vendor analysis, payment breakdown by category, advance payments, and AMC tracking"
-        />
-      );
-
     case 'party-ledger':
-      return (
-        <FinancialPlaceholder
-          moduleName="Party-wise Ledger"
-          moduleDescription="Member and vendor personal accounts, advances, and supporting document ledgers"
-        />
-      );
-
     case 'audit-evidence':
-      return (
-        <FinancialPlaceholder
-          moduleName="Audit Evidence & Statutory Compliance"
-          moduleDescription="Bylaw compliance tracking, voucher completeness registers, and statutory audit readiness"
-        />
-      );
-
     case 'bank-reconciliation':
-      return (
-        <FinancialPlaceholder
-          moduleName="Bank Statement Direct Reconciliation"
-          moduleDescription="Bank statement import, automated clearance date matching, and unpresented cheque tracking"
-        />
-      );
-
     case 'observations-actions':
-      return (
-        <FinancialPlaceholder
-          moduleName="Observations & Action Items"
-          moduleDescription="Managing Committee observations, auditor queries, and corrective action workflows"
-        />
-      );
-
     case 'reports':
-      return (
-        <FinancialPlaceholder
-          moduleName="Statutory Reports & Registers"
-          moduleDescription="Receipts and Payments Account, Income & Expenditure, Balance Sheet, Cash Book, and Bank Books"
-        />
-      );
+    case 'treasurer-dashboard':
+    case 'secretary-dashboard':
+    case 'chairman-dashboard':
+    case 'member-dashboard':
+    case 'auditor-dashboard':
+      return <SocietyRoleDashboards screen={currentScreen} />;
 
     case 'settings':
     case 'data-management':
