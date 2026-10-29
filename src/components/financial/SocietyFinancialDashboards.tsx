@@ -15,8 +15,15 @@ const num = (n:number) => new Intl.NumberFormat('en-IN').format(Number(n)||0);
 const COLORS = ['#16a34a','#ef4444','#2563eb','#f59e0b','#8b5cf6','#06b6d4','#64748b'];
 const monthOrder = ['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
 
-const downloadCsv = (name:string, rows:(string|number)[][]) => {
- const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+const csvValue = (value:any):string => {
+ if (value===null||value===undefined) return '';
+ if (React.isValidElement(value)) return csvValue((value.props as any)?.children);
+ if (Array.isArray(value)) return value.map(csvValue).join('');
+ if (typeof value==='object') return JSON.stringify(value);
+ return String(value);
+};
+const downloadCsv = (name:string, rows:(any[])[]) => {
+ const csv=rows.map(r=>r.map(v=>'"'+csvValue(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
  const url=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
  const a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);
 };
