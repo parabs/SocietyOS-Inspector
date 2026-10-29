@@ -759,8 +759,12 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (partyRes.error) throw new Error(`party_master: ${partyRes.error.message}`);
 
-      setPartyMaster((partyRes.data as DbPartyMaster[]) || []);
-      setFlatOwnerMaster((flatRes.data as DbFlatOwnerMaster[]) || []);
+      const flatRows=(flatRes.data||[]) as any[];
+      const partyRows=(partyRes.data||[]) as any[];
+      const normalizedParties=partyRows.map((p:any)=>({...p,flat_no:p.flat_no||flatRows.find((f:any)=>String(f.owner_name||'').trim().toLowerCase()===String(p.party_name||'').trim().toLowerCase())?.flat_number_source_value}));
+      const normalizedFlats=flatRows.map((f:any)=>({...f,flat_no:f.flat_no||f.flat_number_source_value,party_type:f.party_type||f.owner_type||'Member / Owner',phone:f.phone||f.mobile||''}));
+      setPartyMaster(normalizedParties as DbPartyMaster[]);
+      setFlatOwnerMaster(normalizedFlats as DbFlatOwnerMaster[]);
       setCategoryMaster((catRes.data as DbCategoryMaster[]) || []);
       setRulesMaster((rulesRes.data as DbRulesMaster[]) || []);
       setSourceRegister((srcRes.data as DbSourceRegister[]) || []);
