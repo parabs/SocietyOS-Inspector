@@ -59,31 +59,43 @@ export const MonthlyReconciliation: React.FC = () => {
   const [editRemarks, setEditRemarks] = useState<string>('');
 
   const accountList = useMemo(() => {
-    const stored = showAllAccounts
-      ? [...(reconciliations.TDCC || []), ...(reconciliations.BOM || []), ...(reconciliations.CASH || [])]
-      : (reconciliations[activeAccount] || []);
-    if (stored.length > 0) return stored;
-
-    // Derive calculated movements from live transactions when no source reconciliation rows exist.
-    // Source closing balances remain unavailable; these months must never be marked reconciled.
+    // Always derive monthly credits/debits from the transaction source of truth.
+    // Use the verified April opening balance as the starting point, then carry
+    // each calculated closing balance into the following month.
     const months = ['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
     const accountIds: AccountId[] = showAllAccounts ? ['TDCC','BOM','CASH'] : [activeAccount];
     return accountIds.flatMap((accountId) => {
-      let carry = openingBalances.find(o => o.accountId === accountId)?.recordedOpeningBalance || 0;
+      const storedRows = reconciliations[accountId] || [];
+      const openingRecord = openingBalances.find(o => o.accountId === accountId);
+      let carry = openingRecord?.recordedOpeningBalance || 0;
       return months.map((month, monthIndex) => {
         const monthRows = transactions.filter(t => t.month === month && t.accountId === accountId);
-        const credits = monthRows.filter(t => t.type === 'Receipt').reduce((sum,t) => sum + Math.abs(t.amount),0);
-        const debits = monthRows.filter(t => t.type === 'Payment').reduce((sum,t) => sum + Math.abs(t.amount),0);
+        const credits = monthRows.filter(t => t.type === 'Receipt').reduce((sum,t) => sum + Math.abs(Number(t.amount) || 0),0);
+        const debits = monthRows.filter(t => t.type === 'Payment').reduce((sum,t) => sum + Math.abs(Number(t.amount) || 0),0);
+        const stored = storedRows.find(row => row.month === month);
         const opening = carry;
-        const closing = opening + credits - debits;
+        const adjustments = stored?.adjustments || 0;
+        const closing = opening + credits - debits + adjustments;
         carry = closing;
+        const sourceClosing = stored?.sourceClosingBalance || 0;
+        const hasSourceClosing = !!stored && sourceClosing !== 0;
+        const difference = hasSourceClosing ? closing - sourceClosing : 0;
         return {
-          id: 'CALC-' + accountId + '-' + monthIndex,
+          id: stored?.id || 'CALC-' + accountId + '-' + monthIndex,
           month, monthIndex, accountId,
-          sourceOpeningBalance: opening, calculatedOpeningBalance: opening, openingDifference: 0,
-          credits, debits, adjustments: 0, calculatedClosingBalance: closing,
-          sourceClosingBalance: 0, closingDifference: 0, status: 'Pending' as const,
-          remarks: 'Source closing balance not loaded. Confirm against bank statement / cash book.',
+          sourceOpeningBalance: opening,
+          calculatedOpeningBalance: opening,
+          openingDifference: 0,
+          credits, debits, adjustments,
+          calculatedClosingBalance: closing,
+          sourceClosingBalance: sourceClosing,
+          closingDifference: difference,
+          status: (hasSourceClosing ? (difference === 0 ? 'Reconciled' : 'Difference') : 'Pending') as MonthlyReconciliationRecord['status'],
+          remarks: stored?.remarks && stored.remarks !== 'Loaded from Supabase database'
+            ? stored.remarks
+            : (accountId === 'CASH'
+              ? 'Calculated from cash transactions; verify against the cash book.'
+              : 'Calculated from transactions; verify against the bank passbook.'),
         };
       });
     });
@@ -188,7 +200,7 @@ export const MonthlyReconciliation: React.FC = () => {
           className="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white">
           <option value="All">All Accounts</option><option value="TDCC">TDCC</option><option value="BOM">BOM</option><option value="CASH">Petty Cash</option>
         </select>
-        {accountList.some(r => r.remarks.includes('Source closing balance not loaded')) && <span className="text-xs text-amber-700">Calculated movements shown; source closing balances are not loaded, so months remain Pending.</span>}
+        {accountList.some(r => r.remarks.includes('Source closing balance not loaded')) && <span className="text-xs text-amber-700">Credits/debits are live transaction totals. Confirm bank balances against passbooks; confirm cash using the cash book.</span>}
       </div>
       {/* Main Reconciliation Grid: Left Table (7 Cols) + Right Charts & Summary (5 Cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -205,7 +217,7 @@ export const MonthlyReconciliation: React.FC = () => {
                   : 'Cash (Petty Cash)'}
               </h2>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Calculated balances vs recorded source passbook entries
+                Monthly credits and debits are calculated from transactions; verify bank balances against the passbook or cash against the cash book.
               </p>
             </div>
 
@@ -345,12 +357,15 @@ export const MonthlyReconciliation: React.FC = () => {
 
                       <td className="py-2.5 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={() => handleEditOpen(row)}
-                          disabled={row.id.startsWith('CALC-')}
-                          title={row.id.startsWith('CALC-') ? 'Source reconciliation records are not loaded; this calculated row is read-only.' : 'Update reconciliation review'}
-                          className="px-2 py-0.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          onClick={() => {
+                            setSelectedAccountId(row.accountId);
+                            setSelectedMonthFilter(row.month);
+                            setCurrentScreen('transaction-verification');
+                          }}
+                          title={`Open ${row.month} transactions to review credits, debits and supporting evidence before confirming reconciliation.`}
+                          className="px-2 py-1 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors cursor-pointer"
                         >
-                          View
+                          Review Transactions
                         </button>
                       </td>
                     </tr>
