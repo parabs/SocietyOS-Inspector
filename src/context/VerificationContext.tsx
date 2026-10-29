@@ -589,8 +589,14 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             closingDifference: sourceCloseExists ? Number((calcClose - Number(srcClose)).toFixed(2)) : 0,
             status: (row.reconciliation_status === 'Reconciled' ? 'Matched' : row.reconciliation_status === 'Difference' ? 'Mismatch' : row.reconciliation_status || (sourceCloseExists ? (Math.abs(calcClose - Number(srcClose)) < 0.01 ? 'Matched' : 'Mismatch') : 'Pending')) as any,
             remarks: row.remarks || '',
-            reviewedBy: row.reviewed_by || 'Auditor',
+            reviewedBy: row.reviewed_by || undefined,
             updatedAt: row.updated_at,
+            openingConfirmed: Boolean(row.opening_confirmed),
+            transactionsConfirmed: Boolean(row.transactions_confirmed),
+            closingConfirmed: Boolean(row.closing_confirmed),
+            confirmationNotes: row.confirmation_notes || '',
+            confirmedBy: row.confirmed_by || undefined,
+            confirmedAt: row.confirmed_at || undefined,
           });
         });
 
