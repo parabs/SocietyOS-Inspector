@@ -63,6 +63,14 @@ export const SocietyRoleDashboards: React.FC<{ screen: DashboardScreen }> = ({ s
   const demandTotal = demandRegister.reduce((s,d)=>s+Number(d.total_demand ?? 0),0);
   const outstanding = cumulativeOutstanding.reduce((s,r)=>s+Number(r.net_outstanding||0),0);
   const netMovement = receipts - payments;
+  const categorySummary = Object.entries(rows.reduce((acc: Record<string, { count: number; amount: number }>, t) => {
+    const key = t.categoryName || 'Unclassified';
+    acc[key] ??= { count: 0, amount: 0 };
+    acc[key].count += 1;
+    acc[key].amount += Math.abs(Number(t.amount) || 0);
+    return acc;
+  }, {})).sort((a, b) => b[1].amount - a[1].amount).slice(0, 8);
+  const maxCategoryAmount = Math.max(1, ...categorySummary.map(([, item]) => item.amount));
   const loading = isLoadingTransactions || isLoadingDemandRegister || isLoadingMasters;
   const financialScreens: DashboardScreen[] = ['financial-summary','demand-collections','payments-expenses','party-ledger','reports'];
   const isFinancial = financialScreens.includes(screen);
@@ -116,7 +124,7 @@ export const SocietyRoleDashboards: React.FC<{ screen: DashboardScreen }> = ({ s
         <Metric label="Verification readiness" value={`${stats.readinessPercentage}%`} detail={`${number(stats.inspectedTransactions)} of ${number(stats.totalTransactions)} transactions inspected`} icon={ShieldCheck} tone="blue"/>
       </div>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2"><Section title="Transaction activity by category"><div className="space-y-3">{Object.entries(rows.reduce((acc:Record<string,{count:number;amount:number}>,t)=>{const k=t.categoryName||'Unclassified';acc[k]??={count:0,amount:0};acc[k].count++;acc[k].amount+=Number(t.amount)||0;return acc;},{})).sort((a,b)=>Math.abs(b[1].amount)-Math.abs(a[1].amount)).slice(0,8).map(([name,item])=><div key={name}><div className="flex justify-between gap-3 text-xs mb-1"><span className="font-medium text-slate-700 truncate">{name}</span><span className="text-slate-600 whitespace-nowrap">{number(item.count)} entries · {money(item.amount)}</span></div><div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-blue-600 rounded-full" style={{width:`${Math.min(100,Math.abs(item.amount)/(Math.max(1,...Object.values(rows.reduce((acc:Record<string,number>,t)=>{const k=t.categoryName||'Unclassified';acc[k]=(acc[k]||0)+Math.abs(Number(t.amount)||0);return acc;},{})))*100)}%`}}/></div></div>)}{rows.length===0&&<p className="text-xs text-slate-500">No transaction records match the current filters.</p>}</div></Section></div>
+        <div className="xl:col-span-2"><Section title="Transaction activity by category"><div className="space-y-3">{categorySummary.map(([name,item])=><div key={name}><div className="flex justify-between gap-3 text-xs mb-1"><span className="font-medium text-slate-700 truncate">{name}</span><span className="text-slate-600 whitespace-nowrap">{number(item.count)} entries · {money(item.amount)}</span></div><div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-blue-600 rounded-full" style={{width:`${Math.min(100,(item.amount/maxCategoryAmount)*100)}%`}}/></div></div>)}{rows.length===0&&<p className="text-xs text-slate-500">No transaction records match the current filters.</p>}</div></Section></div>
         <Section title="Priority attention"><div className="space-y-2"><Action label={`Review transaction evidence (${number(missingEvidence)} exceptions)`} screen="transaction-verification"/><Action label={`Review opening balances (${number(stats.openingBalancesTotal-stats.openingBalancesVerified)} pending)`} screen="opening-balances"/><Action label="Review month-end reconciliation" screen="monthly-reconciliation"/><Action label="Review audit evidence & compliance" screen="audit-evidence"/><Action label="Review observations & actions" screen="observations-actions"/></div></Section>
       </div>
     </>}
