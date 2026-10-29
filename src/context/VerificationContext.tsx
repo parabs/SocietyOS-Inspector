@@ -446,6 +446,8 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const voucherRef = row.voucher_no || row.voucher_receipt_no || undefined;
           return {
             id: row.transaction_id || row.id || `TXN-${String(idx + 1).padStart(5, '0')}`,
+            isCorrection: Boolean(row.is_correction),
+            correctionStatus: row.correction_status || 'Original',
             sourceFile: row.source_file || row.source_id || 'transactions.supabase',
             sourceSheet: row.source_sheet || 'transactions',
             sourceRow: row.source_row ?? idx + 1,
