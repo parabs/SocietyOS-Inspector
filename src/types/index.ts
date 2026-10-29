@@ -85,7 +85,7 @@ export interface OpeningBalanceRecord {
   verifiedOn?: string;
 }
 
-export type ReconciliationStatus = 'Pending' | 'Matched' | 'Mismatch' | 'Mismatch Accepted';
+export type ReconciliationStatus = 'Pending' | 'Matched' | 'Mismatch' | 'Mismatch Accepted' | 'Reconciled' | 'Difference'; // legacy stored values remain readable
 
 export interface MonthlyReconciliationRecord {
   id: string;
