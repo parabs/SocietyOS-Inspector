@@ -180,10 +180,10 @@ export const AnomalyDetectionModal: React.FC<AnomalyDetectionModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-white tracking-tight">
-                  Automated Society Audit Anomaly Scanner
+                  Transaction Anomaly Review
                 </h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  MCS Bye-Law 152 Forensic Engine
+                  Rule-Based Screening
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
@@ -350,7 +350,7 @@ export const AnomalyDetectionModal: React.FC<AnomalyDetectionModalProps> = ({
               </div>
               <h3 className="text-sm font-bold text-slate-800">No Anomalies Found</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                No transactions matched the active filters for this anomaly category. All inspected vouchers adhere to statutory thresholds.
+                No transactions matched the active filters. This does not establish that all transactions are compliant; review the selected period and source records.
               </p>
             </div>
           ) : (
@@ -446,7 +446,7 @@ export const AnomalyDetectionModal: React.FC<AnomalyDetectionModalProps> = ({
                       )}
                     </div>
 
-                    {/* Statutory Guidance */}
+                    {/* Rule / Review Guidance */}
                     {anom.statutoryReference && (
                       <div className="text-[10px] bg-slate-50 border border-slate-200 rounded p-1.5 text-slate-600 flex items-center gap-1.5 mt-1">
                         <span className="font-bold text-slate-700">Audit Rule:</span>
