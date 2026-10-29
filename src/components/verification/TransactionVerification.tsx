@@ -1555,20 +1555,21 @@ export const TransactionVerification: React.FC = () => {
         </div>
       )}
 
-      <AddMissingTransactionModal
-        isOpen={showAddMissingTransaction}
-        onClose={() => setShowAddMissingTransaction(false)}
-        onSaved={async (transactionId) => {
-          setToastMessage(`Added correction ${transactionId}. Status: Pending Review.`);
-          setShowAddMissingTransaction(false);
-          setActiveTxnId(transactionId);
-          setSelectedTransactionId(transactionId);
-          setFilterAccount('All');
-          setFilterMonth('All Months');
-          setCurrentPage(1);
-          setTimeout(() => setToastMessage(null), 5000);
-        }}
-      />
+      {showAddMissingTransaction && (
+        <AddMissingTransactionModal
+          onClose={() => setShowAddMissingTransaction(false)}
+          onSaved={(transactionId) => {
+            setToastMessage(`Added correction ${transactionId}. Status: Pending Review.`);
+            setShowAddMissingTransaction(false);
+            setActiveTxnId(transactionId);
+            setSelectedTransactionId(transactionId);
+            setFilterAccount('All');
+            setFilterMonth('All Months');
+            setCurrentPage(1);
+            setTimeout(() => setToastMessage(null), 5000);
+          }}
+        />
+      )}
 
       {/* Anomaly Detection Modal */}
       <AnomalyDetectionModal
