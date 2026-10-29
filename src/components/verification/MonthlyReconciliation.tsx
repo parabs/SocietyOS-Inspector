@@ -39,13 +39,8 @@ export const MonthlyReconciliation: React.FC = () => {
   const [drillDownMonth, setDrillDownMonth] = useState<string>('Jul 2018');
   const [showHowToModal, setShowHowToModal] = useState<boolean>(false);
   const [editingRecord, setEditingRecord] = useState<MonthlyReconciliationRecord | null>(null);
-  const [editAdjustments, setEditAdjustments] = useState<number>(0);
   const [editSourceClosing, setEditSourceClosing] = useState<string>('');
-  const [editStatus, setEditStatus] = useState<'Pending' | 'Matched' | 'Mismatch' | 'Mismatch Accepted'>('Pending');
-  const [editOpeningConfirmed, setEditOpeningConfirmed] = useState(false);
-  const [editTransactionsConfirmed, setEditTransactionsConfirmed] = useState(false);
-  const [editClosingConfirmed, setEditClosingConfirmed] = useState(false);
-  const [editRemarks, setEditRemarks] = useState<string>('');
+  const [editObservations, setEditObservations] = useState<string>('');
 
   const accountList = useMemo(() => {
     // Always derive monthly credits/debits from the transaction source of truth.
@@ -64,8 +59,9 @@ export const MonthlyReconciliation: React.FC = () => {
         const contra = monthRows.filter(t => t.transactionClass === 'Contra').reduce((sum,t) => sum + Number(t.amount || 0),0);
         const stored = storedRows.find(row => row.month === month);
         const opening = carry;
-        const adjustments = stored?.adjustments || 0;
-        const closing = opening + credits - debits + contra + adjustments;
+        // Reconciliation is derived from ledger movements; no manual balancing adjustments.
+        const adjustments = 0;
+        const closing = opening + credits - debits + contra;
         carry = closing;
         const sourceClosing = stored?.sourceClosingBalance ?? null;
         const hasSourceClosing = sourceClosing !== null && sourceClosing !== undefined;
@@ -142,28 +138,22 @@ export const MonthlyReconciliation: React.FC = () => {
 
   const handleEditOpen = (rec: MonthlyReconciliationRecord) => {
     setEditingRecord(rec);
-    setEditAdjustments(rec.adjustments);
     setEditSourceClosing(rec.sourceClosingBalance == null ? '' : String(rec.sourceClosingBalance));
-    setEditStatus(rec.status);
-    setEditOpeningConfirmed(Boolean(rec.openingConfirmed));
-    setEditTransactionsConfirmed(Boolean(rec.transactionsConfirmed));
-    setEditClosingConfirmed(Boolean(rec.closingConfirmed));
-    setEditRemarks(rec.remarks === '-' ? '' : rec.remarks);
+    setEditObservations(rec.confirmationNotes || '');
   };
 
   const handleEditSave = async () => {
     if (!editingRecord) return;
     const sourceClosing = editSourceClosing.trim() === '' ? null : Number(editSourceClosing);
-    const calculated = editingRecord.calculatedOpeningBalance + editingRecord.credits - editingRecord.debits + (editingRecord.contra || 0) + (Number(editAdjustments) || 0);
-    const diff = sourceClosing === null ? null : calculated - sourceClosing;
-    const suggested: 'Pending' | 'Matched' | 'Mismatch' = sourceClosing === null ? 'Pending' : Math.abs(diff || 0) < 0.01 ? 'Matched' : 'Mismatch';
+    const calculated = editingRecord.calculatedOpeningBalance + editingRecord.credits - editingRecord.debits + (editingRecord.contra || 0);
+    const diff = sourceClosing === null ? null : Number((calculated - sourceClosing).toFixed(2));
+    const status = sourceClosing === null ? 'Pending' : Math.abs(diff || 0) < 0.01 ? 'Matched' : 'Mismatch';
+    const generatedRemarks = sourceClosing === null ? 'Pending: Enter the month-end closing balance from the bank passbook or cash book.' : status === 'Matched' ? 'Matched: Calculated closing balance agrees with the source closing balance. No action required.' : `Mismatch: Source closing balance differs from calculated closing balance by ₹${Math.abs(diff || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}. Investigate transactions and source records; no adjustment has been posted.`;
     await updateReconciliation(editingRecord.accountId, editingRecord.month, {
-      adjustments: Number(editAdjustments) || 0, remarks: editRemarks.trim(),
-      status: editStatus === 'Mismatch Accepted' ? 'Mismatch Accepted' : suggested,
+      adjustments: 0, remarks: generatedRemarks, status,
       calculatedOpeningBalance: editingRecord.calculatedOpeningBalance, credits: editingRecord.credits,
       debits: editingRecord.debits, contra: editingRecord.contra || 0, calculatedClosingBalance: calculated,
-      sourceClosingBalance: sourceClosing, openingConfirmed: editOpeningConfirmed,
-      transactionsConfirmed: editTransactionsConfirmed, closingConfirmed: editClosingConfirmed, confirmationNotes: editRemarks.trim(),
+      sourceClosingBalance: sourceClosing, confirmationNotes: editObservations.trim(),
     });
     await fetchMonthlyReconciliation();
     setEditingRecord(null);
@@ -561,38 +551,9 @@ export const MonthlyReconciliation: React.FC = () => {
               <div>
                 <label className="block text-[11px] font-semibold text-slate-800 mb-1">Source Closing Balance (₹) — passbook / cash book</label>
                 <input type="number" step="0.01" value={editSourceClosing} onChange={(e) => { const v=e.target.value; setEditSourceClosing(v); }} placeholder="Enter month-end source balance" className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono" />
-                <div className="grid grid-cols-2 gap-2 mt-2"><div><label className="block text-[11px] font-semibold mb-1">Calculated Closing</label><div className="p-2 rounded bg-slate-50 border font-mono">{formatINR(editingRecord.calculatedOpeningBalance+editingRecord.credits-editingRecord.debits+(editingRecord.contra||0)+(Number(editAdjustments)||0))}</div></div><div><label className="block text-[11px] font-semibold mb-1">Difference</label><div className="p-2 rounded bg-slate-50 border font-mono">{editSourceClosing.trim()===''?'—':formatINR(editingRecord.calculatedOpeningBalance+editingRecord.credits-editingRecord.debits+(editingRecord.contra||0)+(Number(editAdjustments)||0)-Number(editSourceClosing))}</div></div></div>
+                <div className="grid grid-cols-2 gap-2 mt-2"><div><label className="block text-[11px] font-semibold mb-1">Calculated Closing</label><div className="p-2 rounded bg-slate-50 border font-mono">{formatINR(editingRecord.calculatedOpeningBalance+editingRecord.credits-editingRecord.debits+(editingRecord.contra||0))}</div></div><div><label className="block text-[11px] font-semibold mb-1">Difference</label><div className="p-2 rounded bg-slate-50 border font-mono">{editSourceClosing.trim()===''?'—':formatINR(editingRecord.calculatedOpeningBalance+editingRecord.credits-editingRecord.debits+(editingRecord.contra||0)-Number(editSourceClosing))}</div></div></div>
               </div>
-              <div><label className="block text-[11px] font-semibold text-slate-800 mb-1">Status</label><select value={editStatus} onChange={e=>setEditStatus(e.target.value as typeof editStatus)} className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2"><option>Pending</option><option>Matched</option><option>Mismatch</option><option>Mismatch Accepted</option></select>{editStatus==='Mismatch Accepted' && <p className="text-[10px] text-amber-700 mt-1">Explain the accepted difference in remarks.</p>}</div>
-              <div className="space-y-2 rounded-lg border p-3 bg-slate-50"><p className="font-semibold">Reviewer confirmations</p><label className="flex items-center gap-2"><input type="checkbox" checked={editOpeningConfirmed} onChange={e=>setEditOpeningConfirmed(e.target.checked)}/> Opening balance checked</label><label className="flex items-center gap-2"><input type="checkbox" checked={editTransactionsConfirmed} onChange={e=>setEditTransactionsConfirmed(e.target.checked)}/> Transaction movements checked</label><label className="flex items-center gap-2"><input type="checkbox" checked={editClosingConfirmed} onChange={e=>setEditClosingConfirmed(e.target.checked)}/> Source closing balance checked</label></div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-800 mb-1">
-                  Adjustments (+/- ₹)
-                </label>
-                <input
-                  type="number"
-                  value={editAdjustments}
-                  onChange={(e) => setEditAdjustments(Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 focus:ring-1 focus:ring-blue-500 font-mono"
-                />
-                <span className="text-[10px] text-slate-500 mt-0.5 block">
-                  Adjustments require formal justification and must not hide unexplained differences.
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-800 mb-1">
-                  Remarks / Explanation
-                </label>
-                <textarea
-                  rows={3}
-                  value={editRemarks}
-                  onChange={(e) => setEditRemarks(e.target.value)}
-                  placeholder="Reason for adjustment, cheque clearance delay, or bank charge note"
-                  className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-800">System-derived status</p><p className="mt-1">{editSourceClosing.trim() === '' ? 'Pending — enter the source closing balance.' : Math.abs((editingRecord.calculatedOpeningBalance + editingRecord.credits - editingRecord.debits + (editingRecord.contra || 0)) - Number(editSourceClosing)) < 0.01 ? 'Matched — no action required.' : 'Mismatch — investigate the difference.'}</p><p className="mt-1 text-[10px] text-slate-500">Any missing or incorrect transaction must be recorded through the transaction correction workflow. This screen does not create adjustment entries.</p></div><div><label className="block text-[11px] font-semibold text-slate-800 mb-1">Reviewer observations (optional)</label><textarea rows={3} value={editObservations} onChange={(e) => setEditObservations(e.target.value)} placeholder="Record investigation notes or follow-up required" className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 focus:ring-1 focus:ring-blue-500" /></div>
             </div>
 
             <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
