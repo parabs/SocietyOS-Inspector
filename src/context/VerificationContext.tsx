@@ -342,7 +342,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         throw new Error(`account_master query failed: ${accRes.error.message}`);
       }
 
-      const accounts = (accRes.data as any[]) || [];
+      const accounts = ((accRes.data as any[]) || []).filter((acc) => ['ACC-0001', 'ACC-0002', 'ACC-0003'].includes(String(acc.account_id || '').toUpperCase()));
       const balances = (balRes.data as any[]) || [];
 
       if (accounts.length === 0) {
@@ -354,12 +354,10 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }));
       } else {
         const mappedRecords: OpeningBalanceRecord[] = accounts.map((acc: any) => {
-          const rawId = (acc.account_code || acc.account_id || acc.id || '').toUpperCase();
-          const accountId: AccountId = rawId.includes('TDCC') ? 'TDCC' : rawId.includes('BOM') ? 'BOM' : 'CASH';
+          const rawId = String(acc.account_id || '').toUpperCase();
+          const accountId: AccountId = rawId === 'ACC-0001' ? 'TDCC' : rawId === 'ACC-0002' ? 'BOM' : 'CASH';
 
-          const matchBal = balances.find((b: any) =>
-            (b.account_id || '').toUpperCase().includes(accountId)
-          );
+          const matchBal = balances.find((b: any) => String(b.account_id || '').toUpperCase() === rawId);
 
           const recordedOp = acc.opening_balance ?? matchBal?.opening_balance ?? 0;
           const auditClosing = acc.current_balance ?? recordedOp;
@@ -1182,7 +1180,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const totalTxn = transactions.length;
     const inspectedTxn = transactions.filter(
-      (t) => t.evidenceStatus !== 'Pending' || t.internalAuditStatus !== 'Pending'
+      (t) => t.evidenceStatus !== 'Pending' && t.internalAuditStatus !== 'Pending'
     ).length;
     const pendingTxn = totalTxn - inspectedTxn;
 
