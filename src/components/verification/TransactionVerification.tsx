@@ -78,9 +78,7 @@ export const TransactionVerification: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Selected transaction for side panel
-  const [activeTxnId, setActiveTxnId] = useState<string | null>(
-    selectedTransactionId || 'TXN-2018-00041'
-  );
+  const [activeTxnId, setActiveTxnId] = useState<string | null>(selectedTransactionId || null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -101,7 +99,7 @@ export const TransactionVerification: React.FC = () => {
 
   // Side panel form state
   const activeTxn = useMemo(() => {
-    return transactions.find((t) => t.id === activeTxnId) || transactions[0];
+    return activeTxnId ? transactions.find((t) => t.id === activeTxnId) : undefined;
   }, [transactions, activeTxnId]);
 
   const [formBillStatus, setFormBillStatus] = useState<BillStatus>(
