@@ -1,5 +1,5 @@
 /**
- * Anomaly Detection Engine for Varsha Nivas CHS Ltd. Audit Platform
+ * Rule-based transaction screening for Society OS
  * Implements rule-based forensic scanning for duplicate entries,
  * suspicious round-number transactions, cash ceiling breaches, and documentation risks.
  * 
@@ -149,7 +149,7 @@ export function scanTransactionsForAnomalies(
           party: primary.party,
           accountId: primary.accountId,
           recommendedAction: `Inspect physical voucher book to verify if ${primary.id} or ${secondary.id} has an erroneous voucher entry.`,
-          statutoryReference: 'MCS Act Rule 65 - Maintenance of Accounts & Vouchers',
+          statutoryReference: 'Internal screening rule: duplicate voucher reference; confirm against source register',
         });
       }
     }
@@ -177,7 +177,7 @@ export function scanTransactionsForAnomalies(
           party: primary.party,
           accountId: primary.accountId,
           recommendedAction: 'Verify member receipt counterfoil book and resolve receipt numbering collision.',
-          statutoryReference: 'MCS Bye-Law 152(b) - Member Maintenance Receipts',
+          statutoryReference: 'Internal screening rule: duplicate receipt reference; confirm against receipt book',
         });
       }
     }
@@ -205,7 +205,7 @@ export function scanTransactionsForAnomalies(
           party: primary.party,
           accountId: primary.accountId,
           recommendedAction: 'Cross-check bank statement / cash book to confirm whether this payment/receipt cleared twice or was posted twice in error.',
-          statutoryReference: 'MCS Bye-Law 152 - Double Entry Prevention',
+          statutoryReference: 'Internal screening rule: possible duplicate transaction; verify manually',
         });
       }
     }
@@ -244,7 +244,7 @@ export function scanTransactionsForAnomalies(
               party: t1.party,
               accountId: t1.accountId,
               recommendedAction: 'Verify vendor work orders and bills to ensure both distinct jobs were executed and authorized.',
-              statutoryReference: 'MCS Bye-Law 145 - Disbursement Sanctions',
+              statutoryReference: 'Internal screening rule: payment pattern requires review',
             });
           }
         }
@@ -270,7 +270,7 @@ export function scanTransactionsForAnomalies(
         party: txn.party,
         accountId: txn.accountId,
         recommendedAction: 'Require special Managing Committee sanction resolution and verify recipient identification / revenue stamp.',
-        statutoryReference: 'MCS Bye-Law 143 & IT Act Sec 40A(3) - Cash Ceiling Restriction',
+        statutoryReference: 'Internal screening rule: cash amount threshold; confirm applicable limits before drawing conclusions',
       });
     }
 
@@ -293,7 +293,7 @@ export function scanTransactionsForAnomalies(
         party: txn.party,
         accountId: txn.accountId,
         recommendedAction: 'Inspect detailed measurement sheets, labor rolls, or tax invoices to verify actual expense incurred against round figure.',
-        statutoryReference: 'Standard Audit Guidance - Round Estimate Scrutiny',
+        statutoryReference: 'Internal screening rule: round-number amount; not proof of an error',
       });
     }
 
@@ -317,7 +317,7 @@ export function scanTransactionsForAnomalies(
         party: txn.party,
         accountId: txn.accountId,
         recommendedAction: 'Escalate to Managing Committee to procure duplicate bill from vendor or hold audit certification.',
-        statutoryReference: 'MCS Act Sec 81 - Vouching & Physical Verification',
+        statutoryReference: 'Internal screening rule: documentation status requires review',
       });
     }
 
@@ -337,7 +337,7 @@ export function scanTransactionsForAnomalies(
         party: txn.party,
         accountId: txn.accountId,
         recommendedAction: 'Review auditor remarks and obtain society explanation before finalizing session.',
-        statutoryReference: 'MCS Bye-Law 152(g) - Discrepancy Rectification',
+        statutoryReference: 'Internal screening rule: discrepancy requires investigation',
       });
     }
   });
