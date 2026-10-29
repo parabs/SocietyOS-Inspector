@@ -1121,8 +1121,20 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       openingConfirmed?: boolean; transactionsConfirmed?: boolean; closingConfirmed?: boolean; confirmationNotes?: string;
     }
   ) => {
-    const rec = reconciliations[accountId]?.find(r => r.id === monthId || r.month === monthId);
-    if (!rec) throw new Error('Selected account-month was not found. Refresh and try again.');
+    const found = reconciliations[accountId]?.find(r => r.id === monthId || r.month === monthId);
+    const monthNames = ['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
+    const monthIndex = monthNames.indexOf(monthId);
+    const openingFromMaster = openingBalances.find(o => o.accountId === accountId)?.recordedOpeningBalance ?? 0;
+    const rec: MonthlyReconciliationRecord = found || {
+      id: `CALC-${accountId}-${Math.max(0, monthIndex)}`,
+      month: monthId, monthIndex: Math.max(0, monthIndex), accountId,
+      sourceOpeningBalance: updates.calculatedOpeningBalance ?? openingFromMaster,
+      calculatedOpeningBalance: updates.calculatedOpeningBalance ?? openingFromMaster,
+      openingDifference: 0, credits: updates.credits ?? 0, debits: updates.debits ?? 0,
+      contra: updates.contra ?? 0, adjustments: updates.adjustments ?? 0,
+      calculatedClosingBalance: updates.calculatedClosingBalance ?? openingFromMaster,
+      sourceClosingBalance: null, closingDifference: 0, status: 'Pending', remarks: '',
+    };
     const adjustments = updates.adjustments ?? rec.adjustments;
     const contra = updates.contra ?? rec.contra ?? 0;
     const sourceClosing = updates.sourceClosingBalance !== undefined ? updates.sourceClosingBalance : rec.sourceClosingBalance;
@@ -1132,7 +1144,9 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const suggested: 'Pending' | 'Matched' | 'Mismatch' = sourceClosing === null ? 'Pending' : Math.abs(difference || 0) < 0.01 ? 'Matched' : 'Mismatch';
     const status = updates.status === 'Mismatch Accepted' ? 'Mismatch Accepted' : suggested;
     const now = new Date().toISOString(), reviewer = APP_CONFIG.currentReviewer.name;
-    const list = (reconciliations[accountId] || []).map(r => r.id !== monthId && r.month !== monthId ? r : ({
+    const existingRows = reconciliations[accountId] || [];
+    const rowsToUpdate = found ? existingRows : [...existingRows, rec];
+    const list = rowsToUpdate.map(r => r.id !== monthId && r.month !== monthId && r.id !== rec.id ? r : ({
       ...r, adjustments, contra, calculatedClosingBalance: calculatedClosing, sourceClosingBalance: sourceClosing,
       closingDifference: difference ?? 0, status, remarks: updates.remarks ?? r.remarks,
       openingConfirmed: updates.openingConfirmed ?? r.openingConfirmed ?? false,
