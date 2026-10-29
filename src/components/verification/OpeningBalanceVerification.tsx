@@ -303,12 +303,12 @@ export const OpeningBalanceVerification: React.FC = () => {
               <tr className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                 <th className="py-2.5 px-3">Account</th>
                 <th className="py-2.5 px-3 text-right">
-                  Audit Closing Balance <br />
-                  <span className="text-[10px] text-slate-500 font-normal">(31 Mar 2018) (A)</span>
+                  Opening Balance <br />
+                  <span className="text-[10px] text-slate-500 font-normal">(01 Apr 2018) (B)</span>
                 </th>
                 <th className="py-2.5 px-3 text-right">
-                  Recorded Opening Balance <br />
-                  <span className="text-[10px] text-slate-500 font-normal">(01 Apr 2018) (B)</span>
+                  Audit Closing Balance <br />
+                  <span className="text-[10px] text-slate-500 font-normal">(31 Mar 2018) (A)</span>
                 </th>
                 <th className="py-2.5 px-3 text-right">
                   Difference <br />
@@ -409,7 +409,7 @@ export const OpeningBalanceVerification: React.FC = () => {
                     {acc.verifiedOn || '—'}
                   </td>
 
-                  <td className="py-3 px-3 text-slate-600 max-w-xs truncate" title={acc.remarks}>
+                  <td className="py-3 px-3 text-slate-600 max-w-xs truncate" title={acc.remarks || '—'}>
                     {acc.remarks}
                   </td>
 
