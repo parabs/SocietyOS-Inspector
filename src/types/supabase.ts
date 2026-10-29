@@ -194,6 +194,8 @@ export interface DbCategoryMaster {
   id?: string;
   category_code?: string;
   category_name?: string;
+  /** Optional reporting group when supplied by the connected category master. */
+  category_group?: string;
   type?: 'Income' | 'Expense' | 'Asset' | 'Liability' | string;
   description?: string;
 }
