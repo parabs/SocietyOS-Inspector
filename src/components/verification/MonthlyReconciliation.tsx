@@ -93,9 +93,15 @@ export const MonthlyReconciliation: React.FC = () => {
     setSelectedAccountId(acc);
   };
 
-  const tdccClosing = reconciliations.TDCC?.[reconciliations.TDCC.length - 1]?.calculatedClosingBalance ?? openingBalances.find((o) => o.accountId === 'TDCC')?.recordedOpeningBalance ?? 0;
-  const bomClosing = reconciliations.BOM?.[reconciliations.BOM.length - 1]?.calculatedClosingBalance ?? openingBalances.find((o) => o.accountId === 'BOM')?.recordedOpeningBalance ?? 0;
-  const cashClosing = reconciliations.CASH?.[reconciliations.CASH.length - 1]?.calculatedClosingBalance ?? openingBalances.find((o) => o.accountId === 'CASH')?.recordedOpeningBalance ?? 0;
+  const calculatedClosing = (accountId: AccountId) => {
+    const opening = openingBalances.find((o) => o.accountId === accountId)?.recordedOpeningBalance || 0;
+    const movement = transactions.filter(t => t.accountId === accountId).reduce((sum, t) =>
+      sum + (t.type === 'Receipt' ? Math.abs(t.amount) : -Math.abs(t.amount)), 0);
+    return reconciliations[accountId]?.[reconciliations[accountId].length - 1]?.calculatedClosingBalance ?? opening + movement;
+  };
+  const tdccClosing = calculatedClosing('TDCC');
+  const bomClosing = calculatedClosing('BOM');
+  const cashClosing = calculatedClosing('CASH');
 
   // Reconciled totals
   const totalCredits = useMemo(() => {
@@ -207,7 +213,7 @@ export const MonthlyReconciliation: React.FC = () => {
                   activeAccount === 'TDCC' ? 'text-blue-100' : 'text-slate-400'
                 }`}
               >
-                Current Balance (as per Mar 2019)
+                Calculated Closing Balance (source pending)
               </div>
               <div
                 className={`text-lg font-bold font-mono mt-0.5 ${
