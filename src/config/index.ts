@@ -3,9 +3,9 @@
  */
 
 export const APP_CONFIG = {
-  societyName: 'Varsha निवास',
-  societySubtitle: 'Co-operative Housing Society',
-  registrationNo: 'BOM/GEN/1984/CHS',
+  societyName: "Pearl Meadows 'C' Type 'C' Wing Chs Ltd",
+  societySubtitle: 'Regd. No. TNA/KLN/HSG(TC) 27051/2014-15/YEAR 2014',
+  registrationNo: 'TNA/KLN/HSG(TC) 27051/2014-15/YEAR 2014',
   financialYear: '2018 - 2019',
   periodDisplay: '01 Apr 2018 – 31 Mar 2019',
   currentReviewer: {
