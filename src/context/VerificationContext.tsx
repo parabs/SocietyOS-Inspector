@@ -438,7 +438,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             rawAcc.includes('BOM') || rawAcc === 'ACC-0002' ? 'BOM' :
             rawAcc.includes('CASH') || rawAcc.includes('PETTY') || rawAcc === 'ACC-0003' ? 'CASH' : 'CASH';
           const rawType = row.transaction_type || row.type || (Number(row.amount) >= 0 ? 'Receipt' : 'Payment');
-          const type: 'Receipt' | 'Payment' = String(rawType).toLowerCase().includes('rec') ? 'Receipt' : 'Payment';
+          const type: 'Receipt' | 'Payment' = String(rawType).toLowerCase().includes('rec') ? 'Receipt' : 'Payment'; // Contra is classified by signed amount in reconciliation totals.
           const rawDate = row.transaction_date || row.date || new Date().toISOString().split('T')[0];
           const billRaw = String(row.bill_status || row.bills_available || '').toLowerCase();
           const voucherRaw = String(row.voucher_receipt_status || row.voucher_available || '').toLowerCase();
@@ -456,7 +456,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             sourceSheet: row.source_sheet || 'transactions',
             sourceRow: row.source_row ?? idx + 1,
             date: String(rawDate).slice(0, 10),
-            month: (() => { const sourceMonth = String(row.month || row.reporting_month || ''); const normalized = sourceMonth.match(/^([A-Za-z]{3,})[- ](\\d{4})$/); return normalized ? `${normalized[1].slice(0, 3)} ${normalized[2]}` : (sourceMonth || (rawDate ? new Date(rawDate).toLocaleString('en-US', { month: 'short', year: 'numeric' }) : 'Apr 2018')); })(),
+            month: (() => { const sourceMonth = String(row.month || row.reporting_month || ''); const normalized = sourceMonth.match(/^([A-Za-z]{3,})[- ](\d{4})$/); return normalized ? `${normalized[1].slice(0, 3)} ${normalized[2]}` : (sourceMonth || (rawDate ? new Date(rawDate).toLocaleString('en-US', { month: 'short', year: 'numeric' }) : 'Apr 2018')); })(),
             accountId,
             type,
             party: (row.party_id && partyNames.get(row.party_id)) || row.party_name || row.party_id || 'Sundry Member / Vendor',
