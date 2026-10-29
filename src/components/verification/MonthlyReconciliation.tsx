@@ -406,7 +406,7 @@ export const MonthlyReconciliation: React.FC = () => {
                   <td className="py-2.5 px-2 text-right font-mono">
                     {formatNumber(totalDebits)}
                   </td>
-                  <td className="py-2.5 px-2 text-right font-mono">{formatNumber(accountList.reduce((sum, row) => sum + row.contra, 0))}
+                  <td className="py-2.5 px-2 text-right font-mono">{formatNumber(accountList.reduce((sum, row) => sum + (row.contra || 0), 0))}
                   </td>
                   <td className="py-2.5 px-2 text-right font-mono">
                     {totalAdjustments !== 0 ? formatNumber(totalAdjustments) : '—'}
