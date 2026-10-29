@@ -90,7 +90,7 @@ export const SocietyRoleDashboards: React.FC<{ screen: DashboardScreen }> = ({ s
   ];
   const exportTransactions = () => downloadCsv('society-transaction-register.csv', [
     ['Transaction ID','Date','Period','Type','Party','Category','Account','Description','Amount','Voucher','Receipt','Bill status','Voucher status','Internal audit status','Source file','Source sheet','Source row'],
-    ...rows.map(t=>[t.id,t.date,t.reportingMonth||t.month,t.transactionClass||t.type,t.party,t.categoryName,t.accountName,t.description,t.amount,t.voucherNo,t.receiptNo,t.billStatus,t.voucherReceiptStatus,t.internalAuditStatus,t.sourceFile,t.sourceSheet,t.sourceRow])
+    ...rows.map(t=>[t.id,t.date,t.reportingMonth||t.month,t.transactionClass||t.type,t.party,t.categoryName,t.accountName,t.description,t.amount,t.voucherNo,t.receiptNo,t.billStatus,t.voucherReceiptStatus,t.internalAuditStatus,t.sourceFile,t.sourceSheet,t.sourceRow].map(v=>String(v ?? '')))
   ]);
   const Metric = ({ label, value, detail, icon: Icon, tone='slate' }: any) => (
     <div className="bg-white border border-slate-200 rounded-xl p-4 min-w-0">
