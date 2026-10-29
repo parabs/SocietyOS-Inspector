@@ -415,6 +415,7 @@ export const AuditCertificatePDFModal: React.FC<AuditCertificatePDFModalProps> =
                       </td>
                       <td className="py-1.5 px-2 font-mono font-bold text-blue-900 whitespace-nowrap text-[11px]">
                         {t.id}
+                        {t.isCorrection && <div className="mt-0.5 font-sans text-[8px] font-bold text-amber-800">CORRECTION · {t.correctionStatus || "Pending Review"}</div>}
                       </td>
                       <td className="py-1.5 px-2 text-center">
                         <span className="font-semibold text-slate-700 px-1 py-0.5 rounded bg-slate-100 text-[10px]">
