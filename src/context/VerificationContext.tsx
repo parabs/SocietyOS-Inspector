@@ -629,11 +629,13 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsLoadingMemberBalances(true);
     setMemberBalancesError(null);
     try {
-      const [opRes, balRes, finRes, cumRes] = await Promise.all([
+      const [opRes, balRes, finRes, cumRes, partyRes, flatRes] = await Promise.all([
         supabaseClient.from('member_opening_balances').select('*'),
         supabaseClient.from('balance_register').select('*'),
         supabaseClient.from('v_member_financial_year_balance').select('*'),
         supabaseClient.from('v_member_cumulative_outstanding').select('*'),
+        supabaseClient.from('party_master').select('party_id, party_name, party_type'),
+        supabaseClient.from('flat_owner_master').select('flat_number_source_value, owner_name, owner_type, asset_type'),
       ]);
 
       if (opRes.error) throw new Error(`member_opening_balances: ${opRes.error.message}`);
@@ -641,11 +643,33 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       setMemberOpeningBalances((opRes.data as DbMemberOpeningBalance[]) || []);
       setBalanceRegister((balRes.data as DbBalanceRegister[]) || []);
+      const partyRows=(partyRes.data||[]) as any[];
+      const flatRows=(flatRes.data||[]) as any[];
+      const partyNames=new Map(partyRows.map((p:any)=>[String(p.party_id||''),String(p.party_name||'')]));
+      const flatFor=(name:string)=>flatRows.find((f:any)=>String(f.owner_name||'').trim().toLowerCase()===String(name||'').trim().toLowerCase());
+      const displayFlat=(name:string,partyId:string)=>String(flatFor(name)?.flat_number_source_value||name||partyNames.get(partyId)||'Unmapped party');
       if (!finRes.error && finRes.data) {
-        setMemberFinancialBalances((finRes.data as DbMemberFinancialYearBalance[]) || []);
+        const normalized=(finRes.data as any[]).map(row=>{
+          const name=String(row.member_name||row.name||partyNames.get(String(row.party_id||''))||'Unmapped party');
+          return {...row,flat_no:displayFlat(name,String(row.party_id||'')),member_name:name,
+            billed_amount:Number(row.billed_amount??row.current_fy_demand)||0,
+            received_amount:Number(row.received_amount??row.current_fy_receipts)||0,
+            adjusted_amount:Number(row.adjusted_amount??row.adjustments)||0,
+            closing_balance:Number(row.closing_balance??row.total_outstanding)||0};
+        });
+        setMemberFinancialBalances(normalized as DbMemberFinancialYearBalance[]);
       }
       if (!cumRes.error && cumRes.data) {
-        setCumulativeOutstanding((cumRes.data as DbMemberCumulativeOutstanding[]) || []);
+        const normalized=(cumRes.data as any[]).map(row=>{
+          const name=String(row.member_name||row.name||partyNames.get(String(row.party_id||''))||'Unmapped party');
+          return {...row,flat_no:displayFlat(name,String(row.party_id||'')),member_name:name,
+            total_billed:row.total_billed==null?undefined:Number(row.total_billed),
+            total_received:row.total_received==null?undefined:Number(row.total_received),
+            total_adjustments:row.total_adjustments==null?undefined:Number(row.total_adjustments),
+            net_outstanding:Number(row.net_outstanding??row.cumulative_outstanding??row.total_outstanding)||0,
+            status:row.status||row.opening_balance_verification_status||'Review'};
+        });
+        setCumulativeOutstanding(normalized as DbMemberCumulativeOutstanding[]);
       }
       setSupabaseSync((prev) => ({
         ...prev,
@@ -673,16 +697,28 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsLoadingDemandRegister(true);
     setDemandRegisterError(null);
     try {
-      const [demRes, adjRes, allocRes] = await Promise.all([
+      const [demRes, adjRes, allocRes, partyRes, flatRes] = await Promise.all([
         supabaseClient.from('demand_register').select('*'),
         supabaseClient.from('demand_adjustments').select('*'),
         supabaseClient.from('demand_payment_allocations').select('*'),
+        supabaseClient.from('party_master').select('party_id, party_name'),
+        supabaseClient.from('flat_owner_master').select('flat_number_source_value, owner_name'),
       ]);
 
       if (demRes.error) throw new Error(`demand_register: ${demRes.error.message}`);
 
-      setDemandRegister((demRes.data as DbDemandRegister[]) || []);
-      setDemandAdjustments((adjRes.data as DbDemandAdjustment[]) || []);
+      const partyNames=new Map(((partyRes.data||[]) as any[]).map((p:any)=>[String(p.party_id||''),String(p.party_name||'')]));
+      const flatRows=(flatRes.data||[]) as any[];
+      const demandRows=(demRes.data||[] as any[]).map((row:any)=>{
+        const partyName=String(partyNames.get(String(row.party_id||''))||'');
+        const flat=String(flatRows.find((f:any)=>String(f.owner_name||'').trim().toLowerCase()===partyName.trim().toLowerCase())?.flat_number_source_value||partyName||'');
+        return {...row,id:row.demand_id,bill_no:row.demand_id,flat_no:flat,member_id:flat||partyName||row.party_id,member_name:partyName,party_name:partyName,
+          bill_date:row.demand_date,month:row.demand_month,total_demand:Number(row.total_demand??row.demand_amount)||0};
+      });
+      const demandById=new Map(demandRows.map((d:any)=>[String(d.demand_id||d.id||''),d]));
+      const adjustmentRows=(adjRes.data||[] as any[]).map((a:any)=>{const d:any=demandById.get(String(a.demand_id||''));return {...a,id:a.adjustment_id,amount:Number(a.amount??a.adjustment_amount)||0,created_at:a.created_at||a.adjustment_date,flat_no:d?.flat_no||'',member_id:d?.member_id||d?.party_name||'',member_name:d?.member_name||'',is_approved:String(a.approval_status||'').toLowerCase()==='approved'};});
+      setDemandRegister(demandRows as DbDemandRegister[]);
+      setDemandAdjustments(adjustmentRows as DbDemandAdjustment[]);
       setDemandAllocations((allocRes.data as DbDemandPaymentAllocation[]) || []);
 
       setSupabaseSync((prev) => ({
