@@ -364,15 +364,19 @@ export const TransactionVerification: React.FC = () => {
   };
 
   // Handle Save Single
-  const handleSaveInspection = () => {
+  const handleSaveInspection = async () => {
     if (!activeTxn) return;
-    updateTransactionInspection(activeTxn.id, {
+    const result = await updateTransactionInspection(activeTxn.id, {
       billStatus: formBillStatus,
       voucherReceiptStatus: formVoucherStatus,
       internalAuditStatus: formAuditStatus,
-      remarks: formRemarks || '-',
+      remarks: formRemarks || '',
     });
-    setToastMessage(`Saved inspection for transaction ${activeTxn.id}`);
+    if (!result.success) {
+      window.alert(`Could not save verification for ${activeTxn.id}: ${result.error || 'Unknown database error'}`);
+      return;
+    }
+    setToastMessage(`Saved verification for transaction ${activeTxn.id}`);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
