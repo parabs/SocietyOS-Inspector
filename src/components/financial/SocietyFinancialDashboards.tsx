@@ -53,15 +53,15 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   {id:'monthly-demands',name:'Monthly Demand Matrix — Party-wise',category:'Demands & Payments',description:'Opening balance and monthly demand; no pre-payment balance'},
   {id:'monthly-payments',name:'Monthly Payment / Collection Matrix — Party-wise',category:'Demands & Payments',description:'Monthly receipts by party; no opening balance column'},
   {id:'monthly-flat-balance',name:'Monthly Flat Owner Balance Report',category:'Demands & Payments',description:'Monthly demand, allocated payment and month-wise unpaid dues'},
-  {id:'party-ledger-summary',name:'RPT-21 Party-wise Ledger — Summary',category:'Ledgers',description:'Opening, period movements and closing by party'},
-  {id:'party-ledger-monthly',name:'RPT-22 Party-wise Ledger — Month-wise',category:'Ledgers',description:'Monthly demand, receipts, adjustments and rolling balance by party'},
-  {id:'party-ledger-detail',name:'RPT-23 Party-wise Ledger — Detailed',category:'Ledgers',description:'Chronological party transactions with running balance'},
-  {id:'account-ledger-summary',name:'RPT-24 Account-wise Ledger — Summary',category:'Ledgers',description:'Opening, receipts, payments and closing by cash/bank account'},
-  {id:'account-ledger-monthly',name:'RPT-25 Account-wise Ledger — Month-wise',category:'Ledgers',description:'Monthly opening, receipts, payments and closing by account'},
-  {id:'account-ledger-detail',name:'RPT-26 Account-wise Ledger — Detailed',category:'Ledgers',description:'Chronological account transactions with running balance'},
-  {id:'category-ledger-summary',name:'RPT-27 Category-wise Ledger — Summary',category:'Ledgers',description:'Category group, category and period movement totals'},
-  {id:'category-ledger-monthly',name:'RPT-28 Category-wise Ledger — Month-wise',category:'Ledgers',description:'Monthly category movements by category group and category'},
-  {id:'category-ledger-detail',name:'RPT-29 Category-wise Ledger — Detailed',category:'Ledgers',description:'Chronological category transactions and running movement'},
+  {id:'party-ledger-summary',name:'Party-wise Ledger — Summary',category:'Ledgers',description:'Opening, period movements and closing by party'},
+  {id:'party-ledger-monthly',name:'Party-wise Ledger — Month-wise',category:'Ledgers',description:'Monthly demand, receipts, adjustments and rolling balance by party'},
+  {id:'party-ledger-detail',name:'Party-wise Ledger — Detailed',category:'Ledgers',description:'Chronological party transactions with running balance'},
+  {id:'account-ledger-summary',name:'Account-wise Ledger — Summary',category:'Ledgers',description:'Opening, receipts, payments and closing by cash/bank account'},
+  {id:'account-ledger-monthly',name:'Account-wise Ledger — Month-wise',category:'Ledgers',description:'Monthly opening, receipts, payments and closing by account'},
+  {id:'account-ledger-detail',name:'Account-wise Ledger — Detailed',category:'Ledgers',description:'Chronological account transactions with running balance'},
+  {id:'category-ledger-summary',name:'Category-wise Ledger — Summary',category:'Ledgers',description:'Category group, category and period movement totals'},
+  {id:'category-ledger-monthly',name:'Category-wise Ledger — Month-wise',category:'Ledgers',description:'Monthly category movements by category group and category'},
+  {id:'category-ledger-detail',name:'Category-wise Ledger — Detailed',category:'Ledgers',description:'Chronological category transactions and running movement'},
   {id:'receipts-payments',name:'Receipts & Payments Account',category:'Financial Statements',description:'Cash movement statement, provisional until matched to auditor format'},
   {id:'income-expense',name:'Income & Expenditure Analysis',category:'Financial Statements',description:'Category group and category-wise income and expenditure'},
   {id:'balance-sheet',name:'Balance Sheet Working Statement',category:'Financial Statements',description:'Available balances and reconciliation exceptions'},
@@ -160,7 +160,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
     const keys=new Set<string>(sourceTx.map(getKey));
     if(isParty){flatOwnerMaster.forEach((x:any)=>keys.add(String(x.owner_name||x.flat_no||'')));memberFinancialBalances.forEach((x:any)=>keys.add(String(x.member_name||x.flat_no||'')));}
     if(isCategory) categoryMaster.forEach((x:any)=>keys.add(String(x.category_name||'Unclassified')));
-    const scopedKeys=Array.from(keys).filter(k=>k&&(!query||k.toLowerCase().includes(query.toLowerCase()))).sort();
+    const scopedKeys=Array.from(keys).filter(k=>k&&(!query||k.toLowerCase().includes(query.toLowerCase()))&&(!isParty||partyTypeFilter==='All party types'||String(partyMaster.find((p:any)=>String(p.party_name||'')===k||String(p.flat_no||'')===k)?.party_type||'Member / Owner')===partyTypeFilter)).sort();
     const openingFor=(key:string)=>isParty&&!isVendor?Number(memberFinancialBalances.find((x:any)=>String(x.member_name||'')===key||String(x.flat_no||'')===key)?.opening_balance)||0:isAccount?Number(Object.values(reconciliations).flat().filter((x:any)=>String(x.accountId||'')===key||String(x.accountName||'')===key).sort((a:any,b:any)=>(a.monthIndex||0)-(b.monthIndex||0))[0]?.calculatedOpeningBalance)||0:0;
     if(mode==='summary'){
       const rows=scopedKeys.map(key=>{const ts=sourceTx.filter(t=>getKey(t)===key),opening=openingFor(key),rec=ts.filter(t=>t.type==='Receipt').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0),pay=ts.filter(t=>t.type==='Payment').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0),demand=isParty?demandRegister.filter((d:any)=>String(d.member_name||d.party_name||d.flat_no||d.member_id||'')===key).reduce((s,d)=>s+Number(d.total_demand||0),0):0;return isParty?[key,currencyCell(opening),currencyCell(demand),currencyCell(rec),currencyCell(opening+demand-rec)]:isAccount?[key,currencyCell(opening),currencyCell(rec),currencyCell(pay),currencyCell(opening+rec-pay)]:[categoryMaster.find((x:any)=>String(x.category_name||'')===key)?.category_group||'Unmapped',key,currencyCell(rec),currencyCell(pay),currencyCell(rec-pay)];});
