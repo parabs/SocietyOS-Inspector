@@ -77,6 +77,8 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
   const [loginPassword, setLoginPassword] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [authMessage, setAuthMessage] = useState('');
+  const [selectedTables, setSelectedTables] = useState<string[]>([]);
+  const [preflightMessage, setPreflightMessage] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -324,7 +326,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
     try {
       const data = await buildPayload(chosen);
       setPayload(data);
-      setPlan([
+      const nextPlan: ImportPlanRow[] = [
         { table: 'source_register', count: data.source_register.length, note: 'Source files and review status' },
         { table: 'flat_owner_master', count: data.flat_owner_master.length, note: 'Owner/asset records' },
         { table: 'account_master', count: data.account_master.length, note: 'Bank, cash and deposit accounts' },
@@ -336,61 +338,116 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
         { table: 'society_dropdown_options', count: data.society_dropdown_options.length, note: 'Controlled dropdown options, kept separate from application configuration' },
         { table: 'society_correction_log', count: data.society_correction_log.length, note: 'Correction log audit trail' },
         { table: 'party_category_rules', count: data.party_category_rules.length, note: 'Persistent party/category rules' },
-      ]);
+      ];
+      setPlan(nextPlan);
+      setSelectedTables(nextPlan.map(row => row.table));
+      setPreflightMessage('');
     } catch (e: any) {
       setPreviewError(e?.message || 'Could not read workbook.');
     }
   };
 
   const runImport = async () => {
-    if (!payload || !fileName) return;
+    if (!payload || !fileName || selectedTables.length === 0) return;
     setBusy(true);
     setResults([]);
     setComplete(false);
+    setPreflightMessage('');
+    let batchId = '';
+    let hasFailure = false;
     try {
       const { data: authData, error: authError } = await supabaseClient.auth.getSession();
       if (authError) throw authError;
       if (!authData.session) throw new Error('Sign in with Google through Supabase before importing.');
 
-      const { data, error } = await supabaseClient.functions.invoke('import-fy2018-workbook', {
-        body: {
-          fileName,
-          financialYear: 'FY 2018-19',
-          payload,
-        },
-      });
-      if (error) {
-        let detail = error.message || 'Backend import request failed.';
-        try {
-          const context = (error as any).context;
-          if (context && typeof context.json === 'function') {
-            const body = await context.json();
-            if (body?.error) detail = body.error;
-          }
-        } catch {}
-        throw new Error(detail);
+      // Preflight: reject overlapping imports and inspect existing destination counts.
+      const { data: status, error: statusError } = await supabaseClient.functions.invoke('import-fy2018-workbook', { body: { action: 'status' } });
+      if (statusError) throw new Error(statusError.message || 'Could not check current import status.');
+      if (status?.error) throw new Error(status.error);
+      if (status?.active) throw new Error(`Import ${status.active.id} is already running. Do not start another import until it is resolved.`);
+      const existingCounts = status?.counts || {};
+      const existingSelected = selectedTables.filter(table => Number(existingCounts[table] || 0) > 0);
+      if (existingSelected.length) {
+        const summary = existingSelected.map(table => `${table}: ${existingCounts[table]} existing`).join('\n');
+        const proceed = window.confirm(`Some selected tables already contain records. Matching IDs will be upserted, not blindly duplicated.\n\n${summary}\n\nContinue?`);
+        if (!proceed) { setPreflightMessage('Import cancelled. Existing records were detected; no new import was started.'); return; }
+      } else {
+        setPreflightMessage('Pre-import check passed: no active import and selected destination tables are empty.');
       }
-      if (data?.error) throw new Error(data.error);
 
-      const serverResults = Array.isArray(data?.results) ? data.results : [];
-      const normalized: ResultRow[] = serverResults.map((row: any) => ({
-        table: String(row.table || 'unknown'),
-        attempted: Number(row.attempted || 0),
-        succeeded: Number(row.succeeded || 0),
-        error: row.error ? String(row.error) : undefined,
-      }));
-      setResults(normalized);
-      const success = data?.success === true && normalized.every(row => !row.error && row.succeeded === row.attempted);
-      setComplete(success);
+      const rowCounts = Object.fromEntries(selectedTables.map(table => [table, (payload[table] || []).length]));
+      const { data: started, error: startError } = await supabaseClient.functions.invoke('import-fy2018-workbook', {
+        body: { action: 'start', fileName, financialYear: 'FY 2018-19', tables: selectedTables, rowCounts },
+      });
+      if (startError) throw new Error(startError.message || 'Could not start import batch.');
+      if (started?.error) throw new Error(started.error);
+      batchId = String(started.batchId || '');
+      if (!batchId) throw new Error('Server did not return an import batch ID.');
+
+      const ordered = plan.filter(row => selectedTables.includes(row.table));
+      setResults(ordered.map(row => ({ table: row.table, attempted: row.count, succeeded: 0 })));
+      for (const tableRow of ordered) {
+        const table = tableRow.table;
+        const rows = payload[table] || [];
+        if (rows.length === 0) {
+          setResults(prev => prev.map(r => r.table === table ? { ...r, attempted: 0, succeeded: 0 } : r));
+          continue;
+        }
+        for (const group of batches(rows, BATCH_SIZE)) {
+          const { data: batchData, error: batchError } = await supabaseClient.functions.invoke('import-fy2018-workbook', {
+            body: { action: 'batch', batchId, table, rows: group },
+          });
+          if (batchError) {
+            let detail = batchError.message || `Batch failed for ${table}`;
+            try {
+              const context = (batchError as any).context;
+              if (context && typeof context.json === 'function') {
+                const body = await context.json();
+                if (body?.error) detail = body.error;
+              }
+            } catch {}
+            throw new Error(`${table} ${Math.min(group.length, rows.length)}-record batch failed: ${detail}`);
+          }
+          if (batchData?.error || batchData?.success !== true) throw new Error(batchData?.error || `Batch failed for ${table}`);
+          const succeeded = Number(batchData.succeeded || 0);
+          setResults(prev => prev.map(r => r.table === table ? { ...r, succeeded } : r));
+        }
+      }
+
+      const { data: finished, error: finishError } = await supabaseClient.functions.invoke('import-fy2018-workbook', {
+        body: { action: 'finish', batchId, success: true },
+      });
+      if (finishError) throw new Error(finishError.message || 'Records were written but final audit verification failed.');
+      if (finished?.error || finished?.success !== true) throw new Error(finished?.error || 'Server did not confirm all selected table counts.');
+      setResults(ordered.map(row => ({ table: row.table, attempted: row.count, succeeded: row.count })));
+      setComplete(true);
+      setPreflightMessage('Import completed and the server confirmed every selected table count.');
     } catch (e: any) {
-      setResults([{ table: 'import-fy2018-workbook', attempted: 0, succeeded: 0, error: e?.message || String(e) }]);
+      hasFailure = true;
+      const message = e?.message || String(e);
+      if (batchId) {
+        try {
+          await supabaseClient.functions.invoke('import-fy2018-workbook', { body: { action: 'finish', batchId, success: false, error: message } });
+        } catch {}
+      }
+      setResults(prev => {
+        const failedTable = plan.find(row => selectedTables.includes(row.table) && !prev.some(p => p.table === row.table && p.error));
+        if (failedTable) {
+          const existing = prev.find(r => r.table === failedTable.table);
+          return existing
+            ? prev.map(r => r.table === failedTable.table ? { ...r, error: message } : r)
+            : [...prev, { table: failedTable.table, attempted: failedTable.count, succeeded: 0, error: message }];
+        }
+        return [...prev, { table: 'Import', attempted: 0, succeeded: 0, error: message }];
+      });
+      setPreflightMessage('Import stopped safely. Review the table progress and error before retrying.');
       setComplete(false);
     } finally {
       setBusy(false);
     }
   };
 
-  const totalRecords = plan.reduce((sum, row) => sum + row.count, 0);
+  const totalRecords = plan.filter(row => selectedTables.includes(row.table)).reduce((sum, row) => sum + row.count, 0);
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
@@ -445,17 +502,30 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
                 <span className="text-xs font-semibold text-slate-600">{plan.length} destinations</span>
               </div>
               <table className="w-full text-xs">
-                <thead><tr className="text-left bg-white border-b border-slate-100"><th className="px-4 py-2">Supabase table</th><th className="px-4 py-2">Records</th><th className="px-4 py-2">Purpose</th></tr></thead>
-                <tbody>{plan.map(row => <tr key={row.table} className="border-b border-slate-50"><td className="px-4 py-2 font-mono">{row.table}</td><td className="px-4 py-2 font-semibold">{row.count.toLocaleString()}</td><td className="px-4 py-2 text-slate-600">{row.note}</td></tr>)}</tbody>
+                <thead><tr className="text-left bg-white border-b border-slate-100"><th className="px-4 py-2">Import</th><th className="px-4 py-2">Supabase table</th><th className="px-4 py-2">Records / progress</th><th className="px-4 py-2">Purpose</th></tr></thead>
+                <tbody>{plan.map(row => {
+                  const result = results.find(r => r.table === row.table);
+                  const done = result?.succeeded ?? 0;
+                  const pct = row.count ? Math.min(100, Math.round((done / row.count) * 100)) : 0;
+                  const checked = selectedTables.includes(row.table);
+                  return <tr key={row.table} className="border-b border-slate-50">
+                    <td className="px-4 py-2"><input type="checkbox" aria-label={`Select ${row.table}`} checked={checked} disabled={busy || complete} onChange={e => setSelectedTables(prev => e.target.checked ? [...prev, row.table] : prev.filter(t => t !== row.table))} /></td>
+                    <td className="px-4 py-2 font-mono">{row.table}</td>
+                    <td className="px-4 py-2 min-w-44"><div className="font-semibold">{done.toLocaleString()}/{row.count.toLocaleString()} {result ? (result.error ? 'completed before error' : done === row.count ? 'imported' : 'completed') : 'records'}</div>
+                      <div className="mt-1 h-2 w-full rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-blue-600 transition-all duration-200" style={{ width: `${pct}%` }} /></div>
+                      {result?.error && <div className="mt-1 max-w-xs whitespace-normal text-rose-700">{result.error}</div>}
+                    </td><td className="px-4 py-2 text-slate-600">{row.note}</td>
+                  </tr>;
+                })}</tbody>
               </table>
-              {results.length > 0 && <div className="p-4 border-t border-slate-200 space-y-2">{results.map(r => <div key={r.table} className="flex flex-wrap items-center gap-2 text-xs"><span className={r.error ? 'text-rose-700' : 'text-emerald-700'}>{r.error ? <AlertTriangle className="inline w-3.5 h-3.5 mr-1" /> : <CheckCircle2 className="inline w-3.5 h-3.5 mr-1" />}{r.table}</span><span className="text-slate-600">{r.succeeded}/{r.attempted} records{r.error ? ` — ${r.error}` : ''}</span></div>)}</div>}
+              {preflightMessage && <div className="px-4 py-2 text-xs text-slate-700 border-t border-slate-100">{preflightMessage}</div>}
               {complete && <div className="mx-4 mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="inline w-4 h-4 mr-1" />Import completed for all mapped tables. Verify table counts and monthly amount totals before production use.</div>}
             </div>
           )}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="text-[11px] text-slate-500 max-w-2xl">Uses the authenticated Supabase client and admin-only row-level security policies. No service-role key is used in the browser.</div>
             <button onClick={() => void runImport()} disabled={busy || authBusy || !sessionEmail || !payload || plan.length === 0 || complete} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-              {busy ? <><Loader2 className="w-4 h-4 animate-spin" />Importing…</> : <><FileSpreadsheet className="w-4 h-4" />Import {totalRecords.toLocaleString()} records</>}
+              {busy ? <><Loader2 className="w-4 h-4 animate-spin" />Importing…</> : <><FileSpreadsheet className="w-4 h-4" />Import {totalRecords.toLocaleString()} selected records</>}
             </button>
           </div>
         </div>
