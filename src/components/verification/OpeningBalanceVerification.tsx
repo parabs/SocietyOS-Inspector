@@ -236,10 +236,10 @@ export const OpeningBalanceVerification: React.FC = () => {
                     {acc.accountName}
                   </td>
                   <td className="py-3 px-3 text-right font-mono font-medium text-slate-800">
-                    {formatINR(acc.auditClosingBalance)}
+                    {formatINR(acc.recordedOpeningBalance)}
                   </td>
                   <td className="py-3 px-3 text-right font-mono font-medium text-slate-800">
-                    {formatINR(acc.recordedOpeningBalance)}
+                    {formatINR(acc.auditClosingBalance)}
                   </td>
                   <td className="py-3 px-3 text-right font-mono font-bold">
                     <span
