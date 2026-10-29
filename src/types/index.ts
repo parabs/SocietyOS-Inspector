@@ -24,7 +24,8 @@ export type EvidenceStatus = 'Complete' | 'Discrepancy' | 'Missing' | 'Pending' 
 export type InternalAuditStatus = 'Pending' | 'Verified' | 'Failed';
 
 export interface TransactionSourceRecord {
-  id: string; // e.g., 'TXN-2018-00041'
+  id: string;
+  transactionClass?: 'Receipt' | 'Payment' | 'Contra'; // e.g., 'TXN-2018-00041'
   sourceFile: string;
   sourceSheet: string;
   sourceRow: number;
@@ -84,7 +85,7 @@ export interface OpeningBalanceRecord {
   verifiedOn?: string;
 }
 
-export type ReconciliationStatus = 'Reconciled' | 'Difference' | 'Pending';
+export type ReconciliationStatus = 'Pending' | 'Matched' | 'Mismatch' | 'Mismatch Accepted';
 
 export interface MonthlyReconciliationRecord {
   id: string;
@@ -96,9 +97,10 @@ export interface MonthlyReconciliationRecord {
   openingDifference: number; // (B - A)
   credits: number; // Receipts
   debits: number; // Payments
+  contra: number; // Net signed contra movement
   adjustments: number; // default 0
   calculatedClosingBalance: number; // (C) = B + Credits - Debits + Adjustments
-  sourceClosingBalance: number; // (D)
+  sourceClosingBalance: number | null; // (D), null until entered from source
   closingDifference: number; // (C - D)
   status: ReconciliationStatus;
   remarks: string;
