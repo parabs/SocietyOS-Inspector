@@ -37,6 +37,8 @@ export interface TransactionSourceRecord {
   amount: number;
   voucherNo?: string;
   receiptNo?: string;
+  isCorrection?: boolean;
+  correctionStatus?: 'Original' | 'Pending Review' | 'Approved' | 'Rejected';
 }
 
 export interface TransactionInspection {
