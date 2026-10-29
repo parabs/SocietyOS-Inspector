@@ -68,22 +68,24 @@ export const MonthlyReconciliation: React.FC = () => {
     // Source closing balances remain unavailable; these months must never be marked reconciled.
     const months = ['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
     const accountIds: AccountId[] = showAllAccounts ? ['TDCC','BOM','CASH'] : [activeAccount];
-    let carry = accountIds.reduce((sum, id) => sum + (openingBalances.find(o => o.accountId === id)?.recordedOpeningBalance || 0), 0);
-    return months.map((month, monthIndex) => {
-      const monthRows = transactions.filter(t => t.month === month && accountIds.includes(t.accountId));
-      const credits = monthRows.filter(t => t.type === 'Receipt').reduce((sum,t) => sum + Math.abs(t.amount),0);
-      const debits = monthRows.filter(t => t.type === 'Payment').reduce((sum,t) => sum + Math.abs(t.amount),0);
-      const opening = carry;
-      const closing = opening + credits - debits;
-      carry = closing;
-      return {
-        id: 'CALC-' + (showAllAccounts ? 'ALL' : activeAccount) + '-' + monthIndex,
-        month, monthIndex, accountId: activeAccount,
-        sourceOpeningBalance: opening, calculatedOpeningBalance: opening, openingDifference: 0,
-        credits, debits, adjustments: 0, calculatedClosingBalance: closing,
-        sourceClosingBalance: 0, closingDifference: 0, status: 'Pending' as const,
-        remarks: 'Source closing balance not loaded. Confirm against bank statement / cash book.',
-      };
+    return accountIds.flatMap((accountId) => {
+      let carry = openingBalances.find(o => o.accountId === accountId)?.recordedOpeningBalance || 0;
+      return months.map((month, monthIndex) => {
+        const monthRows = transactions.filter(t => t.month === month && t.accountId === accountId);
+        const credits = monthRows.filter(t => t.type === 'Receipt').reduce((sum,t) => sum + Math.abs(t.amount),0);
+        const debits = monthRows.filter(t => t.type === 'Payment').reduce((sum,t) => sum + Math.abs(t.amount),0);
+        const opening = carry;
+        const closing = opening + credits - debits;
+        carry = closing;
+        return {
+          id: 'CALC-' + accountId + '-' + monthIndex,
+          month, monthIndex, accountId,
+          sourceOpeningBalance: opening, calculatedOpeningBalance: opening, openingDifference: 0,
+          credits, debits, adjustments: 0, calculatedClosingBalance: closing,
+          sourceClosingBalance: 0, closingDifference: 0, status: 'Pending' as const,
+          remarks: 'Source closing balance not loaded. Confirm against bank statement / cash book.',
+        };
+      });
     });
   }, [showAllAccounts, reconciliations, activeAccount, openingBalances, transactions]);
 
@@ -116,9 +118,9 @@ export const MonthlyReconciliation: React.FC = () => {
     return accountList.reduce((sum, item) => sum + item.adjustments, 0);
   }, [accountList]);
 
-  const openingApr = accountList[0]?.calculatedOpeningBalance || 0;
-  const closingMarCalc = accountList[accountList.length - 1]?.calculatedClosingBalance || 0;
-  const closingMarSource = accountList[accountList.length - 1]?.sourceClosingBalance || 0;
+  const openingApr = showAllAccounts ? accountList.filter(r => r.monthIndex === 0).reduce((sum, r) => sum + r.calculatedOpeningBalance, 0) : accountList[0]?.calculatedOpeningBalance || 0;
+  const closingMarCalc = showAllAccounts ? accountList.filter(r => r.monthIndex === 11).reduce((sum, r) => sum + r.calculatedClosingBalance, 0) : accountList[accountList.length - 1]?.calculatedClosingBalance || 0;
+  const closingMarSource = showAllAccounts ? accountList.filter(r => r.monthIndex === 11).reduce((sum, r) => sum + r.sourceClosingBalance, 0) : accountList[accountList.length - 1]?.sourceClosingBalance || 0;
   const finalDifference = closingMarCalc - closingMarSource;
   const sourceClosingUnavailable = accountList.some((row) => row.remarks.includes('Source closing balance not loaded'));
 
@@ -224,6 +226,7 @@ export const MonthlyReconciliation: React.FC = () => {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200 whitespace-nowrap text-[11px]">
+                  {showAllAccounts && <th className="py-2.5 px-3">Account</th>}
                   <th className="py-2.5 px-3">Month</th>
                   <th className="py-2.5 px-2 text-right">
                     Source Opening (A)
@@ -272,6 +275,7 @@ export const MonthlyReconciliation: React.FC = () => {
                         isDrillDown ? 'bg-blue-50/40' : ''
                       }`}
                     >
+                      {showAllAccounts && <td className="py-2.5 px-3 whitespace-nowrap">{row.accountId === 'TDCC' ? 'TDCC Main A/c' : row.accountId === 'BOM' ? 'BOM Secondary A/c' : 'Petty Cash'}</td>}
                       <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
                         {row.month}
                       </td>
