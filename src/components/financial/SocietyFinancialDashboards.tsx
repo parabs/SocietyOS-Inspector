@@ -324,10 +324,6 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   {screen==='reports'&&<div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-start">
    <aside className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm xl:sticky xl:top-4">
     <div className="mb-3 border-b border-slate-100 pb-3"><h2 className="text-sm font-bold text-blue-950">Financial Reports & Registers</h2><p className="mt-1 text-[11px] leading-4 text-slate-600">Choose a report to view connected records.</p></div>
-    <label htmlFor="society-report-select" className="mb-1 block text-[11px] font-semibold text-slate-600">Select report</label>
-    <select id="society-report-select" value={selectedReport} onChange={e=>setSelectedReport(e.target.value)} className="mb-3 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs">
-     {reportCategories.slice(1).map(cat=><optgroup key={cat} label={cat}>{reportCatalog.filter(r=>r.category===cat).map(r=><option key={r.id} value={r.id}>RPT-{reportNumbers[r.id]||'—'} · {r.name}</option>)}</optgroup>)}
-    </select>
     <div className="mb-2 flex flex-wrap gap-1.5" role="tablist" aria-label="Report categories">
      {reportCounts.map(cat=><button key={cat.name} role="tab" aria-selected={reportCategory===cat.name} onClick={()=>setReportCategory(cat.name)} className={'rounded-full border px-2 py-1 text-[10px] font-semibold '+(reportCategory===cat.name?'border-blue-600 bg-blue-600 text-white':'border-slate-200 bg-white text-slate-700 hover:bg-blue-50')}>{cat.name} <span className="opacity-75">{cat.count}</span></button>)}
     </div>
@@ -397,7 +393,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
     <Table headers={reportData.headers} rows={reportData.rows}/>
    </Panel>
   </>}
-  </div></div>
+  </div></div>}
   {screen!=='reports'&&<Panel title={'Transaction Summary & Source Traceability'} action={<span className="text-[10px] text-slate-500">{num(filtered.length)} rows</span>}><Table headers={['Date','Transaction ID','Party / Payee','Category','Type','Amount','Voucher / receipt','Evidence','Source file / row']} rows={filtered.slice(0,100).map(t=>[t.date||'—',t.id||'—',t.party||'Unmapped',t.categoryName||'Unclassified',t.transactionClass||t.type,currencyCell(Number(t.amount)||0),t.voucherNo||t.receiptNo||'—',statusPill(t.evidenceStatus||'Pending'),(t.sourceFile||'Source not recorded')+(t.sourceRow?' · row '+t.sourceRow:'')])}/></Panel>}
   <footer className="flex flex-wrap items-center justify-between gap-2 px-1 text-[10px] text-slate-500"><span>Society OS · data is derived from connected records; missing fields are labelled rather than estimated.</span><span>Showing {Math.min(100,filtered.length)} of {num(filtered.length)} filtered transactions · CSV exports all filtered rows.</span></footer>
  </div>;
