@@ -321,22 +321,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   </header>
   {loading&&<div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-2 text-xs text-blue-800">Loading the latest society records…</div>}
   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"><strong>Preliminary — not an audit opinion.</strong> Values reflect currently available connected records and must not be treated as certified statutory figures.</div>
-  {screen==='reports'&&<div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-start">
-   <aside className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm xl:sticky xl:top-4">
-    <div className="mb-3 border-b border-slate-100 pb-3"><h2 className="text-sm font-bold text-blue-950">Financial Reports & Registers</h2><p className="mt-1 text-[11px] leading-4 text-slate-600">Choose a report to view connected records.</p></div>
-    <div className="mb-2 flex flex-wrap gap-1.5" role="tablist" aria-label="Report categories">
-     {reportCounts.map(cat=><button key={cat.name} role="tab" aria-selected={reportCategory===cat.name} onClick={()=>setReportCategory(cat.name)} className={'rounded-full border px-2 py-1 text-[10px] font-semibold '+(reportCategory===cat.name?'border-blue-600 bg-blue-600 text-white':'border-slate-200 bg-white text-slate-700 hover:bg-blue-50')}>{cat.name} <span className="opacity-75">{cat.count}</span></button>)}
-    </div>
-    <nav className="max-h-[60vh] space-y-1 overflow-y-auto" aria-label="Available reports">
-     {visibleReports.map(r=><button key={r.id} onClick={()=>setSelectedReport(r.id)} className={'w-full rounded-lg border p-2.5 text-left transition '+(selectedReport===r.id?'border-blue-500 bg-blue-50 ring-1 ring-blue-200':'border-transparent bg-white hover:border-slate-200 hover:bg-slate-50')}>
-      <span className="block text-[11px] font-bold leading-4 text-slate-900">RPT-{reportNumbers[r.id]||'—'} · {r.name}</span>
-      <span className="mt-1 block text-[10px] leading-4 text-slate-500">{r.description}</span>
-      {selectedReport===r.id&&<span className="mt-1 inline-block rounded-full bg-blue-600 px-2 py-0.5 text-[9px] font-bold text-white">Selected</span>}
-     </button>)}
-    </nav>
-   </aside>
-   <div className="min-w-0 space-y-4">
-    {filterBar}
+  {
   {screen==='financial-summary'&&<>
    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5"><Card label="Total Demand Raised" value={fmt(demandTotal)} detail="From available demand register" icon={FileText}/><Card label="Total Collections (Receipts)" value={fmt(receipts)} detail={pct(receipts,demandTotal)+'% of demand register' } icon={ArrowDownRight} tone="green"/><Card label="Total Payments (Expenses)" value={fmt(payments)} detail="Excludes contra transfers" icon={ArrowUpRight} tone="red"/><Card label="Contra Entries" value={fmt(contra)} detail="Internal transfers / adjustments" icon={ArrowLeftRight} tone="violet"/><Card label="Net Movement" value={fmt(net)} detail="Receipts less payments in selected data" icon={Wallet} tone="amber"/></div>
    <div className="grid grid-cols-1 gap-3 xl:grid-cols-5"><div className="xl:col-span-3"><Panel title="Monthly Financial Summary"><div className="h-[300px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthly}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Legend/><Bar dataKey="receipts" name="Collections / Receipts" fill="#22a765" radius={[3,3,0,0]}/><Bar dataKey="payments" name="Payments / Expenses" fill="#ef4444" radius={[3,3,0,0]}/><Line dataKey="contra" name="Contra" stroke="#2563eb" strokeWidth={2}/></ComposedChart></ResponsiveContainer></div></Panel></div><div className="xl:col-span-2"><Panel title="Expense Analysis by Category"><div className="h-[300px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={categoryData.slice(0,7)} layout="vertical" margin={{left:12,right:12}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tick={{fontSize:10}}/><YAxis type="category" dataKey="name" width={125} tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="amount" fill="#2563eb" radius={[0,4,4,0]}/></BarChart></ResponsiveContainer></div></Panel></div></div>
@@ -375,6 +360,24 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
    <Panel title="Corrective Action Register"><Table headers={['Priority','Observation / issue','Reference','Current status','Recommended next action']} rows={filtered.filter(t=>t.evidenceStatus==='Missing'||t.evidenceStatus==='Discrepancy'||t.internalAuditStatus==='Failed'||t.internalAuditStatus==='Pending').slice(0,100).map(t=>[t.evidenceStatus==='Discrepancy'||t.internalAuditStatus==='Failed'?'High':'Medium',t.remarks||t.description||'Evidence / verification follow-up',t.id||t.voucherNo||'—',statusPill(t.internalAuditStatus||t.evidenceStatus||'Pending'),t.evidenceStatus==='Missing'?'Obtain and link source evidence':'Review transaction, document findings and record authorised closure'])}/></Panel>
    <Panel title="Audit Notes / Observations"><Table headers={['Date','Title / observation','Category','Status','Owner / reference']} rows={auditNotes.map(n=>[n.timestamp||'—',n.title||n.content||'—',n.tag||'—',n.priority||'Not assessed',n.author||'—'])}/></Panel>
   </>}
+screen==='reports'&&<div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-start">
+   <aside className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm xl:sticky xl:top-4">
+    <div className="mb-3 border-b border-slate-100 pb-3"><h2 className="text-sm font-bold text-blue-950">Financial Reports & Registers</h2><p className="mt-1 text-[11px] leading-4 text-slate-600">Choose a report to view connected records.</p></div>
+    <nav className="max-h-[72vh] space-y-2 overflow-y-auto" aria-label="Reports">
+     <div className="px-2 py-1 text-xs font-extrabold uppercase tracking-wide text-slate-800">Reports</div>
+     {reportCategories.slice(1).map(cat=><section key={cat} className="rounded-lg border border-slate-100">
+      <button onClick={()=>setReportCategory(reportCategory===cat?'All Reports':cat)} aria-expanded={reportCategory===cat} className="flex w-full items-center justify-between rounded-lg bg-slate-50 px-2.5 py-2 text-left text-xs font-bold text-slate-800 hover:bg-blue-50"><span>{cat}</span><span className="text-[10px] text-slate-500">{reportCatalog.filter(r=>r.category===cat).length} {reportCategory===cat?'−':'+'}</span></button>
+      {(reportCategory===cat||reportCategory==='All Reports')&&<div className="space-y-0.5 p-1">
+       {reportCatalog.filter(r=>r.category===cat).map(r=><button key={r.id} onClick={()=>setSelectedReport(r.id)} className={'w-full rounded-md border-l-2 px-2.5 py-2 text-left transition '+(selectedReport===r.id?'border-blue-600 bg-blue-50 text-blue-900':'border-transparent text-slate-700 hover:border-slate-300 hover:bg-slate-50')}>
+        <span className="block text-[11px] font-semibold leading-4">RPT-{reportNumbers[r.id]||'—'} · {r.name}</span>
+        {selectedReport===r.id&&<span className="mt-0.5 block text-[9px] font-bold text-blue-700">Selected report</span>}
+       </button>)}
+      </div>}
+     </section>)}
+    </nav>
+   </aside>
+   <div className="min-w-0 space-y-4">
+    {filterBar}
   {screen==='reports'&&<>
    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
     <span className="px-1 text-[11px] font-semibold text-slate-600">Report filters</span>
