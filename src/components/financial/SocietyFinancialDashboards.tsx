@@ -491,11 +491,103 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
     </>;
    })()}
   </> }
-  {screen==='party-ledger'&&<>
-   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5"><Card label="Members / Flat Owners" value={num(flatOwnerMaster.length)} detail="Master records" icon={Users}/><Card label="Demand Register" value={fmt(demandTotal)} detail="Available demand total" icon={FileText}/><Card label="Receipts / Collections" value={fmt(receipts)} detail="Selected filter" icon={ArrowDownRight} tone="green"/><Card label="Outstanding" value={fmt(outstanding)} detail="Cumulative outstanding register" icon={AlertTriangle} tone="red"/><Card label="Vendors / Parties" value={num(partyMaster.length)} detail="Party master" icon={Landmark} tone="violet"/></div>
-   <div className="grid grid-cols-1 gap-3 xl:grid-cols-2"><Panel title="Members / Flat Owners — Outstanding Summary"><Table headers={['Party / Flat','Demand / opening data','Outstanding','Status']} rows={cumulativeOutstanding.slice(0,20).map(r=>[r.member_name||r.flat_no||'Unidentified','—',currencyCell(Number(r.net_outstanding)||0),statusPill(Number(r.net_outstanding)>0?'Pending':'Review')])}/></Panel><Panel title="Vendor / Payee Summary"><Table headers={['Party','Transaction count','Payments','Evidence gaps']} rows={Object.entries(filtered.filter(t=>t.type==='Payment').reduce((a:Record<string,{n:number;sum:number;gaps:number}>,t)=>{const k=t.party||'Unmapped';a[k]??={n:0,sum:0,gaps:0};a[k].n++;a[k].sum+=Math.abs(Number(t.amount)||0);if(t.evidenceStatus!=='Complete')a[k].gaps++;return a;},{})).sort((a,b)=>b[1].sum-a[1].sum).slice(0,15).map(([k,v])=>[k,num(v.n),currencyCell(v.sum),num(v.gaps)])}/></Panel></div>
-   <Panel title="Party Ledger Drill-Down"><p className="text-xs text-slate-600">Use the summaries above for the overall position. Open a detailed report when you need date-wise transactions, receipts, payments and running balances.</p><div className="mt-3 flex flex-wrap gap-2"><ReportLink id="party-balances" category="Debtors & Parties" label="Open All-Party Debtors"/><ReportLink id="member-ledger" category="Debtors & Parties" label="Open Detailed Member Ledger"/><ReportLink id="vendor-ledger" category="Debtors & Parties" label="Open Detailed Vendor / Payee Ledger"/></div></Panel>
-  </>}
+  {screen==='party-ledger'&&(()=>{
+   const memberRows=[...cumulativeOutstanding].sort((a,b)=>Number(b.net_outstanding||0)-Number(a.net_outstanding||0));
+   const memberDueTotal=memberRows.reduce((sum,r)=>sum+Math.max(0,Number(r.net_outstanding)||0),0);
+   const membersWithDues=memberRows.filter(r=>Number(r.net_outstanding||0)>0);
+   const paymentRows=filtered.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra');
+   const vendorMap=paymentRows.reduce((acc:Record<string,{count:number;paid:number;gaps:number;lastDate:string}>,t)=>{
+    const name=String(t.party||'Unmapped payee');
+    acc[name]??={count:0,paid:0,gaps:0,lastDate:''};
+    acc[name].count++;acc[name].paid+=Math.abs(Number(t.amount)||0);
+    if(t.evidenceStatus!=='Complete')acc[name].gaps++;
+    if(String(t.date||'')>acc[name].lastDate)acc[name].lastDate=String(t.date||'');
+    return acc;
+   },{});
+   const vendorRows=Object.entries(vendorMap).map(([name,v])=>({name,...v})).sort((a,b)=>b.paid-a.paid);
+   const vendorTotal=vendorRows.reduce((sum,v)=>sum+v.paid,0);
+   const selectedMember=memberRows.find(r=>String(r.member_name||r.flat_no||'')===query)||memberRows[0];
+   const selectedVendor=vendorRows.find(v=>v.name===query)||vendorRows[0];
+   const memberName=(r:any)=>String(r.member_name||r.flat_no||'Unidentified member');
+   const memberLabel=(r:any)=>String(r.flat_no||r.member_name||'Unidentified');
+   const memberTx=selectedMember?transactions.filter(t=>String(t.party||'')===memberName(selectedMember)||String(t.party||'')===memberLabel(selectedMember)): [];
+   const vendorTx=selectedVendor?paymentRows.filter(t=>String(t.party||'Unmapped payee')===selectedVendor.name):[];
+   const memberMonthly=allMonths.map(m=>({month:m.split(' ')[0],demand:demandRegister.filter((d:any)=>String(d.demand_period||d.period||d.month||'').includes(m)).reduce((sum:number,d:any)=>sum+Number(d.total_demand||d.demand_amount||0),0),collection:transactions.filter(t=>(t.reportingMonth||t.month)===m&&t.type==='Receipt'&&t.transactionClass!=='Contra').reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0)}));
+   const vendorMonthly=allMonths.map(m=>({month:m.split(' ')[0],bills:paymentRows.filter(t=>(t.reportingMonth||t.month)===m).reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0),payments:paymentRows.filter(t=>(t.reportingMonth||t.month)===m).reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0)}));
+   const maxMember= Math.max(1,...memberRows.slice(0,5).map(r=>Number(r.net_outstanding)||0));
+   const maxVendor= Math.max(1,...vendorRows.slice(0,5).map(r=>r.paid));
+   const memberStatus=[{name:'With dues',value:membersWithDues.length},{name:'No recorded dues',value:Math.max(0,memberRows.length-membersWithDues.length)}];
+   const vendorEvidence=[{name:'Evidence gaps',value:vendorRows.reduce((sum,v)=>sum+v.gaps,0)},{name:'Complete evidence',value:Math.max(0,paymentRows.length-vendorRows.reduce((sum,v)=>sum+v.gaps,0))}];
+   return <>
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-white p-3">
+     <div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-blue-700">Party intelligence</p><p className="mt-1 text-sm text-slate-600">See balances, concentration and transaction patterns first; open registers only when you need detail.</p></div>
+     <div className="inline-flex rounded-xl border border-blue-100 bg-slate-50 p-1"><button onClick={()=>{setQuery('');setActiveTab('Members')}} className={'rounded-lg px-4 py-2 text-xs font-bold '+(activeTab!=='Vendors'?'bg-blue-600 text-white shadow-sm':'text-slate-600')}>Members / Flat Owners</button><button onClick={()=>{setQuery('');setActiveTab('Vendors')}} className={'rounded-lg px-4 py-2 text-xs font-bold '+(activeTab==='Vendors'?'bg-blue-600 text-white shadow-sm':'text-slate-600')}>Vendors / Payees</button></div>
+    </div>
+    {activeTab!=='Vendors'?<>
+     <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+      <Card label="Member / flat records" value={num(flatOwnerMaster.length)} detail="Master records loaded" icon={Users}/>
+      <Card label="Recorded demand" value={fmt(demandTotal)} detail={num(demandRegister.length)+' demand records'} icon={FileText}/>
+      <Card label="Receipts recorded" value={fmt(receipts)} detail={num(filtered.filter(t=>t.type==='Receipt').length)+' receipt transactions in filter'} icon={Wallet} tone="green"/>
+      <Card label="Outstanding register" value={fmt(outstanding)} detail={num(membersWithDues.length)+' records with positive balance'} icon={AlertTriangle} tone="red"/>
+      <Card label="Allocation status" value={num(demandAllocations.length)} detail="Receipt-to-demand allocations recorded" icon={ArrowLeftRight} tone="amber"/>
+     </div>
+     <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.15fr_.85fr]">
+      <Panel title="Members with the Highest Recorded Outstanding" action={<ReportLink id="party-balances" category="Debtors & Parties" label="View all debtors"/>}>
+       <div className="space-y-3">{memberRows.slice(0,5).map((r,i)=>{const amount=Math.max(0,Number(r.net_outstanding)||0);return <div key={String(r.member_name||r.flat_no||i)}><div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="font-semibold text-slate-800">{memberLabel(r)}</span><span className="font-bold text-rose-700">{fmt(amount)}</span></div><div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-rose-500" style={{width:(amount/maxMember*100)+'%'}}/></div></div>})}{!memberRows.length&&<p className="text-xs text-slate-500">No member outstanding records are available.</p>}</div>
+       <p className="mt-3 text-[10px] text-slate-500">Sorted from the available cumulative outstanding register. This is not an ageing calculation; opening balances and receipt allocations still require verification.</p>
+      </Panel>
+      <Panel title="Member Balance Coverage">
+       <div className="h-[220px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={memberStatus} dataKey="value" nameKey="name" innerRadius={58} outerRadius={82} paddingAngle={3}>{memberStatus.map((d,i)=><Cell key={d.name} fill={i===0?'#ef4444':'#16a34a'}/>)}</Pie><Tooltip/><Legend/></PieChart></ResponsiveContainer></div>
+       <div className="grid grid-cols-2 gap-2"><div className="rounded-lg bg-rose-50 p-3"><div className="text-[10px] text-rose-700">Positive balances</div><div className="mt-1 text-xl font-bold text-rose-800">{num(membersWithDues.length)}</div></div><div className="rounded-lg bg-emerald-50 p-3"><div className="text-[10px] text-emerald-700">No positive balance</div><div className="mt-1 text-xl font-bold text-emerald-800">{num(memberRows.length-membersWithDues.length)}</div></div></div>
+       <p className="mt-2 text-[10px] text-slate-500">Coverage reflects records in the register, not confirmed member ageing or recoverable dues.</p>
+      </Panel>
+     </div>
+     <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+      <Panel title="Monthly Receipts Trend" action={<ReportLink id="monthly-payments" category="Demands & Payments" label="Month-wise collection"/>}>
+       <div className="h-[250px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthly}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}} tickFormatter={(v)=>'₹'+num(Number(v)/1000)+'k'}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Legend/><Bar dataKey="receipts" name="Receipts recorded" fill="#16a34a" radius={[4,4,0,0]}/></ComposedChart></ResponsiveContainer></div>
+       <p className="text-[10px] text-slate-500">Based on recorded receipt transactions by reporting month. It does not imply allocation to individual demand periods.</p>
+      </Panel>
+      <Panel title="Member Snapshot" action={<ReportLink id="member-ledger" category="Debtors & Parties" label="Detailed member ledger"/>}>
+       <div className="flex flex-wrap items-end gap-3"><label className="min-w-[180px] flex-1 text-xs font-semibold text-slate-700">Select member / flat<select value={selectedMember?memberName(selectedMember):''} onChange={e=>setQuery(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal"><option value="">Choose member</option>{memberRows.map((r,i)=><option key={i} value={memberName(r)}>{memberLabel(r)} — {memberName(r)}</option>)}</select></label><div className="rounded-lg bg-rose-50 px-4 py-2"><div className="text-[10px] text-rose-700">Recorded balance</div><div className="text-lg font-bold text-rose-800">{fmt(Number(selectedMember?.net_outstanding)||0)}</div></div></div>
+       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3"><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Member / flat</div><div className="mt-1 text-sm font-bold text-slate-800">{selectedMember?memberLabel(selectedMember):'Not available'}</div></div><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Receipt transactions</div><div className="mt-1 text-sm font-bold text-slate-800">{num(memberTx.filter(t=>t.type==='Receipt').length)}</div></div><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Data caveat</div><div className="mt-1 text-xs font-semibold text-amber-700">Allocation unverified</div></div></div>
+       <div className="mt-3"><Table headers={['Date','Description','Type','Amount','Reference']} rows={memberTx.slice(0,5).map(t=>[t.date||'—',t.description||t.categoryName||'—',t.type||'—',fmt(Math.abs(Number(t.amount)||0)),t.voucherNo||t.receiptNo||t.id||'—'])}/></div>
+      </Panel>
+     </div>
+     <Panel title="Member Ledger Drill-Down"><div className="flex flex-wrap gap-2"><ReportLink id="party-balances" category="Debtors & Parties" label="All-party debtors"/><ReportLink id="member-ledger" category="Debtors & Parties" label="Detailed member ledger"/><ReportLink id="demand-summary" category="Demands & Payments" label="Demand summary by party"/><ReportLink id="monthly-flat-balance" category="Demands & Payments" label="Monthly flat-owner balances"/></div></Panel>
+    </>:<>
+     <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+      <Card label="Vendor / payee records" value={num(partyMaster.length)} detail="Party master records" icon={Landmark} tone="violet"/>
+      <Card label="Payment transactions" value={num(paymentRows.length)} detail="Current selected period / filters" icon={FileText}/>
+      <Card label="Payments recorded" value={fmt(payments)} detail="Recorded payments, not bill certification" icon={ArrowUpRight} tone="red"/>
+      <Card label="Payees with evidence gaps" value={num(vendorRows.filter(v=>v.gaps>0).length)} detail="At least one payment not marked complete" icon={AlertTriangle} tone="amber"/>
+      <Card label="Evidence gap transactions" value={num(vendorRows.reduce((sum,v)=>sum+v.gaps,0))} detail="Requires supporting-document review" icon={ShieldCheck} tone="green"/>
+     </div>
+     <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.15fr_.85fr]">
+      <Panel title="Top 5 Vendors by Recorded Payments" action={<ReportLink id="vendor-ledger" category="Debtors & Parties" label="View vendor ledger"/>}>
+       <div className="space-y-3">{vendorRows.slice(0,5).map((v,i)=><div key={v.name}><div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="font-semibold text-slate-800">{v.name}</span><span className="font-bold text-blue-800">{fmt(v.paid)}</span></div><div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{width:(v.paid/maxVendor*100)+'%'}}/></div><div className="mt-1 text-[10px] text-slate-500">{num(v.count)} transactions · {num(v.gaps)} evidence gaps</div></div>)}{!vendorRows.length&&<p className="text-xs text-slate-500">No payment transactions are available for this filter.</p>}</div>
+       <p className="mt-3 text-[10px] text-slate-500">Payment concentration is a screening signal only; it is not proof of irregularity.</p>
+      </Panel>
+      <Panel title="Vendor Evidence Coverage">
+       <div className="h-[220px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={vendorEvidence} dataKey="value" nameKey="name" innerRadius={58} outerRadius={82} paddingAngle={3}>{vendorEvidence.map((d,i)=><Cell key={d.name} fill={i===0?'#f59e0b':'#16a34a'}/>)}</Pie><Tooltip/><Legend/></PieChart></ResponsiveContainer></div>
+       <div className="grid grid-cols-2 gap-2"><div className="rounded-lg bg-amber-50 p-3"><div className="text-[10px] text-amber-700">Evidence gaps</div><div className="mt-1 text-xl font-bold text-amber-800">{num(vendorEvidence[0].value)}</div></div><div className="rounded-lg bg-emerald-50 p-3"><div className="text-[10px] text-emerald-700">Complete</div><div className="mt-1 text-xl font-bold text-emerald-800">{num(vendorEvidence[1].value)}</div></div></div>
+       <p className="mt-2 text-[10px] text-slate-500">Completeness uses the current evidence status field; verify bill, voucher and approval documents separately.</p>
+      </Panel>
+     </div>
+     <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+      <Panel title="Monthly Payments Trend" action={<ReportLink id="payments" category="Registers" label="Payment register"/>}>
+       <div className="h-[250px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthly}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}} tickFormatter={(v)=>'₹'+num(Number(v)/1000)+'k'}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Legend/><Bar dataKey="payments" name="Payments recorded" fill="#2563eb" radius={[4,4,0,0]}/></ComposedChart></ResponsiveContainer></div>
+       <p className="text-[10px] text-slate-500">Recorded cash/bank payment movements only. Bill amount, approval and actual liability may differ.</p>
+      </Panel>
+      <Panel title="Vendor Snapshot" action={<ReportLink id="vendor-ledger" category="Debtors & Parties" label="Detailed vendor ledger"/>}>
+       <div className="flex flex-wrap items-end gap-3"><label className="min-w-[180px] flex-1 text-xs font-semibold text-slate-700">Select vendor / payee<select value={selectedVendor?.name||''} onChange={e=>setQuery(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal"><option value="">Choose vendor</option>{vendorRows.map(v=><option key={v.name} value={v.name}>{v.name}</option>)}</select></label><div className="rounded-lg bg-blue-50 px-4 py-2"><div className="text-[10px] text-blue-700">Payments recorded</div><div className="text-lg font-bold text-blue-800">{fmt(selectedVendor?.paid||0)}</div></div></div>
+       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3"><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Transactions</div><div className="mt-1 text-sm font-bold text-slate-800">{num(selectedVendor?.count||0)}</div></div><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Evidence gaps</div><div className="mt-1 text-sm font-bold text-amber-700">{num(selectedVendor?.gaps||0)}</div></div><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Latest recorded date</div><div className="mt-1 text-xs font-bold text-slate-800">{selectedVendor?.lastDate||'Not recorded'}</div></div></div>
+       <div className="mt-3"><Table headers={['Date','Description','Category','Amount','Voucher / reference']} rows={vendorTx.slice(0,5).map(t=>[t.date||'—',t.description||'—',t.categoryName||'Unmapped',fmt(Math.abs(Number(t.amount)||0)),t.voucherNo||t.id||'—'])}/></div>
+      </Panel>
+     </div>
+     <Panel title="Vendor / Payee Drill-Down"><div className="flex flex-wrap gap-2"><ReportLink id="vendor-ledger" category="Debtors & Parties" label="Detailed vendor / payee ledger"/><ReportLink id="payments" category="Registers" label="Payments register"/><ReportLink id="largest-payments-anomalies" category="Audit & Governance" label="Largest payments & potential anomalies"/><ReportLink id="missing-docs" category="Audit & Governance" label="Missing bill / voucher evidence"/></div></Panel>
+    </>}
+   </>;
+  })()}
   {screen==='audit-evidence'&&<>
    <div className="flex flex-wrap gap-2"><ReportLink id="missing-docs" category="Audit & Governance" label="Missing Evidence Register"/><ReportLink id="mapping-exceptions" category="Audit & Governance" label="Mapping Exceptions"/><ReportLink id="opening-balance-review" category="Audit & Governance" label="Opening Balance Exceptions"/><ReportLink id="rectification" category="Audit & Governance" label="Audit Rectification Register"/></div>
    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5"><Card label="Total Transactions" value={num(filtered.length)} detail="Current filter" icon={FileText}/><Card label="Complete Evidence" value={num(evidenceComplete)} detail={pct(evidenceComplete,filtered.length)+'% of filtered transactions'} icon={CheckCircle2} tone="green"/><Card label="Missing Evidence" value={num(evidenceMissing)} detail={pct(evidenceMissing,filtered.length)+'% require review'} icon={AlertTriangle} tone="amber"/><Card label="Pending Review" value={num(stats.pendingTransactions)} detail="Transaction inspection status" icon={ClipboardList} tone="red"/><Card label="Reconciliation Gaps" value={num(unmatched)} detail="Loaded reconciliation records" icon={Landmark} tone="violet"/></div>
