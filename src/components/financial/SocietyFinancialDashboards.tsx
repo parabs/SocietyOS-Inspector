@@ -43,6 +43,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const [statusFilter,setStatusFilter]=useState('All statuses');
  const [accountFilter,setAccountFilter]=useState<'TDCC'|'BOM'|'CASH'|'ALL'>('TDCC');
  const [activeTab,setActiveTab]=useState('Overview');
+ const [partySelection,setPartySelection]=useState('');
  const [selectedReport,setSelectedReport]=useState('party-balances');
  const [reportCategory,setReportCategory]=useState('Debtors & Parties');
  const reportCatalog=[
@@ -506,8 +507,8 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
    },{});
    const vendorRows=Object.entries(vendorMap).map(([name,v])=>({name,...v})).sort((a,b)=>b.paid-a.paid);
    const vendorTotal=vendorRows.reduce((sum,v)=>sum+v.paid,0);
-   const selectedMember=memberRows.find(r=>String(r.member_name||r.flat_no||'')===query)||memberRows[0];
-   const selectedVendor=vendorRows.find(v=>v.name===query)||vendorRows[0];
+   const selectedMember=memberRows.find(r=>String(r.member_name||r.flat_no||'')===partySelection)||memberRows[0];
+   const selectedVendor=vendorRows.find(v=>v.name===partySelection)||vendorRows[0];
    const memberName=(r:any)=>String(r.member_name||r.flat_no||'Unidentified member');
    const memberLabel=(r:any)=>String(r.flat_no||r.member_name||'Unidentified');
    const memberTx=selectedMember?transactions.filter(t=>String(t.party||'')===memberName(selectedMember)||String(t.party||'')===memberLabel(selectedMember)): [];
@@ -521,7 +522,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
    return <>
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-white p-3">
      <div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-blue-700">Party intelligence</p><p className="mt-1 text-sm text-slate-600">See balances, concentration and transaction patterns first; open registers only when you need detail.</p></div>
-     <div className="inline-flex rounded-xl border border-blue-100 bg-slate-50 p-1"><button onClick={()=>{setQuery('');setActiveTab('Members')}} className={'rounded-lg px-4 py-2 text-xs font-bold '+(activeTab!=='Vendors'?'bg-blue-600 text-white shadow-sm':'text-slate-600')}>Members / Flat Owners</button><button onClick={()=>{setQuery('');setActiveTab('Vendors')}} className={'rounded-lg px-4 py-2 text-xs font-bold '+(activeTab==='Vendors'?'bg-blue-600 text-white shadow-sm':'text-slate-600')}>Vendors / Payees</button></div>
+     <div className="inline-flex rounded-xl border border-blue-100 bg-slate-50 p-1"><button onClick={()=>{setPartySelection('');setActiveTab('Members')}} className={'rounded-lg px-4 py-2 text-xs font-bold '+(activeTab!=='Vendors'?'bg-blue-600 text-white shadow-sm':'text-slate-600')}>Members / Flat Owners</button><button onClick={()=>{setPartySelection('');setActiveTab('Vendors')}} className={'rounded-lg px-4 py-2 text-xs font-bold '+(activeTab==='Vendors'?'bg-blue-600 text-white shadow-sm':'text-slate-600')}>Vendors / Payees</button></div>
     </div>
     {activeTab!=='Vendors'?<>
      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
@@ -548,7 +549,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
        <p className="text-[10px] text-slate-500">Based on recorded receipt transactions by reporting month. It does not imply allocation to individual demand periods.</p>
       </Panel>
       <Panel title="Member Snapshot" action={<ReportLink id="member-ledger" category="Debtors & Parties" label="Detailed member ledger"/>}>
-       <div className="flex flex-wrap items-end gap-3"><label className="min-w-[180px] flex-1 text-xs font-semibold text-slate-700">Select member / flat<select value={selectedMember?memberName(selectedMember):''} onChange={e=>setQuery(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal"><option value="">Choose member</option>{memberRows.map((r,i)=><option key={i} value={memberName(r)}>{memberLabel(r)} — {memberName(r)}</option>)}</select></label><div className="rounded-lg bg-rose-50 px-4 py-2"><div className="text-[10px] text-rose-700">Recorded balance</div><div className="text-lg font-bold text-rose-800">{fmt(Number(selectedMember?.net_outstanding)||0)}</div></div></div>
+       <div className="flex flex-wrap items-end gap-3"><label className="min-w-[180px] flex-1 text-xs font-semibold text-slate-700">Select member / flat<select value={selectedMember?memberName(selectedMember):''} onChange={e=>setPartySelection(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal"><option value="">Choose member</option>{memberRows.map((r,i)=><option key={i} value={memberName(r)}>{memberLabel(r)} — {memberName(r)}</option>)}</select></label><div className="rounded-lg bg-rose-50 px-4 py-2"><div className="text-[10px] text-rose-700">Recorded balance</div><div className="text-lg font-bold text-rose-800">{fmt(Number(selectedMember?.net_outstanding)||0)}</div></div></div>
        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3"><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Member / flat</div><div className="mt-1 text-sm font-bold text-slate-800">{selectedMember?memberLabel(selectedMember):'Not available'}</div></div><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Receipt transactions</div><div className="mt-1 text-sm font-bold text-slate-800">{num(memberTx.filter(t=>t.type==='Receipt').length)}</div></div><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Data caveat</div><div className="mt-1 text-xs font-semibold text-amber-700">Allocation unverified</div></div></div>
        <div className="mt-3"><Table headers={['Date','Description','Type','Amount','Reference']} rows={memberTx.slice(0,5).map(t=>[t.date||'—',t.description||t.categoryName||'—',t.type||'—',fmt(Math.abs(Number(t.amount)||0)),t.voucherNo||t.receiptNo||t.id||'—'])}/></div>
       </Panel>
@@ -579,7 +580,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
        <p className="text-[10px] text-slate-500">Recorded cash/bank payment movements only. Bill amount, approval and actual liability may differ.</p>
       </Panel>
       <Panel title="Vendor Snapshot" action={<ReportLink id="vendor-ledger" category="Debtors & Parties" label="Detailed vendor ledger"/>}>
-       <div className="flex flex-wrap items-end gap-3"><label className="min-w-[180px] flex-1 text-xs font-semibold text-slate-700">Select vendor / payee<select value={selectedVendor?.name||''} onChange={e=>setQuery(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal"><option value="">Choose vendor</option>{vendorRows.map(v=><option key={v.name} value={v.name}>{v.name}</option>)}</select></label><div className="rounded-lg bg-blue-50 px-4 py-2"><div className="text-[10px] text-blue-700">Payments recorded</div><div className="text-lg font-bold text-blue-800">{fmt(selectedVendor?.paid||0)}</div></div></div>
+       <div className="flex flex-wrap items-end gap-3"><label className="min-w-[180px] flex-1 text-xs font-semibold text-slate-700">Select vendor / payee<select value={selectedVendor?.name||''} onChange={e=>setPartySelection(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal"><option value="">Choose vendor</option>{vendorRows.map(v=><option key={v.name} value={v.name}>{v.name}</option>)}</select></label><div className="rounded-lg bg-blue-50 px-4 py-2"><div className="text-[10px] text-blue-700">Payments recorded</div><div className="text-lg font-bold text-blue-800">{fmt(selectedVendor?.paid||0)}</div></div></div>
        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3"><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Transactions</div><div className="mt-1 text-sm font-bold text-slate-800">{num(selectedVendor?.count||0)}</div></div><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Evidence gaps</div><div className="mt-1 text-sm font-bold text-amber-700">{num(selectedVendor?.gaps||0)}</div></div><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Latest recorded date</div><div className="mt-1 text-xs font-bold text-slate-800">{selectedVendor?.lastDate||'Not recorded'}</div></div></div>
        <div className="mt-3"><Table headers={['Date','Description','Category','Amount','Voucher / reference']} rows={vendorTx.slice(0,5).map(t=>[t.date||'—',t.description||'—',t.categoryName||'Unmapped',fmt(Math.abs(Number(t.amount)||0)),t.voucherNo||t.id||'—'])}/></div>
       </Panel>
