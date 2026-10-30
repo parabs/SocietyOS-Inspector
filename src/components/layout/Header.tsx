@@ -4,15 +4,12 @@ import {
   ChevronDown,
   Building2,
   RotateCcw,
-  CheckCircle2,
-  Clock,
-  Sparkles,
 } from 'lucide-react';
 import { APP_CONFIG } from '../../config';
 import { useVerification } from '../../context/VerificationContext';
 
 export const Header: React.FC = () => {
-  const { resetAllData, currentScreen, stats, supabaseSync, refetchFromSupabase } = useVerification();
+  const { resetAllData, supabaseSync, refetchFromSupabase } = useVerification();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showNotificationToast, setShowNotificationToast] = useState(false);
@@ -38,7 +35,7 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Center FY Status Badge & Supabase Connection */}
+        {/* Center FY Status Badge & Database Connection */}
         <div className="hidden lg:flex items-center gap-3 bg-slate-800/80 px-4 py-1.5 rounded-lg border border-slate-700/60">
           <div>
             <div className="text-xs font-semibold text-white flex items-center gap-2">
@@ -54,7 +51,7 @@ export const Header: React.FC = () => {
 
           <div className="h-6 w-px bg-slate-700 mx-1" />
 
-          {/* Supabase Status */}
+          {/* Database Status */}
           <div className="flex items-center gap-2">
             <span
               className={`w-2.5 h-2.5 rounded-full ${
@@ -67,7 +64,7 @@ export const Header: React.FC = () => {
             />
             <div className="text-left">
               <div className="text-[11px] font-medium text-slate-200 flex items-center gap-1.5">
-                <span>Supabase</span>
+                <span>Database</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
                   supabaseSync.isLoading
                     ? 'bg-amber-500/20 text-amber-300'
@@ -79,14 +76,15 @@ export const Header: React.FC = () => {
                 </span>
               </div>
               <div className="text-[10px] text-slate-400">
-                {supabaseSync.lastSyncedAt ? `Synced ${supabaseSync.lastSyncedAt}` : supabaseSync.error ? 'Connection error' : 'hklibokniuwurdxndxfd'}
+                {supabaseSync.lastSyncedAt ? `Synced ${supabaseSync.lastSyncedAt}` : supabaseSync.error ? 'Connection error' : 'Database sync pending'}
               </div>
             </div>
 
             <button
               onClick={() => refetchFromSupabase()}
               disabled={supabaseSync.isLoading}
-              title="Refresh Supabase data"
+              title="Refresh database data"
+              aria-label="Refresh database data"
               className="p-1 rounded hover:bg-slate-700/70 text-slate-400 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
             >
               <RotateCcw className={`w-3.5 h-3.5 ${supabaseSync.isLoading ? 'animate-spin' : ''}`} />
@@ -96,34 +94,18 @@ export const Header: React.FC = () => {
 
         {/* Right Controls */}
         <div className="flex items-center gap-3">
-          {/* FY Selector */}
+          {/* Financial Year Selector */}
           <div className="hidden md:flex flex-col text-right">
             <label className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">
               Financial Year
             </label>
             <select
               defaultValue="2018-2019"
+              aria-label="Financial Year"
               className="bg-slate-800 text-xs text-white rounded px-2.5 py-1 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
             >
               <option value="2018-2019">2018 - 2019</option>
               <option value="2019-2020">2019 - 2020 (Locked)</option>
-            </select>
-          </div>
-
-          {/* Period Selector */}
-          <div className="hidden md:flex flex-col text-right">
-            <label className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">
-              Period
-            </label>
-            <select
-              defaultValue="Apr 2018 - Mar 2019"
-              className="bg-slate-800 text-xs text-white rounded px-2.5 py-1 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-            >
-              <option value="Apr 2018 - Mar 2019">Apr 2018 – Mar 2019</option>
-              <option value="Q1">Q1 (Apr - Jun 2018)</option>
-              <option value="Q2">Q2 (Jul - Sep 2018)</option>
-              <option value="Q3">Q3 (Oct - Dec 2018)</option>
-              <option value="Q4">Q4 (Jan - Mar 2019)</option>
             </select>
           </div>
 
