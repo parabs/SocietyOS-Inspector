@@ -355,21 +355,72 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2"><Panel title="Transaction Summary (From Consolidated Data)"><Table headers={['Transaction type','Records','Amount','% of total']} rows={[['Receipts',num(filtered.filter(t=>t.type==='Receipt').length),currencyCell(receipts),pct(receipts,receipts+payments)+'%'],['Payments',num(filtered.filter(t=>t.type==='Payment').length),currencyCell(payments),pct(payments,receipts+payments)+'%'],['Contra entries',num(filtered.filter(t=>t.transactionClass==='Contra').length),currencyCell(contra),pct(contra,receipts+payments+contra)+'%']]}/></Panel><Panel title="Data Quality & Control Exceptions"><Table headers={['Control check','Count','Status']} rows={[[ 'Transactions with missing evidence',num(evidenceMissing),statusPill(evidenceMissing?'Review required':'Complete')],[ 'Transactions awaiting inspection',num(stats.pendingTransactions),statusPill(stats.pendingTransactions?'Pending':'Complete')],[ 'Source files awaiting review',num(openSource),statusPill(openSource?'Pending':'Not assessed')],[ 'Audit discrepancies / failed checks',num(stats.evidenceDiscrepancy+stats.internalAuditFailed),statusPill(stats.evidenceDiscrepancy+stats.internalAuditFailed?'Investigate':'Complete')]]}/></Panel></div>
   </>}
   {screen==='demand-collections'&&<>
-   <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-    <Card label="Total FY Demand" value={fmt(reportDemands.reduce((sum:number,d:any)=>sum+Number(d.total_demand||0),0))} detail={num(reportDemands.length)+" demand records"} icon={FileText}/>
-    <Card label="Receipts Recorded" value={fmt(filtered.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra').reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0))} detail={num(filtered.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra').length)+" receipt transactions"} icon={Banknote} tone="green"/>
-    <Card label="Register Outstanding" value={fmt(cumulativeOutstanding.reduce((sum:any,r:any)=>sum+Number(r.net_outstanding||0),0))} detail="Unreconciled register balance" icon={AlertTriangle} tone="red"/>
-    <Card label="Members / Flats" value={num(flatOwnerMaster.length)} detail="Master records" icon={Users}/>
-    <Card label="Members with Due Records" value={num(cumulativeOutstanding.filter((r:any)=>Number(r.net_outstanding||0)>0).length)} detail="Register rows; verify unique members" icon={CalendarDays} tone="amber"/>
-   </div>
-   <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-    <Panel title="Monthly Collections vs Payments"><div className="h-[220px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthly}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Legend/><Bar dataKey="receipts" name="Receipts" fill="#16a34a" radius={[3,3,0,0]}/><Line dataKey="payments" name="Payments (context only)" stroke="#ef4444" strokeWidth={2} dot={false}/></ComposedChart></ResponsiveContainer></div><p className="mt-1 text-[10px] text-slate-500">Receipt trend only; receipt-to-demand allocations are not recorded, so collection efficiency is not calculated.</p></Panel>
-    <Panel title="Demand Mix by Charge Group"><Table headers={['Charge / demand type','Demand records','Demand amount']} rows={Object.entries(reportDemands.reduce((acc:Record<string,{count:number;amount:number}>,d:any)=>{const name=String(d.category_name||d.demand_type||d.description||'Unmapped demand');const key=/maintenance/i.test(name)?'Maintenance':/parking/i.test(name)?'Parking':/cheque.?bounce|bounce/i.test(name)?'Cheque bounce':/additional|special fund|levy|capital/i.test(name)?'Additional funds / levies':/previous dues|opening/i.test(name)?'Previous-year dues':name;acc[key]??={count:0,amount:0};acc[key].count++;acc[key].amount+=Number(d.total_demand||0);return acc;},{})).sort((x,y)=>y[1].amount-x[1].amount).slice(0,6).map(([name,v])=>[name,num(v.count),currencyCell(v.amount)])}/><div className="mt-2 flex flex-wrap gap-2"><ReportLink id="demand-summary" category="Demands & Payments" label="Demand Summary"/><ReportLink id="monthly-demands" category="Demands & Payments" label="Monthly Demand Matrix"/><ReportLink id="receipt-allocation-review" category="Demands & Payments" label="Unmatched Receipts"/></div></Panel>
-   </div>
-   <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-    <Panel title="Highest Register Outstanding — Top 5"><div className="h-[205px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={cumulativeOutstanding.filter((r:any)=>Number(r.net_outstanding)>0).slice().sort((x:any,y:any)=>Number(y.net_outstanding)-Number(x.net_outstanding)).slice(0,5).map((r:any)=>({party:String(r.member_name||r.flat_no||'Unidentified'),amount:Number(r.net_outstanding)||0}))} layout="vertical" margin={{left:8,right:12}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><YAxis type="category" dataKey="party" width={85} tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="amount" name="Register outstanding" fill="#dc6262" radius={[0,4,4,0]}/></BarChart></ResponsiveContainer></div><p className="text-[10px] text-slate-500">Investigative ranking only; opening balances and receipt allocations are not reconciled.</p><div className="mt-2 flex flex-wrap gap-2"><ReportLink id="party-balances" category="Debtors & Parties" label="All-Party Debtors"/><ReportLink id="member-ledger" category="Debtors & Parties" label="Member Ledger"/></div></Panel>
-    <Panel title="Demand Controls Requiring Attention"><Table headers={['Control','Current result','Action']} rows={[[ 'Current FY maintenance expected','Not yet reliable','Verify active flats, approved rates and all 12 months'],['Previous FY outstanding','Not yet verified','Validate opening balances and carry-forward'],['Cheque-bounce charges',currencyCell(reportDemands.filter((d:any)=>/cheque.?bounce|bounce charge/i.test(String(d.category_name||d.description||d.demand_type||''))).reduce((sum:number,d:any)=>sum+Number(d.total_demand||0),0)),'Confirm charge mapping and evidence'],['Additional funds / special levies',currencyCell(reportDemands.filter((d:any)=>/additional fund|special fund|capital contribution|special levy/i.test(String(d.category_name||d.description||d.demand_type||''))).reduce((sum:number,d:any)=>sum+Number(d.total_demand||0),0)),'Verify approved resolution and member allocation']].map((r:any)=>r)}/><div className="mt-2 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-900">Do not issue recovery notices from register totals until opening balances, demand periods and allocations are verified.</div></Panel>
-   </div>
+   {(() => {
+    const fyDemand=reportDemands.reduce((s:number,d:any)=>s+Number(d.total_demand||0),0);
+    const receiptRows=filtered.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra');
+    const fyReceipts=receiptRows.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
+    const dueRows=cumulativeOutstanding.filter((r:any)=>Number(r.net_outstanding||0)>0).sort((a:any,b:any)=>Number(b.net_outstanding||0)-Number(a.net_outstanding||0));
+    const groupKey=(d:any)=>{const n=String(d.category_name||d.demand_type||d.description||'').toLowerCase();return /maintenance/.test(n)&&!/previous|opening|arrears|brought forward/.test(n)?'Maintenance Charges':/parking/.test(n)&&!/previous|opening|arrears|brought forward/.test(n)?'Parking Charges':/previous dues|opening balance|arrears|brought forward/.test(n)?'Previous-year dues':/cheque.?bounce|bounce charge/.test(n)?'Cheque Bounce Charges':/additional fund|special fund|capital contribution|special levy/.test(n)?'Additional Funds / Special Levies':/non.?occup/.test(n)?'Non-Occupancy Charges':'Other Charges'};
+    const groups:Record<string,{amount:number;count:number}>={};
+    reportDemands.forEach((d:any)=>{const k=groupKey(d);groups[k]??={amount:0,count:0};groups[k].amount+=Number(d.total_demand||0);groups[k].count++;});
+    const chargeData=Object.entries(groups).sort((a,b)=>b[1].amount-a[1].amount).slice(0,6).map(([name,v],i)=>({name,amount:v.amount,count:v.count,fill:COLORS[i%COLORS.length]}));
+    const sumGroup=(re:RegExp)=>reportDemands.filter((d:any)=>re.test(String(d.category_name||d.demand_type||d.description||''))).reduce((s:number,d:any)=>s+Number(d.total_demand||0),0);
+    const currentMaintenance=reportDemands.filter((d:any)=>/maintenance/i.test(String(d.category_name||d.demand_type||d.description||''))&&!/previous|opening|arrears|brought forward/i.test(String(d.category_name||d.demand_type||d.description||''))).reduce((s:number,d:any)=>s+Number(d.total_demand||0),0);
+    const previousDues=sumGroup(/previous dues|opening balance|arrears|brought forward/i);
+    const chequeBounce=sumGroup(/cheque.?bounce|bounce charge/i);
+    const additionalFunds=sumGroup(/additional fund|special fund|capital contribution|special levy/i);
+    const monthlyDemand=allMonths.map(m=>({month:m.split(' ')[0],demand:reportDemands.filter((d:any)=>String(d.demand_month||d.month||d.reporting_month||'').toLowerCase().replace(/-/g,' ').trim()===m.toLowerCase()).reduce((s:number,d:any)=>s+Number(d.total_demand||0),0),receipts:receiptRows.filter(t=>String(t.reportingMonth||t.month||'').toLowerCase().replace(/-/g,' ').trim()===m.toLowerCase()).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0)}));
+    const monthlyDemandAvailable=monthlyDemand.some(x=>x.demand>0);
+    const top=dueRows.slice(0,5).map((r:any)=>({party:String(r.flat_no||r.member_name||'Unidentified'),amount:Number(r.net_outstanding)||0}));
+    const outstanding=cumulativeOutstanding.reduce((s:number,r:any)=>s+Number(r.net_outstanding||0),0);
+    const rate=fyDemand?fyReceipts/fyDemand*100:0;
+    const allocated=Array.isArray(demandAllocations)?demandAllocations.length:0;
+    return <>
+     <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
+      <Card label="Members / Flat Owners" value={num(flatOwnerMaster.length)} detail={num(dueRows.length)+' register rows with dues'} icon={Users}/>
+      <Card label="Total Demand Raised" value={fmt(fyDemand)} detail={num(reportDemands.length)+' demand records'} icon={FileText}/>
+      <Card label="Receipts Collected" value={fmt(fyReceipts)} detail={num(receiptRows.length)+' receipt transactions'} icon={Banknote} tone="green"/>
+      <Card label="Outstanding (Register)" value={fmt(outstanding)} detail="Cumulative; not reconciled" icon={AlertTriangle} tone="red"/>
+      <Card label="Receipts vs Demand" value={fyDemand?rate.toFixed(1)+'%':'Not available'} detail="Simple total comparison; not allocation-based" icon={ArrowUpRight} tone="violet"/>
+      <Card label="Unallocated Receipts" value={num(allocated===0?receiptRows.length:Math.max(0,receiptRows.length-allocated))} detail={allocated===0?'No allocations recorded':'Review allocation coverage'} icon={AlertTriangle} tone="amber"/>
+     </div>
+     <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
+      <div className="xl:col-span-7"><Panel title="Monthly Demand vs Collections" action={<ReportLink id="monthly-demands" category="Demands & Payments" label="View Month-wise Matrix"/>}>
+       <div className="h-[225px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthlyDemand}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Legend wrapperStyle={{fontSize:10}}/><Bar dataKey="demand" name="Demand raised (period available)" fill="#3976f6" radius={[3,3,0,0]}/><Bar dataKey="receipts" name="Receipts recorded" fill="#43b581" radius={[3,3,0,0]}/></ComposedChart></ResponsiveContainer></div>
+       <p className="mt-1 text-[10px] text-slate-500">{monthlyDemandAvailable?'Monthly demand is shown where demand-period keys match.':'Demand period keys are missing or inconsistent; monthly demand is not fabricated.'} Receipts are not allocated to specific demand records.</p>
+      </Panel></div>
+      <div className="xl:col-span-5"><Panel title="Outstanding — Top 5 Members / Flats" action={<ReportLink id="party-balances" category="Debtors & Parties" label="View All-Party Debtors"/>}>
+       <div className="h-[225px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={top} layout="vertical" margin={{left:4,right:12}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><YAxis type="category" dataKey="party" width={82} tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="amount" name="Register outstanding" fill="#e45a5a" radius={[0,4,4,0]}/></BarChart></ResponsiveContainer></div>
+       <p className="text-[10px] text-slate-500">For investigation only. Opening balances and receipt allocations are not reconciled; do not use as certified recovery figures.</p><div className="mt-2"><ReportLink id="member-ledger" category="Debtors & Parties" label="Open Detailed Member Ledger"/></div>
+      </Panel></div>
+     </div>
+     <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
+      <div className="xl:col-span-5"><Panel title="Demand by Charge Category" action={<ReportLink id="demand-summary" category="Demands & Payments" label="View Demand Summary"/>}>
+       <div className="space-y-3">{chargeData.map((x:any)=><div key={x.name}><div className="mb-1 flex items-center justify-between gap-2 text-[11px]"><span>{x.name}</span><strong>{fmt(x.amount)}</strong></div><div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full" style={{width:(fyDemand?Math.max(1,x.amount/fyDemand*100):0)+'%',background:x.fill}}/></div></div>)}</div>
+       <p className="mt-3 text-[10px] text-slate-500">Category labels are grouped for insight. Collection-by-charge is not calculated because receipt allocations are absent.</p>
+      </Panel></div>
+      <div className="xl:col-span-4"><Panel title="Demand Profile" action={<ReportLink id="mapping-exceptions" category="Audit & Governance" label="Review Charge Mapping"/>}>
+       <div className="h-[185px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={chargeData} dataKey="amount" nameKey="name" innerRadius={48} outerRadius={72} paddingAngle={2}>{chargeData.map((x:any)=><Cell key={x.name} fill={x.fill}/>)}</Pie><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Legend verticalAlign="bottom" height={34} wrapperStyle={{fontSize:9}}/></PieChart></ResponsiveContainer></div>
+       <div className="rounded-lg bg-blue-50 p-2 text-[10px] text-blue-900">Recorded demand composition only—not collection efficiency by charge type.</div>
+      </Panel></div>
+      <div className="xl:col-span-3"><Panel title="Key Insights & Actions">
+       <div className="space-y-2 text-[11px]">
+        <div className="rounded-lg bg-emerald-50 p-2"><strong className="block">{fmt(fyReceipts)} receipts recorded</strong><span className="text-slate-600">{rate.toFixed(1)}% of FY demand by total comparison only.</span></div>
+        <div className="rounded-lg bg-red-50 p-2"><strong className="block">{fmt(outstanding)} register outstanding</strong><span className="text-slate-600">Reconcile opening balances and allocations.</span></div>
+        <div className="rounded-lg bg-amber-50 p-2"><strong className="block">Previous FY dues</strong><span className="text-slate-600">{previousDues?fmt(previousDues):'Not verified'}; compare with FY 2017–18 closing ledger.</span></div>
+        <div className="rounded-lg bg-blue-50 p-2"><strong className="block">Current FY maintenance</strong><span className="text-slate-600">{currentMaintenance?fmt(currentMaintenance):'Not reliable'}; confirm approved rate, eligible flats and 12 months.</span></div>
+       </div>
+      </Panel></div>
+     </div>
+     <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+      <Card label="Current FY Maintenance Expected" value={currentMaintenance?fmt(currentMaintenance):'Not verified'} detail="Confirm approved rate × eligible flats × 12 months" icon={CalendarDays}/>
+      <Card label="Previous FY Outstanding" value={previousDues?fmt(previousDues):'Not verified'} detail="Verify FY 2017–18 closing member balances" icon={ArrowLeftRight} tone="violet"/>
+      <Card label="Cheque Bounce Charges" value={fmt(chequeBounce)} detail="Validate charge mapping and bank evidence" icon={AlertTriangle} tone="amber"/>
+      <Card label="Additional Funds / Special Levies" value={fmt(additionalFunds)} detail="Verify approved resolution and member allocation" icon={Wallet}/>
+     </div>
+     <div className="flex flex-wrap gap-2"><ReportLink id="monthly-demands" category="Demands & Payments" label="Monthly Demand Matrix"/><ReportLink id="monthly-payments" category="Demands & Payments" label="Monthly Receipts Matrix"/><ReportLink id="receipt-allocation-review" category="Demands & Payments" label="Review Unmatched Receipts"/><ReportLink id="opening-balance-review" category="Audit & Governance" label="Verify Previous FY Balances"/><ReportLink id="receipts" category="Registers" label="Receipt Register"/></div>
+    </>;
+   })()}
   </>}
   {screen==='payments-expenses'&&<>
    {(() => {
