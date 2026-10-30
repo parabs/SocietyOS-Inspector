@@ -42,7 +42,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const [partyTypeFilter,setPartyTypeFilter]=useState('All party types');
  const [statusFilter,setStatusFilter]=useState('All statuses');
  const [accountFilter,setAccountFilter]=useState<'TDCC'|'BOM'|'CASH'|'ALL'>('TDCC');
- const [activeTab,setActiveTab]=useState('Overview');
+ const [activeTab,setActiveTab]=useState('Members');
  const [partySelection,setPartySelection]=useState('');
  const [selectedReport,setSelectedReport]=useState('party-balances');
  const [reportCategory,setReportCategory]=useState('Debtors & Parties');
@@ -586,6 +586,23 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
        <div className="mt-2 grid grid-cols-3 gap-2"><div className="rounded border border-slate-100 p-2"><div className="text-[9px] text-slate-500">Transactions</div><div className="text-sm font-bold">{num(selectedVendor?.count||0)}</div></div><div className="rounded border border-slate-100 p-2"><div className="text-[9px] text-slate-500">Evidence gaps</div><div className="text-sm font-bold text-amber-700">{num(selectedVendor?.gaps||0)}</div></div><div className="rounded border border-slate-100 p-2"><div className="text-[9px] text-slate-500">Latest date</div><div className="text-[10px] font-bold">{selectedVendor?.lastDate||'Not recorded'}</div></div></div>
        <div className="mt-2"><Table headers={['Date','Description','Category','Amount','Voucher / reference']} rows={vendorTx.slice(0,3).map(t=>[t.date||'—',t.description||'—',t.categoryName||'Unmapped',fmt(Math.abs(Number(t.amount)||0)),t.voucherNo||t.id||'—'])}/></div>
       </Panel></div>
+     </div>
+     <div className="grid grid-cols-1 gap-2 xl:grid-cols-3">
+      <Panel title={activeTab==='Utilities'?'Monthly Utility Payments':'Monthly Ad-hoc Payments'} action={<ReportLink id="payments" category="Registers" label="Open register"/>}>
+       <div className="h-[150px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={allMonths.map(m=>({month:m.split(' ')[0],amount:paymentRows.filter(t=>String(t.reportingMonth||t.month||'')===m).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0)}))} margin={{top:4,right:4,bottom:0,left:0}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:9}}/><YAxis width={42} tick={{fontSize:9}} tickFormatter={(v)=>'₹'+num(Number(v)/1000)+'k'}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="amount" name="Recorded payments" fill={activeTab==='Utilities'?'#0d9488':'#7c3aed'} radius={[3,3,0,0]}/></ComposedChart></ResponsiveContainer></div>
+       <p className="text-[9px] text-slate-500">Based on keyword classification of transaction descriptions and categories; verify Party Master classification.</p>
+      </Panel>
+      <Panel title="Largest Payments & Potential Anomalies" action={<ReportLink id="largest-payments-anomalies" category="Audit & Governance" label="Open full report"/>}>
+       <Table headers={['Payee','Amount','Review flag']} rows={paymentRows.map(t=>({t,amount:Math.abs(Number(t.amount)||0)})).sort((a,b)=>b.amount-a.amount).slice(0,5).map(({t,amount})=>[String(t.party||'Unidentified payee'),fmt(amount),t.evidenceStatus==='Complete'?'Check amount / duplicate':'Evidence review'])}/>
+       <p className="mt-2 text-[9px] text-slate-500">Screening prompts only, not findings of irregularity. Verify vouchers, approvals and related transactions.</p>
+      </Panel>
+      <Panel title="Priority Actions">
+       <div className="space-y-2 text-[11px]">
+        <div className="rounded-lg bg-amber-50 p-2"><strong>{num(paymentRows.filter(t=>t.evidenceStatus!=='Complete'||t.billStatus==='Missing'||t.voucherReceiptStatus==='Missing').length)} transactions</strong><div className="text-slate-600">Evidence or bill/voucher status needs review.</div></div>
+        <div className="rounded-lg bg-blue-50 p-2"><strong>{num(paymentRows.filter(t=>!String(t.party||'').trim()||/unknown|unidentified|unmapped/i.test(String(t.party||''))).length)} payments</strong><div className="text-slate-600">Party identity may need confirmation.</div></div>
+        <div className="flex flex-wrap gap-2"><ReportLink id="missing-docs" category="Audit & Governance" label="Evidence register"/><ReportLink id="mapping-exceptions" category="Audit & Governance" label="Mapping exceptions"/></div>
+       </div>
+      </Panel>
      </div>
      <Panel title={activeTab==='Utilities'?'Utility Drill-Down':'Ad-hoc Party Drill-Down'}><div className="flex flex-wrap gap-2"><ReportLink id="vendor-ledger" category="Debtors & Parties" label="Detailed vendor ledger"/><ReportLink id="payments" category="Registers" label="Payments register"/><ReportLink id="largest-payments-anomalies" category="Audit & Governance" label="Largest payments & potential anomalies"/><ReportLink id="missing-docs" category="Audit & Governance" label="Missing bill / voucher evidence"/></div></Panel>
     </>}
