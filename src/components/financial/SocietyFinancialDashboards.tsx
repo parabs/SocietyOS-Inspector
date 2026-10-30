@@ -496,7 +496,9 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
    const memberRows=[...cumulativeOutstanding].sort((a,b)=>Number(b.net_outstanding||0)-Number(a.net_outstanding||0));
    const memberDueTotal=memberRows.reduce((sum,r)=>sum+Math.max(0,Number(r.net_outstanding)||0),0);
    const membersWithDues=memberRows.filter(r=>Number(r.net_outstanding||0)>0);
-   const paymentRows=filtered.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra');
+   const allPaymentRows=filtered.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra');
+   const utilityPattern=/electric|mseb|water|lift|security|housekeeping|cleaning|sweeper|diesel|federation|internet|telephone|utility/i;
+   const paymentRows=activeTab==='Utilities'?allPaymentRows.filter(t=>utilityPattern.test(String(t.categoryName||'')+' '+String(t.party||'')+' '+String(t.description||''))):activeTab==='Ad-hoc'?allPaymentRows.filter(t=>!utilityPattern.test(String(t.categoryName||'')+' '+String(t.party||'')+' '+String(t.description||''))):allPaymentRows;
    const vendorMap=paymentRows.reduce((acc:Record<string,{count:number;paid:number;gaps:number;lastDate:string}>,t)=>{
     const name=String(t.party||'Unmapped payee');
     acc[name]??={count:0,paid:0,gaps:0,lastDate:''};
@@ -522,9 +524,9 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
    return <>
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-white p-3">
      <div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-blue-700">Party intelligence</p><p className="mt-1 text-sm text-slate-600">See balances, concentration and transaction patterns first; open registers only when you need detail.</p></div>
-     <div className="inline-flex rounded-xl border border-blue-100 bg-slate-50 p-1"><button onClick={()=>{setPartySelection('');setActiveTab('Members')}} className={'rounded-lg px-4 py-2 text-xs font-bold '+(activeTab!=='Vendors'?'bg-blue-600 text-white shadow-sm':'text-slate-600')}>Members / Flat Owners</button><button onClick={()=>{setPartySelection('');setActiveTab('Vendors')}} className={'rounded-lg px-4 py-2 text-xs font-bold '+(activeTab==='Vendors'?'bg-blue-600 text-white shadow-sm':'text-slate-600')}>Vendors / Payees</button></div>
+     <div className="inline-flex flex-wrap rounded-xl border border-blue-100 bg-slate-50 p-1"><button onClick={()=>{setPartySelection('');setActiveTab('Members')}} className={'rounded-lg px-3 py-2 text-xs font-bold '+(activeTab==='Members'?'bg-blue-600 text-white shadow-sm':'text-slate-600')}>Members</button><button onClick={()=>{setPartySelection('');setActiveTab('Utilities')}} className={'rounded-lg px-3 py-2 text-xs font-bold '+(activeTab==='Utilities'?'bg-blue-600 text-white shadow-sm':'text-slate-600')}>Utilities</button><button onClick={()=>{setPartySelection('');setActiveTab('Ad-hoc')}} className={'rounded-lg px-3 py-2 text-xs font-bold '+(activeTab==='Ad-hoc'?'bg-blue-600 text-white shadow-sm':'text-slate-600')}>Ad-hoc Parties</button></div>
     </div>
-    {activeTab!=='Vendors'?<>
+    {activeTab==='Members'?<>
      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
       <Card label="Member / flat records" value={num(flatOwnerMaster.length)} detail="Master records loaded" icon={Users}/>
       <Card label="Recorded demand" value={fmt(demandTotal)} detail={num(demandRegister.length)+' demand records'} icon={FileText}/>
@@ -557,18 +559,18 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
      <Panel title="Member Ledger Drill-Down"><div className="flex flex-wrap gap-2"><ReportLink id="party-balances" category="Debtors & Parties" label="All-party debtors"/><ReportLink id="member-ledger" category="Debtors & Parties" label="Detailed member ledger"/><ReportLink id="demand-summary" category="Demands & Payments" label="Demand summary by party"/><ReportLink id="monthly-flat-balance" category="Demands & Payments" label="Monthly flat-owner balances"/></div></Panel>
     </>:<>
      <div className="grid grid-cols-2 gap-2 xl:grid-cols-5">
-      <Card label="Vendor / payee records" value={num(partyMaster.length)} detail="Party master records" icon={Landmark} tone="violet"/>
+      <Card label={activeTab==='Utilities'?'Utility payees':'Ad-hoc parties'} value={num(vendorRows.length)} detail={activeTab==='Utilities'?'Keyword-classified utility providers':'Other payees; verify classification'} icon={Landmark} tone="violet"/>
       <Card label="Payment transactions" value={num(paymentRows.length)} detail="Selected period / filters" icon={FileText}/>
       <Card label="Payments recorded" value={fmt(payments)} detail="Not bill certification" icon={ArrowUpRight} tone="red"/>
       <Card label="Payees with evidence gaps" value={num(vendorRows.filter(v=>v.gaps>0).length)} detail="At least one payment to review" icon={AlertTriangle} tone="amber"/>
       <Card label="Evidence gap transactions" value={num(vendorRows.reduce((sum,v)=>sum+v.gaps,0))} detail="Supporting-document review" icon={ShieldCheck} tone="green"/>
      </div>
      <div className="grid grid-cols-1 gap-2 xl:grid-cols-12">
-      <div className="xl:col-span-7"><Panel title="Top 5 Vendors by Recorded Payments" action={<ReportLink id="vendor-ledger" category="Debtors & Parties" label="View ledger"/>}>
+      <div className="xl:col-span-7"><Panel title={activeTab==='Utilities'?'Top Utility Providers by Payments':'Top Ad-hoc Parties by Payments'} action={<ReportLink id="vendor-ledger" category="Debtors & Parties" label="View ledger"/>}>
        <div className="space-y-2">{vendorRows.slice(0,5).map((v,i)=><div key={v.name}><div className="mb-1 flex items-center justify-between gap-3 text-[11px]"><span className="max-w-[75%] truncate font-semibold text-slate-800" title={v.name}>{v.name}</span><span className="font-bold text-blue-800">{fmt(v.paid)}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{width:(v.paid/maxVendor*100)+'%'}}/></div><div className="mt-0.5 text-[9px] text-slate-500">{num(v.count)} transactions · {num(v.gaps)} evidence gaps</div></div>)}{!vendorRows.length&&<p className="text-xs text-slate-500">No payment transactions for this filter.</p>}</div>
        <p className="mt-2 text-[9px] text-slate-500">Concentration is a screening signal, not proof of irregularity.</p>
       </Panel></div>
-      <div className="xl:col-span-5"><Panel title="Vendor Evidence Coverage">
+      <div className="xl:col-span-5"><Panel title={activeTab==='Utilities'?'Utility Evidence Coverage':'Ad-hoc Evidence Coverage'}>
        <div className="h-[142px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={vendorEvidence} dataKey="value" nameKey="name" innerRadius={42} outerRadius={62} paddingAngle={3}>{vendorEvidence.map((d,i)=><Cell key={d.name} fill={i===0?'#f59e0b':'#16a34a'}/>)}</Pie><Tooltip/><Legend wrapperStyle={{fontSize:11}}/></PieChart></ResponsiveContainer></div>
        <div className="grid grid-cols-2 gap-2"><div className="rounded-lg bg-amber-50 p-2"><div className="text-[9px] text-amber-700">Evidence gaps</div><div className="text-lg font-bold text-amber-800">{num(vendorEvidence[0].value)}</div></div><div className="rounded-lg bg-emerald-50 p-2"><div className="text-[9px] text-emerald-700">Complete</div><div className="text-lg font-bold text-emerald-800">{num(vendorEvidence[1].value)}</div></div></div>
        <p className="mt-1 text-[9px] text-slate-500">Evidence status is not a substitute for checking bills, vouchers and approvals.</p>
@@ -579,13 +581,13 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
        <div className="h-[145px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthly} margin={{top:4,right:4,bottom:0,left:0}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:9}} tickMargin={4}/><YAxis width={42} tick={{fontSize:9}} tickFormatter={(v)=>'₹'+num(Number(v)/1000)+'k'}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="payments" name="Payments recorded" fill="#2563eb" radius={[3,3,0,0]}/></ComposedChart></ResponsiveContainer></div>
        <p className="text-[9px] text-slate-500">Recorded payment movements only; bill amount and approval may differ.</p>
       </Panel></div>
-      <div className="xl:col-span-6"><Panel title="Vendor Snapshot" action={<ReportLink id="vendor-ledger" category="Debtors & Parties" label="Detailed ledger"/>}>
+      <div className="xl:col-span-6"><Panel title={activeTab==='Utilities'?'Utility Provider Snapshot':'Ad-hoc Party Snapshot'} action={<ReportLink id="vendor-ledger" category="Debtors & Parties" label="Detailed ledger"/>}>
        <div className="flex items-end gap-2"><label className="min-w-0 flex-1 text-[11px] font-semibold text-slate-700">Select vendor / payee<select value={selectedVendor?.name||''} onChange={e=>setPartySelection(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-normal"><option value="">Choose vendor</option>{vendorRows.map(v=><option key={v.name} value={v.name}>{v.name}</option>)}</select></label><div className="rounded-lg bg-blue-50 px-3 py-1.5"><div className="text-[9px] text-blue-700">Recorded</div><div className="text-base font-bold text-blue-800">{fmt(selectedVendor?.paid||0)}</div></div></div>
        <div className="mt-2 grid grid-cols-3 gap-2"><div className="rounded border border-slate-100 p-2"><div className="text-[9px] text-slate-500">Transactions</div><div className="text-sm font-bold">{num(selectedVendor?.count||0)}</div></div><div className="rounded border border-slate-100 p-2"><div className="text-[9px] text-slate-500">Evidence gaps</div><div className="text-sm font-bold text-amber-700">{num(selectedVendor?.gaps||0)}</div></div><div className="rounded border border-slate-100 p-2"><div className="text-[9px] text-slate-500">Latest date</div><div className="text-[10px] font-bold">{selectedVendor?.lastDate||'Not recorded'}</div></div></div>
        <div className="mt-2"><Table headers={['Date','Description','Category','Amount','Voucher / reference']} rows={vendorTx.slice(0,3).map(t=>[t.date||'—',t.description||'—',t.categoryName||'Unmapped',fmt(Math.abs(Number(t.amount)||0)),t.voucherNo||t.id||'—'])}/></div>
       </Panel></div>
      </div>
-     <Panel title="Vendor / Payee Drill-Down"><div className="flex flex-wrap gap-2"><ReportLink id="vendor-ledger" category="Debtors & Parties" label="Detailed vendor ledger"/><ReportLink id="payments" category="Registers" label="Payments register"/><ReportLink id="largest-payments-anomalies" category="Audit & Governance" label="Largest payments & potential anomalies"/><ReportLink id="missing-docs" category="Audit & Governance" label="Missing bill / voucher evidence"/></div></Panel>
+     <Panel title={activeTab==='Utilities'?'Utility Drill-Down':'Ad-hoc Party Drill-Down'}><div className="flex flex-wrap gap-2"><ReportLink id="vendor-ledger" category="Debtors & Parties" label="Detailed vendor ledger"/><ReportLink id="payments" category="Registers" label="Payments register"/><ReportLink id="largest-payments-anomalies" category="Audit & Governance" label="Largest payments & potential anomalies"/><ReportLink id="missing-docs" category="Audit & Governance" label="Missing bill / voucher evidence"/></div></Panel>
     </>}
    </>;
   })()}
