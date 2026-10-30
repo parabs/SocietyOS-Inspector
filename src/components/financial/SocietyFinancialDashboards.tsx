@@ -322,28 +322,26 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   </header>
   {loading&&<div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-2 text-xs text-blue-800">Loading the latest society records…</div>}
   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"><strong>Preliminary — not an audit opinion.</strong> Values reflect currently available connected records and must not be treated as certified statutory figures.</div>
-  {screen==='reports'&&<>
-   <div className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><h2 className="text-base font-bold text-blue-950">Financial Reports & Operational Registers</h2><p className="mt-1 text-xs text-slate-600">Select a report to view calculated results from connected records. Provisional reports are clearly labelled.</p></div>
-     <div className="flex flex-wrap items-center gap-2"><label htmlFor="society-report-select" className="text-xs font-semibold text-slate-600">Select report</label><select id="society-report-select" value={selectedReport} onChange={e=>setSelectedReport(e.target.value)} className="min-w-[260px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs">
-      {reportCategories.slice(1).map(cat=><optgroup key={cat} label={cat}>{reportCatalog.filter(r=>r.category===cat).map(r=><option key={r.id} value={r.id}>RPT-{reportNumbers[r.id]||'—'} · {r.name}</option>)}</optgroup>)}
-     </select><button onClick={()=>downloadCsv('society-report-transactions.csv',[['Date','Transaction ID','Party','Category','Type','Amount','Voucher','Evidence'],...filtered.map(t=>[t.date,t.id,t.party,t.categoryName,t.transactionClass||t.type,t.amount,t.voucherNo||t.receiptNo,t.evidenceStatus].map(v=>String(v??'')))])} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Export transactions CSV</button></div>
+  {screen==='reports'&&<div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-start">
+   <aside className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm xl:sticky xl:top-4">
+    <div className="mb-3 border-b border-slate-100 pb-3"><h2 className="text-sm font-bold text-blue-950">Financial Reports & Registers</h2><p className="mt-1 text-[11px] leading-4 text-slate-600">Choose a report to view connected records.</p></div>
+    <label htmlFor="society-report-select" className="mb-1 block text-[11px] font-semibold text-slate-600">Select report</label>
+    <select id="society-report-select" value={selectedReport} onChange={e=>setSelectedReport(e.target.value)} className="mb-3 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs">
+     {reportCategories.slice(1).map(cat=><optgroup key={cat} label={cat}>{reportCatalog.filter(r=>r.category===cat).map(r=><option key={r.id} value={r.id}>RPT-{reportNumbers[r.id]||'—'} · {r.name}</option>)}</optgroup>)}
+    </select>
+    <div className="mb-2 flex flex-wrap gap-1.5" role="tablist" aria-label="Report categories">
+     {reportCounts.map(cat=><button key={cat.name} role="tab" aria-selected={reportCategory===cat.name} onClick={()=>setReportCategory(cat.name)} className={'rounded-full border px-2 py-1 text-[10px] font-semibold '+(reportCategory===cat.name?'border-blue-600 bg-blue-600 text-white':'border-slate-200 bg-white text-slate-700 hover:bg-blue-50')}>{cat.name} <span className="opacity-75">{cat.count}</span></button>)}
     </div>
-   </div>
-   <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-    <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label="Report categories">
-     {reportCounts.map(cat=><button key={cat.name} role="tab" aria-selected={reportCategory===cat.name} onClick={()=>setReportCategory(cat.name)} className={'inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition '+(reportCategory===cat.name?'border-blue-600 bg-blue-600 text-white shadow-sm':'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50')}><span>{cat.name}</span><span className={'rounded-full px-1.5 py-0.5 text-[10px] '+(reportCategory===cat.name?'bg-white/20 text-white':'bg-slate-100 text-slate-600')}>{cat.count}</span></button>)}
-    </div>
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-     {visibleReports.map(r=><button key={r.id} onClick={()=>setSelectedReport(r.id)} className={'rounded-lg border p-2 text-left transition '+(selectedReport===r.id?'border-blue-500 bg-blue-50 ring-1 ring-blue-200':'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50')}>
-      <div className="flex items-start justify-between gap-2"><span className="text-[11px] font-bold text-slate-900">RPT-{reportNumbers[r.id]||'—'} · {r.name}</span>{selectedReport===r.id&&<span className="rounded-full bg-blue-600 px-2 py-0.5 text-[9px] font-bold text-white">Selected</span>}</div>
-      <p className="mt-1 text-[11px] leading-4 text-slate-500">{r.description}</p>
+    <nav className="max-h-[60vh] space-y-1 overflow-y-auto" aria-label="Available reports">
+     {visibleReports.map(r=><button key={r.id} onClick={()=>setSelectedReport(r.id)} className={'w-full rounded-lg border p-2.5 text-left transition '+(selectedReport===r.id?'border-blue-500 bg-blue-50 ring-1 ring-blue-200':'border-transparent bg-white hover:border-slate-200 hover:bg-slate-50')}>
+      <span className="block text-[11px] font-bold leading-4 text-slate-900">RPT-{reportNumbers[r.id]||'—'} · {r.name}</span>
+      <span className="mt-1 block text-[10px] leading-4 text-slate-500">{r.description}</span>
+      {selectedReport===r.id&&<span className="mt-1 inline-block rounded-full bg-blue-600 px-2 py-0.5 text-[9px] font-bold text-white">Selected</span>}
      </button>)}
-    </div>
-   </section>
-
-  </>}
-  {filterBar}
+    </nav>
+   </aside>
+   <div className="min-w-0 space-y-4">
+    {filterBar}
   {screen==='financial-summary'&&<>
    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5"><Card label="Total Demand Raised" value={fmt(demandTotal)} detail="From available demand register" icon={FileText}/><Card label="Total Collections (Receipts)" value={fmt(receipts)} detail={pct(receipts,demandTotal)+'% of demand register' } icon={ArrowDownRight} tone="green"/><Card label="Total Payments (Expenses)" value={fmt(payments)} detail="Excludes contra transfers" icon={ArrowUpRight} tone="red"/><Card label="Contra Entries" value={fmt(contra)} detail="Internal transfers / adjustments" icon={ArrowLeftRight} tone="violet"/><Card label="Net Movement" value={fmt(net)} detail="Receipts less payments in selected data" icon={Wallet} tone="amber"/></div>
    <div className="grid grid-cols-1 gap-3 xl:grid-cols-5"><div className="xl:col-span-3"><Panel title="Monthly Financial Summary"><div className="h-[300px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthly}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Legend/><Bar dataKey="receipts" name="Collections / Receipts" fill="#22a765" radius={[3,3,0,0]}/><Bar dataKey="payments" name="Payments / Expenses" fill="#ef4444" radius={[3,3,0,0]}/><Line dataKey="contra" name="Contra" stroke="#2563eb" strokeWidth={2}/></ComposedChart></ResponsiveContainer></div></Panel></div><div className="xl:col-span-2"><Panel title="Expense Analysis by Category"><div className="h-[300px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={categoryData.slice(0,7)} layout="vertical" margin={{left:12,right:12}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tick={{fontSize:10}}/><YAxis type="category" dataKey="name" width={125} tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="amount" fill="#2563eb" radius={[0,4,4,0]}/></BarChart></ResponsiveContainer></div></Panel></div></div>
@@ -400,6 +398,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
     <Table headers={reportData.headers} rows={reportData.rows}/>
    </Panel>
   </>}
+  {screen==='reports'&&</div></div>}
   {screen!=='reports'&&<Panel title={'Transaction Summary & Source Traceability'} action={<span className="text-[10px] text-slate-500">{num(filtered.length)} rows</span>}><Table headers={['Date','Transaction ID','Party / Payee','Category','Type','Amount','Voucher / receipt','Evidence','Source file / row']} rows={filtered.slice(0,100).map(t=>[t.date||'—',t.id||'—',t.party||'Unmapped',t.categoryName||'Unclassified',t.transactionClass||t.type,currencyCell(Number(t.amount)||0),t.voucherNo||t.receiptNo||'—',statusPill(t.evidenceStatus||'Pending'),(t.sourceFile||'Source not recorded')+(t.sourceRow?' · row '+t.sourceRow:'')])}/></Panel>}
   <footer className="flex flex-wrap items-center justify-between gap-2 px-1 text-[10px] text-slate-500"><span>Society OS · data is derived from connected records; missing fields are labelled rather than estimated.</span><span>Showing {Math.min(100,filtered.length)} of {num(filtered.length)} filtered transactions · CSV exports all filtered rows.</span></footer>
  </div>;
