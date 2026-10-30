@@ -381,20 +381,24 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   </>}
   {screen==='demand-collections'&&<>
    {(() => {
-    const fyDemand=reportDemands.reduce((s:number,d:any)=>s+Number(d.total_demand||0),0);
+    const demandAmount=(d:any)=>Number(d.total_demand??d.demand_amount??d.amount??0)||0;
+    const demandCategory=(d:any)=>{const linked=categoryMaster.find((c:any)=>String(c.category_id??c.id??'')===String(d.category_id??d.categoryId??''));return String(d.category_name??d.categoryName??linked?.category_name??d.demand_type??d.charge_type??d.description??'Unmapped demand category')};
+    const monthKey=(v:any)=>{const raw=String(v??'').trim().replace(/-/g,' ').replace(/\//g,' ');const m=raw.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(20\d{2})/i);return m?m[1].slice(0,3).toLowerCase()+' '+m[2]:''};
+    const fyDemand=reportDemands.reduce((s:number,d:any)=>s+demandAmount(d),0);
     const receiptRows=filtered.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra');
     const fyReceipts=receiptRows.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
     const dueRows=cumulativeOutstanding.filter((r:any)=>Number(r.net_outstanding||0)>0).sort((a:any,b:any)=>Number(b.net_outstanding||0)-Number(a.net_outstanding||0));
-    const groupKey=(d:any)=>{const n=String(d.category_name||d.demand_type||d.description||'').toLowerCase();return /maintenance/.test(n)&&!/previous|opening|arrears|brought forward/.test(n)?'Maintenance Charges':/parking/.test(n)&&!/previous|opening|arrears|brought forward/.test(n)?'Parking Charges':/previous dues|opening balance|arrears|brought forward/.test(n)?'Previous-year dues':/cheque.?bounce|bounce charge/.test(n)?'Cheque Bounce Charges':/additional fund|special fund|capital contribution|special levy/.test(n)?'Additional Funds / Special Levies':/non.?occup/.test(n)?'Non-Occupancy Charges':'Other Charges'};
+    const groupKey=(d:any)=>{const n=demandCategory(d).toLowerCase();return /maintenance/.test(n)&&!/previous|opening|arrears|brought forward/.test(n)?'Maintenance Charges':/parking/.test(n)&&!/previous|opening|arrears|brought forward/.test(n)?'Parking Charges':/previous dues|opening balance|arrears|brought forward/.test(n)?'Previous-year dues':/cheque.?bounce|bounce charge/.test(n)?'Cheque Bounce Charges':/additional fund|special fund|capital contribution|special levy/.test(n)?'Additional Funds / Special Levies':/non.?occup/.test(n)?'Non-Occupancy Charges':'Other Charges'};
     const groups:Record<string,{amount:number;count:number}>={};
-    reportDemands.forEach((d:any)=>{const k=groupKey(d);groups[k]??={amount:0,count:0};groups[k].amount+=Number(d.total_demand||0);groups[k].count++;});
+    reportDemands.forEach((d:any)=>{const k=groupKey(d);groups[k]??={amount:0,count:0};groups[k].amount+=demandAmount(d);groups[k].count++;});
     const chargeData=Object.entries(groups).sort((a,b)=>b[1].amount-a[1].amount).slice(0,6).map(([name,v],i)=>({name,amount:v.amount,count:v.count,fill:COLORS[i%COLORS.length]}));
-    const sumGroup=(re:RegExp)=>reportDemands.filter((d:any)=>re.test(String(d.category_name||d.demand_type||d.description||''))).reduce((s:number,d:any)=>s+Number(d.total_demand||0),0);
-    const currentMaintenance=reportDemands.filter((d:any)=>/maintenance/i.test(String(d.category_name||d.demand_type||d.description||''))&&!/previous|opening|arrears|brought forward/i.test(String(d.category_name||d.demand_type||d.description||''))).reduce((s:number,d:any)=>s+Number(d.total_demand||0),0);
+    const sumGroup=(re:RegExp)=>reportDemands.filter((d:any)=>re.test(demandCategory(d))).reduce((s:number,d:any)=>s+demandAmount(d),0);
+    const currentMaintenance=reportDemands.filter((d:any)=>/maintenance/i.test(demandCategory(d))&&!/previous|opening|arrears|brought forward/i.test(demandCategory(d))).reduce((s:number,d:any)=>s+demandAmount(d),0);
     const previousDues=sumGroup(/previous dues|opening balance|arrears|brought forward/i);
     const chequeBounce=sumGroup(/cheque.?bounce|bounce charge/i);
     const additionalFunds=sumGroup(/additional fund|special fund|capital contribution|special levy/i);
-    const monthlyDemand=allMonths.map(m=>({month:m.split(' ')[0],demand:reportDemands.filter((d:any)=>String(d.demand_month||d.month||d.reporting_month||'').toLowerCase().replace(/-/g,' ').trim()===m.toLowerCase()).reduce((s:number,d:any)=>s+Number(d.total_demand||0),0),receipts:receiptRows.filter(t=>String(t.reportingMonth||t.month||'').toLowerCase().replace(/-/g,' ').trim()===m.toLowerCase()).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0)}));
+    const monthLabels=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
+    const monthlyDemand=monthLabels.map(m=>({month:m.split(' ')[0],demand:reportDemands.filter((d:any)=>monthKey(d.demand_month??d.month??d.reporting_month??d.demand_date??d.created_at)===m.toLowerCase()).reduce((s:number,d:any)=>s+demandAmount(d),0),receipts:receiptRows.filter(t=>monthKey(t.reportingMonth??t.month??t.date)===m.toLowerCase()).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0)}));
     const monthlyDemandAvailable=monthlyDemand.some(x=>x.demand>0);
     const top=dueRows.slice(0,5).map((r:any)=>({party:String(r.flat_no||r.member_name||'Unidentified'),amount:Number(r.net_outstanding)||0}));
     const outstanding=cumulativeOutstanding.reduce((s:number,r:any)=>s+Number(r.net_outstanding||0),0);
