@@ -265,13 +265,24 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         return partyName===groupLabel;
       }).map((d:any)=>({date:String(d.demand_date||d.created_at||d.month||''),particulars:'Demand / charge',voucher:String(d.demand_id||d.id||'Demand Register'),category:'Demand',movement:Number(d.total_demand||0),kind:'Demand'})):[];
       const events:any[]=[
-        ...groupTransactions.map(t=>({
-          date:String(t.date||''),particulars:String(t.description||t.party||t.categoryName||'Transaction'),
-          voucher:String(t.voucherNo||t.receiptNo||t.id||'—'),category:String(t.categoryName||'—'),
-          movement:isParty&&!isVendor?(t.type==='Receipt'?-Math.abs(Number(t.amount)||0):t.type==='Payment'?Math.abs(Number(t.amount)||0):(Number(t.amount)||0)):(Number(t.amount)||0),
-          kind:String(t.type||'Transaction')
-        })),
-        ...memberDemands
+        ...groupTransactions.map(t=>{
+          const rawAmount=Number(t.amount)||0;
+          const txKind=String(t.transactionClass||t.transaction_class||t.type||t.transactionType||'').toLowerCase();
+          const isContra=txKind.includes('contra');
+          const isAdjustment=txKind.includes('adjust');
+          // Member receivable convention: demand/payment increases debit; receipt reduces it.
+          // Other ledgers preserve the signed source amount: positive = credit/inflow, negative = debit/outflow.
+          const movement=isParty&&!isVendor
+            ? (String(t.type||'').toLowerCase()==='receipt'?-Math.abs(rawAmount):String(t.type||'').toLowerCase()==='payment'?Math.abs(rawAmount):rawAmount)
+            : rawAmount;
+          return {
+            date:String(t.date||''),particulars:String(t.description||t.party||t.categoryName||'Transaction'),
+            voucher:String(t.voucherNo||t.receiptNo||t.id||'—'),category:String(t.categoryName||'—'),
+            movement,contra:isContra?Math.abs(rawAmount):0,adjustment:isAdjustment?Math.abs(rawAmount):0,
+            column:isContra?'contra':isAdjustment?'adjustment':'normal',kind:txKind||'transaction'
+          };
+        }),
+        ...memberDemands.map((d:any)=>({...d,contra:0,adjustment:0,column:'normal'}))
       ].sort((a,b)=>a.date.localeCompare(b.date));
       const groupOpeningKnown=isParty
         ? memberFinancialBalances.some((x:any)=>String(x.member_name||'')===groupLabel||String(x.flat_no||'')===groupLabel)
@@ -279,26 +290,26 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
           ? openingBalances.some((x:any)=>String(x.accountName||'')===key||String(x.accountId||'')===key)
           : false;
       // Separate group header; no repeated group label on each detail row.
-      detailRows.push([('__GROUP__'+(partyType?partyType+' / ':'')+groupLabel),'','','','','','']);
+      detailRows.push([('__GROUP__'+(partyType?partyType+' / ':'')+groupLabel),'','','','','','','','']);
       let running=opening;
-      detailRows.push(['Opening Balance','—','Brought forward','—',groupOpeningKnown?moneyText(opening):'Not Recorded','—',groupOpeningKnown?moneyText(running):'Not Verified']);
+      detailRows.push(['Opening Balance','—','Brought forward','—',groupOpeningKnown?moneyText(Math.max(0,-opening)):'Not Recorded',groupOpeningKnown?moneyText(Math.max(0,opening)):'—','—','—',groupOpeningKnown?moneyText(running):'Not Verified']);
       events.forEach(e=>{
         running+=e.movement;
+        const isMember=isParty&&!isVendor;
         detailRows.push([
-          e.date||'—',
-          e.particulars,
-          e.voucher,
-          e.category,
-          e.movement>0?moneyText(e.movement):'—',
-          e.movement<0?moneyText(Math.abs(e.movement)):'—',
+          e.date||'—',e.particulars,e.voucher,e.category,
+          e.column==='normal'&&e.movement<0?moneyText(Math.abs(e.movement)):'—',
+          e.column==='normal'&&e.movement>0?moneyText(e.movement):'—',
+          e.column==='contra'?moneyText(e.contra):'—',
+          e.column==='adjustment'?moneyText(e.adjustment):'—',
           moneyText(running)
         ]);
       });
-      detailRows.push(['Closing Balance','—','Carried forward','—','—','—',groupOpeningKnown||events.length?moneyText(running):'Not Calculable']);
-      detailRows.push(['','','','','','','']);
+      detailRows.push(['Closing Balance','—','Carried forward','—','—','—','—','—',groupOpeningKnown||events.length?moneyText(running):'Not Calculable']);
+      detailRows.push(['','','','','','','','','']);
     });
 
-    return {title:isVendor?'Vendor / Payee Ledger — Detailed':selectedReport==='member-ledger'?'Member / Flat Owner Ledger — Detailed':(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Detailed',note:'Each party, account or category group is shown separately with its opening balance (where a verified source exists), dated transaction details and closing balance. Member demand entries are shown as charges and receipts reduce the receivable balance. Category groups show period movement; no unsupported opening balance is assumed.',headers:['Date','Particulars','Voucher / Receipt No.','Category','Debit / Payment','Credit / Receipt','Balance'],rows:detailRows};
+    return {title:isVendor?'Vendor / Payee Ledger — Detailed':selectedReport==='member-ledger'?'Member / Flat Owner Ledger — Detailed':(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Detailed',note:'Each party, account or category group is shown separately with its opening balance (where a verified source exists), dated transaction details and closing balance. Member demand entries are shown as charges and receipts reduce the receivable balance. Category groups show period movement; no unsupported opening balance is assumed.',headers:['Date','Particulars','Voucher / Receipt No.','Category','Debit / Payment','Credit / Receipt','Contra','Adjustment','Balance'],rows:detailRows};
    }
    case 'member-opening-balance-register': return {title:'Member Opening Balance Register — FY 2018–19',note:'Read-only presentation of the validated v_opening_balance_register view.',headers:[],rows:[]};
    case 'receipt-allocation-review': {
