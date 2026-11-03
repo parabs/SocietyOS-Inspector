@@ -314,10 +314,34 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       const opening=openingFor(key);
       const groupLabel=isParty?key.split('¦').slice(1).join('¦'):isAccount?key:key.split('¦').join(' / ');
       const partyType=isParty?key.split('¦')[0]:'';
+      const formatDemandMonth=(value:any,dateValue:any)=>{
+        const raw=String(value||'').trim();
+        const source=raw||String(dateValue||'').trim();
+        if(!source) return '';
+        const named=source.match(/^([A-Za-z]{3})[- /](\d{2}|\d{4})$/);
+        if(named) return named[1].charAt(0).toUpperCase()+named[1].slice(1).toLowerCase()+'-'+named[2].slice(-2);
+        const iso=source.match(/^(\d{4})-(\d{2})(?:-\d{2})?/);
+        if(iso){const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return monthNames[Number(iso[2])-1]+'-'+iso[1].slice(-2);}
+        const parsed=new Date(source);
+        return Number.isNaN(parsed.getTime())?source:parsed.toLocaleDateString('en-IN',{month:'short',year:'2-digit'}).replace(' ','-');
+      };
       const memberDemands=isParty&&!isVendor?reportDemands.filter((d:any)=>{
-        const partyName=String(d.member_name||d.party_name||d.flat_no||d.member_id||'');
-        return partyName===groupLabel;
-      }).map((d:any)=>({date:String(d.demand_date||d.created_at||d.month||''),particulars:'Demand / charge',voucher:String(d.demand_id||d.id||'Demand Register'),category:'Demand',movement:Number(d.total_demand||0),kind:'Demand'})):[];
+        const demandParty=String(
+          d.member_name||d.party_name||d.flat_no||
+          partyMaster.find((p:any)=>String(p.party_id||'')===String(d.party_id||''))?.party_name||
+          d.member_id||''
+        ).trim();
+        return demandParty.toLowerCase()===groupLabel.trim().toLowerCase();
+      }).map((d:any)=>{
+        const demandCategory=categoryMaster.find((c:any)=>
+          String(c.category_id||'')===String(d.category_id||'')||
+          String(c.category_name||'').toLowerCase()===String(d.category_name||'').toLowerCase()
+        );
+        const categoryName=String(d.category_name||demandCategory?.category_name||'Maintenance Charges');
+        const demandMonth=formatDemandMonth(d.demand_month||d.month||d.reporting_month,d.demand_date||d.bill_date);
+        const particulars=categoryName+(demandMonth?' for '+demandMonth:'');
+        return {date:String(d.demand_date||d.created_at||d.month||''),particulars,voucher:String(d.demand_id||d.id||'Demand Register'),category:categoryName,movement:Number(d.total_demand||d.demand_amount||0),kind:'Demand'};
+      }):[];
       const events:any[]=[
         ...groupTransactions.map(t=>{
           const rawAmount=Number(t.amount)||0;
