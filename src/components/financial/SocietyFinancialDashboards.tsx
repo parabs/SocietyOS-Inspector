@@ -271,8 +271,14 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         const partyName=isParty?key.split('¦').slice(1).join('¦'):'';
         const vals=months.map(m=>{
           const monthKey=normalizeMonth(m);
-          const ts=sourceTx.filter(t=>getKey(t)===key&&
-            normalizeMonth(t.reportingMonth||t.month||t.date)===monthKey);
+          const ts=sourceTx.filter(t=>{
+            const sameLedger=isParty
+              ? String(t.party||'').trim().toLowerCase()===partyName.trim().toLowerCase()
+              : getKey(t)===key;
+            // The context normalises the reporting month into t.month (e.g. "Jun 2018").
+            // Prefer that value; reportingMonth is the raw imported label (e.g. "Jun-2018").
+            return sameLedger&&normalizeMonth(t.month||t.reportingMonth||t.date)===monthKey;
+          });
           const rec=ts.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra')
             .reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);
           const pay=ts.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra')
@@ -280,7 +286,11 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
           const contra=ts.filter(t=>t.transactionClass==='Contra')
             .reduce((sum,t)=>sum+(Number(t.amount)||0),0);
           const dem=isParty?reportDemands.filter((d:any)=>{
-            const demandParty=String(d.member_name||d.party_name||d.flat_no||d.member_id||'').trim().toLowerCase();
+            const demandParty=String(
+              d.member_name||d.party_name||d.flat_no||
+              partyMaster.find((p:any)=>String(p.party_id||'')===String(d.party_id||''))?.party_name||
+              d.member_id||''
+            ).trim().toLowerCase();
             return demandParty===partyName.trim().toLowerCase()&&
               normalizeMonth(d.demand_month||d.month||d.reporting_month||d.demand_date||d.bill_date)===monthKey;
           }).reduce((sum,d)=>sum+Number(d.total_demand??d.demand_amount??0),0):0;
@@ -365,15 +375,9 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         running+=e.movement;
         const debit=isMemberLedger?e.movement>0:e.movement<0;
         const credit=isMemberLedger?e.movement<0:e.movement>0;
-        const transactionParticulars=isMemberLedger
-          ? (e.kind==='Demand'
-              ? String(e.particulars)+' — Member to Pay'
-              : String(e.kind).toLowerCase().includes('receipt')
-                ? String(e.particulars)+' — Receipt Received'
-                : e.movement<0
-                  ? String(e.particulars)+' — Credit Adjustment'
-                  : String(e.particulars))
-          : String(e.particulars);
+        // Keep transaction particulars exactly as recorded. Member-to-pay / credit wording
+        // belongs only on Opening Balance and Closing Balance rows.
+        const transactionParticulars=String(e.particulars);
         const categoryParticulars=isCategory
           ? String(e.particulars)+' — '+(e.movement<0?'Expense / Debit movement':e.movement>0?'Income / Credit movement':'No movement')
           : transactionParticulars;
