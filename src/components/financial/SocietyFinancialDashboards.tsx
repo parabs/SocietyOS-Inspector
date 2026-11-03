@@ -810,7 +810,7 @@ const filteredReceipts=receiptRows.filter((r:any)=>(receiptFyFilter==='All FY'||
 const sum=(key:string)=>filteredReceipts.reduce((v:number,r:any)=>v+Number(r[key]||0),0);
 const cash=filteredReceipts.filter((r:any)=>/cash/i.test(r.paymentMode)).reduce((v:number,r:any)=>v+r.amount,0);
 const nonCash=filteredReceipts.filter((r:any)=>r.paymentMode&&!/cash/i.test(r.paymentMode)).reduce((v:number,r:any)=>v+r.amount,0);
-return <>{<div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border bg-slate-50 p-3">
+return <><div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border bg-slate-50 p-3">
 <label className="text-[11px]">Financial Year<select value={receiptFyFilter} onChange={e=>setReceiptFyFilter(e.target.value)} className="mt-1 block rounded border bg-white px-2 py-2"><option>All FY</option>{Array.from(new Set(receiptRows.map((r:any)=>r.fy).filter(Boolean))).sort().map((v:string)=><option key={v}>{v}</option>)}</select></label>
 <label className="text-[11px]">Reporting Month<select value={receiptReportingMonthFilter} onChange={e=>setReceiptReportingMonthFilter(e.target.value)} className="mt-1 block rounded border bg-white px-2 py-2"><option>All months</option>{Array.from(new Set(receiptRows.map((r:any)=>r.reportingMonth).filter(Boolean))).sort().map((v:string)=><option key={v}>{v}</option>)}</select></label>
 <label className="text-[11px]">Demand Month<select value={receiptDemandMonthFilter} onChange={e=>setReceiptDemandMonthFilter(e.target.value)} className="mt-1 block rounded border bg-white px-2 py-2"><option>All months</option>{Array.from(new Set(receiptRows.map((r:any)=>r.demandMonth).filter(Boolean))).sort().map((v:string)=><option key={v}>{v}</option>)}</select></label>
