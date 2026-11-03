@@ -16,6 +16,7 @@ import { MonthlyReconciliation } from './components/verification/MonthlyReconcil
 import { SocietyFinancialDashboards } from './components/financial/SocietyFinancialDashboards';
 import { LedgerReports } from './components/financial/LedgerReports';
 import { SettingsView } from './components/admin/SettingsView';
+import { DataManagement } from './components/admin/DataManagement';
 
 const MainContent: React.FC = () => {
   const { currentScreen } = useVerification();
@@ -46,8 +47,10 @@ const MainContent: React.FC = () => {
     case 'reports':
       return <SocietyFinancialDashboards screen={currentScreen} />;
 
-    case 'settings':
     case 'data-management':
+      return <DataManagement />;
+
+    case 'settings':
     case 'user-access':
       return <SettingsView />;
 
