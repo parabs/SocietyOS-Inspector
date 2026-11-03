@@ -291,21 +291,45 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
           : false;
       // Separate group header; no repeated group label on each detail row.
       detailRows.push([('__GROUP__'+(partyType?partyType+' / ':'')+groupLabel),'','','','','','','','']);
+      const isMemberLedger=isParty&&!isVendor;
+      const memberBalanceMeaning=(value:number)=>value>0?'Member owes Society':value<0?'Credit / Advance with Society':'Settled — Nil balance';
+      const balanceDisplay=(value:number)=>isMemberLedger
+        ? moneyText(Math.abs(value))+' '+(value>0?'Dr':value<0?'Cr':'')
+        : moneyText(value);
       let running=opening;
-      detailRows.push(['Opening Balance','—','Brought forward','—',groupOpeningKnown?moneyText(Math.max(0,-opening)):'Not Recorded',groupOpeningKnown?moneyText(Math.max(0,opening)):'—','—','—',groupOpeningKnown?moneyText(running):'Not Verified']);
+      const openingParticulars=isMemberLedger
+        ? 'Opening Balance — '+(groupOpeningKnown?memberBalanceMeaning(opening):'Not Verified')
+        : 'Opening Balance';
+      detailRows.push([
+        openingParticulars,'—','Brought forward','—',
+        groupOpeningKnown?(isMemberLedger?(opening>0?moneyText(opening):'—'):(opening<0?moneyText(Math.abs(opening)):'—')):'Not Recorded',
+        groupOpeningKnown?(isMemberLedger?(opening<0?moneyText(Math.abs(opening)):'—'):(opening>0?moneyText(opening):'—')):'—',
+        '—','—',groupOpeningKnown?balanceDisplay(running):'Not Verified'
+      ]);
       events.forEach(e=>{
         running+=e.movement;
-        const isMember=isParty&&!isVendor;
+        const debit=isMemberLedger?e.movement>0:e.movement<0;
+        const credit=isMemberLedger?e.movement<0:e.movement>0;
+        const detailParticulars=isMemberLedger&&e.kind==='Demand'
+          ? e.particulars+' — Payable by member'
+          : e.particulars;
         detailRows.push([
-          e.date||'—',e.particulars,e.voucher,e.category,
-          e.column==='normal'&&e.movement<0?moneyText(Math.abs(e.movement)):'—',
-          e.column==='normal'&&e.movement>0?moneyText(e.movement):'—',
+          e.date||'—',detailParticulars,e.voucher,e.category,
+          e.column==='normal'&&debit?moneyText(Math.abs(e.movement)):'—',
+          e.column==='normal'&&credit?moneyText(Math.abs(e.movement)):'—',
           e.column==='contra'?moneyText(e.contra):'—',
           e.column==='adjustment'?moneyText(e.adjustment):'—',
-          moneyText(running)
+          balanceDisplay(running)
         ]);
       });
-      detailRows.push(['Closing Balance','—','Carried forward','—','—','—','—','—',groupOpeningKnown||events.length?moneyText(running):'Not Calculable']);
+      const closingKnown=groupOpeningKnown||events.length>0;
+      const closingParticulars=isMemberLedger
+        ? 'Closing Balance — '+(closingKnown?memberBalanceMeaning(running):'Not Calculable')
+        : 'Closing Balance';
+      detailRows.push([
+        closingParticulars,'—','Carried forward','—','—','—','—','—',
+        closingKnown?balanceDisplay(running):'Not Calculable'
+      ]);
       detailRows.push(['','','','','','','','','']);
     });
 
