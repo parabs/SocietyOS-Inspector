@@ -163,7 +163,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const ReportLink=({id,label,category}:any)=><button onClick={()=>openReport(id,category)} className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[11px] font-semibold text-blue-800 hover:bg-blue-100">{label||('Open '+(reportCatalog.find(r=>r.id===id)?.name||'report'))} →</button>;
  const selectedReportExport=()=>{
   if(screen!=='reports')return {title:'Transaction Register — Connected Records',rows:transactionExportRows};
-  const table=document.querySelector('section table');
+  const table=document.querySelector('#selected-report-content table');
   if(!table)return {title:reportCatalog.find(r=>r.id===selectedReport)?.name||'Selected Report',rows:[] as any[][]};
   const tableRows=Array.from(table.querySelectorAll('tr')).map(tr=>Array.from(tr.querySelectorAll('th,td')).map(cell=>(cell as HTMLElement).innerText.trim()));
   const title=selectedReport==='demand-register'?'Demand Register':selectedReport==='member-opening-balance-register'?'Member Opening Balance Register — FY 2018–19':reportData.title;
@@ -776,7 +776,14 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      </section>)}
     </nav>
    </aside>
-   <div className="min-w-0 space-y-4">
+   <div id="selected-report-content" className="min-w-0 space-y-4">
+    <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+     <button onClick={()=>void refetchAll()} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><RefreshCw className="h-4 w-4"/>Refresh</button>
+     <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Print</button>
+     <button onClick={exportRows} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500"><Download className="h-4 w-4"/>CSV</button>
+     <button onClick={exportTxt} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">TXT</button>
+     <button onClick={exportPdf} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">PDF</button>
+    </div>
     {!(screen==='reports'&&(selectedReport==='member-opening-balance-register'||selectedReport==='demand-register'))&&filterBar}
   {screen==='reports'&&<>
    {selectedReport!=='member-opening-balance-register'&&selectedReport!=='demand-register'&&<div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
@@ -795,7 +802,7 @@ const rows=(demandRegister||[]).map((d:any)=>{const party=partyMaster.find((p:an
 const filteredRows=rows.filter((r:any)=>(demandFyFilter==='All FY'||r.fy===demandFyFilter)&&(demandMonthFilter==='All months'||r.month===demandMonthFilter)&&(demandPartyClassFilter==='All classifications'||r.classification===demandPartyClassFilter)&&(demandGroupFilter==='All demand groups'||r.group===demandGroupFilter)&&(demandPaymentStatusFilter==='All statuses'||r.status===demandPaymentStatusFilter)&&(!demandPartySearch||r.party.toLowerCase().includes(demandPartySearch.toLowerCase().trim())));
 const total=(k:string)=>filteredRows.reduce((s:number,r:any)=>s+Number(r[k]||0),0);const shortCount=filteredRows.filter((r:any)=>Number(r.paid)>0&&Number(r.outstanding)>0).length;const excessCount=filteredRows.filter((r:any)=>Number(r.paid)>0&&Number(r.outstanding)<0).length;const short=filteredRows.reduce((s:number,r:any)=>s+Math.max(0,r.outstanding),0);
 const exp=[['Sr. No.','Financial Year','Demand Month','Demand Date','Party Name','Party Classification','Demand Group','Gross / Net Demand','Paid Amount','Adjustments','Outstanding','Paid Month(s)','Payment Status'],...filteredRows.map((r:any,i:number)=>[i+1,r.fy,r.month,r.date,r.party,r.classification,r.group,r.demand,r.paid,r.adjustments,r.outstanding,r.paidMonths,r.status])];
-return <Panel title="RPT-08 · Demand Register" action={<button onClick={()=>downloadCsv('RPT-08-Demand-Register.csv',exp)} className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Export CSV</button>}>
+return <Panel title="RPT-08 · Demand Register">
 <div className="mb-4 border-b-2 border-slate-800 pb-3 text-center"><h2 className="text-base font-bold uppercase tracking-wide text-slate-900">Pearl Meadows 'C' Type 'C' Wing Chs Ltd</h2><p className="mt-1 text-xs font-semibold text-slate-700">Regd. No. TNA/KLN/HSG(TC) 27051/2014-15/YEAR 2014</p><h3 className="mt-3 text-sm font-bold uppercase text-slate-900">Demand Register</h3><p className="mt-1 text-[11px] text-slate-600">Financial Year: {demandFyFilter==='All FY'?'All Financial Years':demandFyFilter}</p></div>
 <div className="mb-3 grid grid-cols-2 gap-2 xl:grid-cols-4"><Card label="Total Demands" value={fmt(total('demand'))} detail={num(filteredRows.length)+' demand records'} icon={FileText}/><Card label="Total Paid" value={fmt(total('paid'))} detail="Mapped receipt transactions" icon={Banknote} tone="green"/><Card label="Total Pending" value={fmt(short)} detail="Positive outstanding" icon={AlertTriangle} tone="amber"/><Card label="Payment Status Summary" value={<span className="text-sm">Part-paid demands: {shortCount}<br/>Demands with excess payments: {excessCount}</span>} detail="Demand-wise payment position" icon={ArrowLeftRight}/></div>
 <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border bg-slate-50 p-3">
