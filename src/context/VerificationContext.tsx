@@ -486,6 +486,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             paymentMode: row.payment_mode || '',
             chequeNo: row.cheque_no || undefined,
             reportingMonth: row.reporting_month || '',
+            demandId: row.demand_id || '',
             amount: Number(row.amount || 0),
             voucherNo: voucherRef,
             receiptNo: undefined,
