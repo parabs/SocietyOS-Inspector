@@ -206,6 +206,7 @@ export interface DbCategoryMaster {
   category_name?: string;
   /** Optional reporting group when supplied by the connected category master. */
   category_group?: string;
+  demand_group?: string;
   type?: 'Income' | 'Expense' | 'Asset' | 'Liability' | string;
   description?: string;
 }
