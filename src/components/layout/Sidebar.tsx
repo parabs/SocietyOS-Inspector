@@ -272,7 +272,7 @@ export const Sidebar: React.FC = () => {
               onClick={() => toggleGroup('reports')}
               className="w-full flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 hover:text-slate-200 cursor-pointer"
             >
-              <span>Reports</span>
+              <span>Reports &amp; Registers</span>
               {openGroups.reports ? (
                 <ChevronDown className="w-3.5 h-3.5" />
               ) : (
@@ -291,15 +291,7 @@ export const Sidebar: React.FC = () => {
                     <span className="truncate">Reports &amp; Registers</span>
                   </div>
                 </button>
-                <button
-                  onClick={() => handleNavClick('ledger-reports')}
-                  className={navItemClass('ledger-reports')}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <FileText className="w-4 h-4 shrink-0" />
-                    <span className="truncate">Ledger Reports</span>
-                  </div>
-                </button>
+
               </div>
             )}
           </div>

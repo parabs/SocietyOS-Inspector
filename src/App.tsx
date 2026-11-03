@@ -14,16 +14,12 @@ import { OpeningBalanceVerification } from './components/verification/OpeningBal
 import { TransactionVerification } from './components/verification/TransactionVerification';
 import { MonthlyReconciliation } from './components/verification/MonthlyReconciliation';
 import { SocietyFinancialDashboards } from './components/financial/SocietyFinancialDashboards';
-import { LedgerReports } from './components/financial/LedgerReports';
 import { SettingsView } from './components/admin/SettingsView';
 
 const MainContent: React.FC = () => {
   const { currentScreen } = useVerification();
 
   switch (currentScreen) {
-    case 'ledger-reports':
-      return <LedgerReports />;
-
     case 'verification-dashboard':
       return <VerificationDashboard />;
 
@@ -44,7 +40,8 @@ const MainContent: React.FC = () => {
     case 'bank-reconciliation':
     case 'observations-actions':
     case 'reports':
-      return <SocietyFinancialDashboards screen={currentScreen} />;
+    case 'ledger-reports':
+      return <SocietyFinancialDashboards screen="reports" />;
 
     case 'settings':
     case 'data-management':
