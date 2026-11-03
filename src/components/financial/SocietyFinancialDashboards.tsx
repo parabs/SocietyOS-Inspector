@@ -294,7 +294,19 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       const memberBalanceMeaning=(value:number)=>value>0?'Member to Pay':value<0?'Member Credit Balance':'No Balance Due';
       const balanceDisplay=(value:number)=>isMemberLedger
         ? moneyText(Math.abs(value))+(value>0?' Dr':value<0?' Cr':'')
-        : moneyText(value);
+        : isCategory
+          ? moneyText(Math.abs(value))+(value>0?' Net Debit':value<0?' Net Credit':'')
+          : moneyText(value);
+      const safeText=(value:unknown,fallback='—')=>{
+        if(value===null||value===undefined||value==='') return fallback;
+        if(typeof value==='string'||typeof value==='number'||typeof value==='boolean') return String(value);
+        if(typeof value==='object'){
+          const item=value as Record<string,unknown>;
+          const candidate=item.label??item.name??item.value??item.amount??item.description;
+          return candidate===undefined?fallback:safeText(candidate,fallback);
+        }
+        return fallback;
+      };
       let running=opening;
       const openingParticulars=isMemberLedger
         ? 'Opening Balance — '+(groupOpeningKnown?memberBalanceMeaning(opening):'Not Verified')
@@ -318,17 +330,22 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
                   ? String(e.particulars)+' — Credit Adjustment'
                   : String(e.particulars))
           : String(e.particulars);
+        const categoryParticulars=isCategory
+          ? String(e.particulars)+' — '+(e.movement<0?'Expense / Debit movement':e.movement>0?'Income / Credit movement':'No movement')
+          : transactionParticulars;
         detailRows.push([
-          e.date||'—',transactionParticulars,e.voucher,e.category,
+          safeText(e.date),safeText(categoryParticulars),safeText(e.voucher),safeText(e.category),
           debit?moneyText(Math.abs(e.movement)):'—',
           credit?moneyText(Math.abs(e.movement)):'—',
-          balanceDisplay(running)
+          safeText(balanceDisplay(running))
         ]);
       });
       const closingKnown=groupOpeningKnown||events.length>0;
       const closingParticulars=isMemberLedger
         ? 'Closing Balance — '+(closingKnown?memberBalanceMeaning(running):'Not Calculable')
-        : 'Closing Balance';
+        : isCategory
+          ? 'Closing Net Movement — '+(running>0?'Net Debit':running<0?'Net Credit':'Nil Movement')
+          : 'Closing Balance';
       detailRows.push([
         '—',closingParticulars,'Carried forward','—','—','—',
         closingKnown?balanceDisplay(running):'Not Calculable'
