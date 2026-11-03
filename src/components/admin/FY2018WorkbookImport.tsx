@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { AlertTriangle, CheckCircle2, Database, FileSpreadsheet, Loader2, UploadCloud } from 'lucide-react';
 import { supabaseClient } from '../../services/supabaseClient';
@@ -74,6 +74,8 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
   const [authMessage, setAuthMessage] = useState('');
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [preflightMessage, setPreflightMessage] = useState('');
+  // Synchronous guard prevents rapid double-clicks before React applies the busy state.
+  const importLock = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -349,7 +351,8 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
   };
 
   const runImport = async () => {
-    if (!payload || !fileName || selectedTables.length === 0) return;
+    if (importLock.current || busy || !payload || !fileName || selectedTables.length === 0) return;
+    importLock.current = true;
     setBusy(true);
     setResults([]);
     setComplete(false);
@@ -444,6 +447,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       setPreflightMessage('Import stopped safely. Review the table progress and error before retrying.');
       setComplete(false);
     } finally {
+      importLock.current = false;
       setBusy(false);
     }
   };
