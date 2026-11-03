@@ -52,13 +52,6 @@ const getFormulaId = (value: unknown, prefix: string, sheetRow: number, label: u
   if (clean(label) === null) return null;
   return `${prefix}-${String(sheetRow - 4).padStart(4, '0')}`;
 };
-const sourceMeta = (notes: unknown, sourceLookup: Map<string, string>) => {
-  const text = String(notes ?? '');
-  const file = text.match(/Source file:\s*([^|]+)/i)?.[1]?.trim();
-  const sheet = text.match(/(?:Sheet|Source sheet):\s*([^|]+)/i)?.[1]?.trim() || 'Transactions';
-  const row = text.match(/Row:\s*(\d+)/i)?.[1];
-  return { source_id: file ? sourceLookup.get(file) ?? null : null, source_sheet: sheet, source_row: row ? Number(row) : null };
-};
 const batches = <T,>(items: T[], size = BATCH_SIZE): T[][] => {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
@@ -128,7 +121,6 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       source_quality_notes: str(r.Source_Quality_Notes),
       pending_activities: str(r.Pending_Activities),
     })).filter(r => r.source_id && r.original_file_name);
-    const sourceLookup = new Map<string, string>(sourcePayload.filter(r => r.original_file_name).map(r => [r.original_file_name!, r.source_id!] as [string, string]));
     const sourceMonthLookup = new Map<string, string>(sourcePayload.filter(r => r.reporting_month).map(r => [r.reporting_month!.trim().toLowerCase(), r.source_id!] as [string, string]));
 
     const balanceRows = rowsFrom(wb, 'BALANCE_REGISTER');
