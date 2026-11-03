@@ -290,7 +290,6 @@ export const Sidebar: React.FC = () => {
                     <Files className="w-4 h-4 shrink-0" />
                     <span className="truncate">Reports &amp; Registers</span>
                   </div>
-                  <Lock className="w-3 h-3 text-slate-500" />
                 </button>
               </div>
             )}
