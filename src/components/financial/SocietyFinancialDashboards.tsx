@@ -267,7 +267,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       const events:any[]=[
         ...groupTransactions.map(t=>{
           const rawAmount=Number(t.amount)||0;
-          const txKind=String(t.transactionClass||t.transaction_class||t.type||t.transactionType||'').toLowerCase();
+          const txKind=String(t.transactionClass||t.type||'').toLowerCase();
           const isContra=txKind.includes('contra');
           const isAdjustment=txKind.includes('adjust');
           // Member receivable convention: demand/payment increases debit; receipt reduces it.
