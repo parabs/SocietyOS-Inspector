@@ -217,7 +217,7 @@ export const Sidebar: React.FC = () => {
 
                 <button
                   onClick={() => handleNavClick('transactions')}
-                  className={navItemClass('data-management')}
+                  className={navItemClass('transactions')}
                 >
                   <div className="flex items-center gap-2.5 truncate">
                     <Database className="w-4 h-4 shrink-0" />
