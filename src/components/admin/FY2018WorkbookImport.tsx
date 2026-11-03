@@ -129,6 +129,15 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       pending_activities: str(r.Pending_Activities),
     })).filter(r => r.source_id && r.original_file_name);
     const sourceLookup = new Map<string, string>(sourcePayload.filter(r => r.original_file_name).map(r => [r.original_file_name!, r.source_id!] as [string, string]));
+    const sourceMonthLookup = new Map<string, string>(sourcePayload.filter(r => r.reporting_month).map(r => [r.reporting_month!.trim().toLowerCase(), r.source_id!] as [string, string]));
+
+    const balanceRows = rowsFrom(wb, 'BALANCE_REGISTER');
+    const balancePayload = balanceRows.map(r => ({
+      opening_balance_id: str(r.Balance_Register_ID), party_id: str(r.Party_ID),
+      financial_year: str(r['Finanical Year']) || str(r['Financial Year']),
+      opening_balance: num(r['Opening Balance']), source_id: null,
+      verification_status: 'Pending', notes: str(r.Notes),
+    })).filter(r => r.opening_balance_id && r.party_id && r.financial_year && r.opening_balance !== null);
 
     const flatRows = rowsFrom(wb, 'FLAT_OWNER_MASTER');
     const flatPayload = flatRows.map(r => ({
@@ -176,6 +185,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       category_id: str(r.Category_ID),
       category_name: str(r.Category_Name),
       category_group: str(r.Category_Group),
+      demand_group: str(r['Demand Group']),
       transaction_type: str(r.Transaction_Type),
       active: boolFromYes(r.Active),
       notes: str(r.Notes),
@@ -193,8 +203,9 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
     })).filter((r: any) => r.rule_id && r.rule_name);
 
     const transactionRows = rowsFrom(wb, 'TRANSACTIONS');
-    const transactionPayload = transactionRows.map(r => {
-      const meta = sourceMeta(r.Notes, sourceLookup);
+    const transactionPayload = transactionRows.map((r, index) => {
+      const reportingMonth = str(r['Reporting Month']);
+      const sourceId = reportingMonth ? sourceMonthLookup.get(reportingMonth.trim().toLowerCase()) ?? null : null;
       return {
         transaction_id: str(r.Transaction_ID),
         reporting_month: str(r['Reporting Month']),
@@ -214,29 +225,23 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
         bank_verified: str(r.Bank_Verified) || 'Pending',
         verified: str(r.Verified),
         audit_notes: str(r.Audit_Notes),
-        source_id: meta.source_id,
-        source_sheet: meta.source_sheet,
-        source_row: meta.source_row,
+        demand_id: str(r.Demand_ID),
+        source_id: sourceId, source_sheet: 'TRANSACTIONS', source_row: index + 5,
       };
     }).filter(r => r.transaction_id && r.amount !== null);
 
-    const demandRows = rowsFrom(wb, 'DEMAND_REGISTER');
-    const demandPayload = demandRows.map(r => ({
-      demand_id: str(r.Demand_ID),
-      financial_year: str(r.Financial_Year),
-      demand_month: str(r.Demand_Month),
-      demand_date: isoDate(r.Demand_Date),
-      due_date: isoDate(r.Due_Date),
-      party_id: str(r.Party_ID),
-      rule_id: str(r.Rule_ID),
-      category_id: str(r.Category_ID),
-      demand_amount: num(r.Demand_Amount),
-      notes: [str(r.Notes), str(r.Party_Name) ? `Party name: ${str(r.Party_Name)}` : null,
-        num(r.Adjustment_Amount) !== null ? `Adjustment amount: ${num(r.Adjustment_Amount)}` : null,
-        num(r.Net_Demand) !== null ? `Net demand: ${num(r.Net_Demand)}` : null,
-        num(r.Paid_Amount) !== null ? `Paid amount: ${num(r.Paid_Amount)}` : null,
-        num(r.Outstanding_Amount) !== null ? `Outstanding amount: ${num(r.Outstanding_Amount)}` : null,
-        str(r.Status) ? `Status: ${str(r.Status)}` : null].filter(Boolean).join(' | ') || null,
+    const demandMatrix = XLSX.utils.sheet_to_json<any[]>(wb.Sheets.DEMAND_REGISTER, { header: 1, defval: null, raw: true });
+    const demandPayload = demandMatrix.slice(4).map((r: any[]) => ({
+      demand_id: str(r[1]),
+      financial_year: str(r[2]), demand_month: str(r[3]), demand_date: isoDate(r[4]), due_date: isoDate(r[5]),
+      party_id: str(r[6]), rule_id: str(r[8]), category_id: str(r[9]), demand_amount: num(r[11]), paid_month: str(r[19]),
+      notes: [str(r[17]) ? `Notes 1: ${str(r[17])}` : null, str(r[18]) ? `Notes 2: ${str(r[18])}` : null,
+        str(r[7]) ? `Party name: ${str(r[7])}` : null,
+        num(r[12]) !== null ? `Adjustment amount: ${num(r[12])}` : null,
+        num(r[13]) !== null ? `Net demand: ${num(r[13])}` : null,
+        num(r[14]) !== null ? `Paid amount: ${num(r[14])}` : null,
+        num(r[15]) !== null ? `Outstanding amount: ${num(r[15])}` : null,
+        str(r[16]) ? `Status: ${str(r[16])}` : null].filter(Boolean).join(' | ') || null,
     })).filter(r => r.demand_id && r.party_id && r.demand_amount !== null);
 
 
@@ -294,11 +299,12 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
     if (transactionPayload.length === 0) throw new Error('No valid transaction rows were found in the TRANSACTIONS sheet.');
     const missingAmounts = transactionRows.filter(r => str(r.Transaction_ID) && num(r.Amount) === null);
     if (missingAmounts.length) throw new Error(`${missingAmounts.length} transaction rows have a Transaction_ID but no valid Amount. Correct the workbook before importing.`);
-    const missingSources = transactionPayload.filter(r => r.source_id === null || r.source_row === null);
-    if (missingSources.length) throw new Error(`${missingSources.length} transactions do not resolve to a Source_Register row and source row number. Correct the source notes before importing.`);
+    const missingSources = transactionPayload.filter(r => r.source_id === null);
+    if (missingSources.length) throw new Error(`${missingSources.length} transactions have a Reporting Month that does not match SOURCE_REGISTER. Correct the month mapping before importing.`);
 
     return {
       source_register: sourcePayload,
+      member_opening_balances: balancePayload,
       flat_owner_master: flatPayload,
       account_master: accountPayload,
       category_master: categoryPayload,
@@ -328,6 +334,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       setPayload(data);
       const nextPlan: ImportPlanRow[] = [
         { table: 'source_register', count: data.source_register.length, note: 'Source files and review status' },
+        { table: 'member_opening_balances', count: data.member_opening_balances.length, note: 'Opening balances by party and financial year' },
         { table: 'flat_owner_master', count: data.flat_owner_master.length, note: 'Owner/asset records' },
         { table: 'account_master', count: data.account_master.length, note: 'Bank, cash and deposit accounts' },
         { table: 'category_master', count: data.category_master.length, note: 'Transaction categories' },
@@ -486,7 +493,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
           </div>
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
             <p className="font-semibold">Import order: source register → masters → demands/opening balances → transactions.</p>
-            <p className="mt-1 text-xs">Blank opening balances are skipped. Import stops at the first table error so you can fix permissions or schema issues before retrying.</p>
+            <p className="mt-1 text-xs">Opening balances are imported by party and financial year. Negative demand amounts are preserved. Blank Demand_ID values remain unmapped. Import stops at the first table error.</p>
           </div>
           <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center cursor-pointer hover:border-blue-400">
             <UploadCloud className="w-8 h-8 text-blue-600" />
