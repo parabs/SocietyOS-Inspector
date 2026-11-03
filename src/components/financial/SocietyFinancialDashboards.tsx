@@ -55,7 +55,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const [receiptFyFilter,setReceiptFyFilter]=useState('All FY'); const [receiptReportingMonthFilter,setReceiptReportingMonthFilter]=useState('All months'); const [receiptDemandMonthFilter,setReceiptDemandMonthFilter]=useState('All months'); const [receiptPartyClassFilter,setReceiptPartyClassFilter]=useState('All classifications'); const [receiptModeFilter,setReceiptModeFilter]=useState('All modes'); const [receiptGroupFilter,setReceiptGroupFilter]=useState('All category groups'); const [receiptCategoryFilter,setReceiptCategoryFilter]=useState('All categories'); const [receiptAccountFilter,setReceiptAccountFilter]=useState('All accounts'); const [receiptPartySearch,setReceiptPartySearch]=useState('');
  const [contraAccountFilter,setContraAccountFilter]=useState('All accounts'); const [contraPartyTypeFilter,setContraPartyTypeFilter]=useState('All types'); const [contraMonthFilter,setContraMonthFilter]=useState('All months'); const [contraSearch,setContraSearch]=useState('');
  const [paymentFyFilter,setPaymentFyFilter]=useState('All FY'); const [paymentReportingMonthFilter,setPaymentReportingMonthFilter]=useState('All months'); const [paymentPartyClassFilter,setPaymentPartyClassFilter]=useState('All classifications'); const [paymentModeFilter,setPaymentModeFilter]=useState('All modes'); const [paymentGroupFilter,setPaymentGroupFilter]=useState('All category groups'); const [paymentCategoryFilter,setPaymentCategoryFilter]=useState('All categories'); const [paymentAccountFilter,setPaymentAccountFilter]=useState('All accounts'); const [paymentPartySearch,setPaymentPartySearch]=useState('');
- const [reportCategory,setReportCategory]=useState('Debtors & Parties');
+ const [reportCategory,setReportCategory]=useState('Ledgers');
  const reportCatalog=[
   {id:'member-opening-balance-register',name:'Member Opening Balance Register',category:'Debtors & Parties',description:'Approved imported opening balances, FY demand, receipts, adjustments and closing outstanding from the validated Supabase view'},
   {id:'party-balances',name:'Debtors — All Parties',category:'Debtors & Parties',description:'Party type, contact, opening, demand, receipts and closing receivable'},
@@ -99,7 +99,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   {id:'payment-mode-quality',name:'Payment Mode Data Quality',category:'Audit & Governance',description:'Missing, inconsistent or unrecognized payment modes by transaction'},
   {id:'transaction-type-quality',name:'Transaction Type Data Quality',category:'Audit & Governance',description:'Missing or unexpected transaction types and counts / amounts'}
  ];
- const reportCategories=['All Reports','Debtors & Parties','Demands & Payments','Ledgers','Financial Statements','Registers','Audit & Governance'];
+ const reportCategories=['All Reports','Financial Statements','Registers','Ledgers','Debtors & Parties','Demands & Payments','Audit & Governance'];
  const categoryGroups=Array.from(new Set([...categoryMaster.map((x:any)=>String(x.category_group||'').trim()),...transactions.map((t:any)=>String(t.categoryGroup||'').trim())].filter(Boolean))).sort();
  const partyTypes=Array.from(new Set([...[],...partyMaster.map((x:any)=>String(x.party_type||x.party_type_name||'').trim())].filter(Boolean))).sort();
  const reportNumbers:Record<string,string>={'member-opening-balance-register':'40','party-balances':'01','member-ledger':'02','vendor-ledger':'03','demand-summary':'04','monthly-demands':'05','monthly-payments':'06','monthly-flat-balance':'07','demand-register':'08','receipts-payments':'08','income-expense':'09','balance-sheet':'10','trial-balance':'11','monthly-summary':'12','cashbook':'13','receipts':'14','payments':'15','largest-payments-anomalies':'34','bank-recon':'16','expense-analysis':'17','missing-docs':'18','statutory':'19','rectification':'20','party-ledger-summary':'21','party-ledger-monthly':'22','party-ledger-detail':'23','account-ledger-summary':'24','account-ledger-monthly':'25','account-ledger-detail':'26','category-ledger-summary':'27','category-ledger-monthly':'28','category-ledger-detail':'29','receipt-allocation-review':'30','opening-balance-review':'31','adjustments-contra':'32','mapping-exceptions':'33','unidentified-parties':'35','unidentified-accounts':'36','unidentified-categories':'37','payment-mode-quality':'38','transaction-type-quality':'39'};
@@ -779,10 +779,24 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      </section>)}
     </nav>
    </aside>
+   <style>{`
+    @media print {
+      @page { size: A4 landscape; margin: 12mm; }
+      body { background: #fff !important; color: #000 !important; }
+      body * { visibility: hidden !important; }
+      #selected-report-content, #selected-report-content * { visibility: visible !important; }
+      #selected-report-content { position: absolute !important; inset: 0 !important; width: 100% !important; max-width: none !important; }
+      #selected-report-content table { width: 100% !important; border-collapse: collapse !important; font-size: 9pt !important; }
+      #selected-report-content th, #selected-report-content td { border: 1px solid #777 !important; padding: 5px !important; color: #000 !important; }
+      #selected-report-content th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      #selected-report-content button, #selected-report-content input, #selected-report-content select { display: none !important; }
+      #selected-report-content section, #selected-report-content .rounded-xl { break-inside: avoid; box-shadow: none !important; }
+    }
+   `}</style>
    <div id="selected-report-content" className="min-w-0 space-y-4">
     <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
      <button onClick={()=>void refetchAll()} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><RefreshCw className="h-4 w-4"/>Refresh</button>
-     <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Print</button>
+     <button onClick={()=>window.print()} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Print</button>
      <button onClick={exportRows} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500"><Download className="h-4 w-4"/>CSV</button>
      <button onClick={exportTxt} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">TXT</button>
      <button onClick={exportPdf} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">PDF</button>
