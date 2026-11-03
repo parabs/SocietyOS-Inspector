@@ -68,6 +68,7 @@ export type ScreenId =
   | 'ledger-reports'
   | 'settings'
   | 'data-management'
+  | 'transactions'
   | 'user-access';
 
 export interface SupabaseSyncState {
