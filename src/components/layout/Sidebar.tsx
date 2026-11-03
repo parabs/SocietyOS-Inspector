@@ -291,6 +291,15 @@ export const Sidebar: React.FC = () => {
                     <span className="truncate">Reports &amp; Registers</span>
                   </div>
                 </button>
+                <button
+                  onClick={() => handleNavClick('ledger-reports')}
+                  className={navItemClass('ledger-reports')}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <FileText className="w-4 h-4 shrink-0" />
+                    <span className="truncate">Ledger Reports</span>
+                  </div>
+                </button>
               </div>
             )}
           </div>
