@@ -351,7 +351,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         : isCategory
           ? moneyText(Math.abs(value))+(value>0?' Net Debit':value<0?' Net Credit':'')
           : moneyText(value);
-      const safeText=(value:unknown,fallback='—')=>{
+      const safeText=(value:unknown,fallback='—'):string=>{
         if(value===null||value===undefined||value==='') return fallback;
         if(typeof value==='string'||typeof value==='number'||typeof value==='boolean') return String(value);
         if(typeof value==='object'){
