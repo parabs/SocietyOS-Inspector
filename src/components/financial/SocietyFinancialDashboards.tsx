@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   ResponsiveContainer, ComposedChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
@@ -176,7 +178,41 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
 };
 const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+selectedReport+'.csv',x.rows)};
  const exportTxt=()=>{const x=selectedReportExport();const txt=x.rows.map(row=>row.map(v=>csvValue(v)).join('\t')).join('\r\n');const url=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='society-'+selectedReport+'.txt';a.click();URL.revokeObjectURL(url)};
- const exportPdf=()=>{const x=selectedReportExport();const w=window.open('','_blank','width=1100,height=800');if(!w)return;const esc=(v:any)=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');const rows=x.rows;w.document.write('<html><head><title>'+esc(x.title)+'</title><style>body{font:11px Arial,sans-serif;padding:20px}h1,h2,h3{text-align:center;margin:5px}table{border-collapse:collapse;width:100%;margin-top:16px}td,th{border:1px solid #9ca3af;padding:5px;text-align:left;white-space:nowrap}th{background:#e5e7eb}@media print{@page{size:landscape;margin:10mm}}</style></head><body><h1>Pearl Meadows \'C\' Type \'C\' Wing Chs Ltd</h1><h2>Regd. No. TNA/KLN/HSG(TC) 27051/2014-15/YEAR 2014</h2><h3>'+esc(x.title)+'</h3><table><thead><tr>'+((rows[3]||[]).map((v:any)=>'<th>'+esc(csvValue(v))+'</th>').join(''))+'</tr></thead><tbody>'+rows.slice(4).map((row:any[])=>'<tr>'+row.map(v=>'<td>'+esc(csvValue(v))+'</td>').join('')+'</tr>').join('')+'</tbody></table><script>window.onload=()=>window.print()</script></body></html>');w.document.close()};
+ const exportPdf=()=>{
+  const x=selectedReportExport();
+  const rows=x.rows||[];
+  const headerIndex=3;
+  const headers=(rows[headerIndex]||[]).map((v:any)=>String(csvValue(v)).replace(/₹/g,'Rs. '));
+  const body=rows.slice(headerIndex+1).map((row:any[])=>row.map(v=>String(csvValue(v)).replace(/₹/g,'Rs. ')));
+  if(!headers.length){window.alert('No report rows are available to export.');return;}
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a3'});
+  const pageWidth=doc.internal.pageSize.getWidth();
+  doc.setFont('helvetica','bold');doc.setFontSize(14);
+  doc.text("Pearl Meadows 'C' Type 'C' Wing Chs Ltd",pageWidth/2,13,{align:'center'});
+  doc.setFont('helvetica','normal');doc.setFontSize(9);
+  doc.text('Regd. No. TNA/KLN/HSG(TC) 27051/2014-15/YEAR 2014',pageWidth/2,19,{align:'center'});
+  doc.setFont('helvetica','bold');doc.setFontSize(12);
+  doc.text(x.title,pageWidth/2,27,{align:'center'});
+  autoTable(doc,{
+   startY:33,
+   head:[headers],
+   body,
+   theme:'grid',
+   styles:{font:'helvetica',fontSize:7,cellPadding:2,overflow:'linebreak',valign:'middle'},
+   headStyles:{fontStyle:'bold',fillColor:[30,41,59],textColor:255},
+   alternateRowStyles:{fillColor:[248,250,252]},
+   margin:{left:8,right:8,bottom:12},
+   horizontalPageBreak:true,
+   horizontalPageBreakRepeat:0,
+   didDrawPage:()=>{
+    const pageCount=(doc as any).internal.getNumberOfPages();
+    doc.setFontSize(7);doc.setFont('helvetica','normal');
+    doc.text('Page '+pageCount,pageWidth-10,doc.internal.pageSize.getHeight()-5,{align:'right'});
+   }
+  });
+  const safeName=String(selectedReport||'transactions').replace(/[^a-z0-9-]+/gi,'-').toLowerCase();
+  doc.save('society-'+safeName+'.pdf');
+ };
  const Card=({label,value,detail,icon:Icon,tone='blue'}:any)=><div className={'rounded-xl border p-4 min-w-0 '+({'blue':'border-blue-100 bg-blue-50/70','green':'border-emerald-100 bg-emerald-50/70','red':'border-red-100 bg-red-50/70','amber':'border-amber-100 bg-amber-50/70','violet':'border-violet-100 bg-violet-50/70'} as any)[tone]}><div className="flex items-center justify-between gap-2"><span className="text-xs font-medium text-slate-600">{label}</span><span className="rounded-lg bg-white/80 p-2 text-blue-700"><Icon className="h-4 w-4"/></span></div><div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{value}</div><div className="mt-1 text-[11px] text-slate-500">{detail}</div></div>;
  const Panel=({title,children,action}:any)=><section className="min-w-0 overflow-hidden rounded-xl border border-blue-100 bg-white shadow-[0_1px_2px_rgba(15,23,42,.03)]"><div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3"><h2 className="text-sm font-bold text-blue-950">{title}</h2>{action}</div><div className="p-3 sm:p-4">{children}</div></section>;
  const Table=({headers,rows}:any)=><div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-xs [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap"><thead className="bg-slate-50 text-slate-600"><tr>{headers.map((h:string)=><th key={h} className="border-b border-slate-200 px-2.5 py-2 font-semibold">{h}</th>)}</tr></thead><tbody>{rows.length?rows.map((row:any[],i:number)=><tr key={i} className="border-b border-slate-100 last:border-0 hover:bg-blue-50/40">{row.map((v:any,j:number)=><td key={j} className={'px-2.5 py-2 '+(j===row.length-1?'':'')}>{v}</td>)}</tr>):<tr><td colSpan={headers.length} className="px-3 py-8 text-center text-slate-500">No matching records in the connected data.</td></tr>}</tbody></table></div>;
