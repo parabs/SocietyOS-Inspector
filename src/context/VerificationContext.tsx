@@ -65,6 +65,7 @@ export type ScreenId =
   | 'bank-reconciliation'
   | 'observations-actions'
   | 'reports'
+  | 'ledger-reports'
   | 'settings'
   | 'data-management'
   | 'user-access';
