@@ -41,8 +41,11 @@ export const Sidebar: React.FC = () => {
     if (['verification-dashboard','opening-balances','transaction-verification','monthly-reconciliation'].includes(currentScreen)) {
       setOpenGroups(prev => ({ ...prev, verification: true }));
     }
-    if (currentScreen === 'data-management') {
+    if (currentScreen === 'transactions') {
       setOpenGroups(prev => ({ ...prev, financial: true }));
+    }
+    if (currentScreen === 'data-management') {
+      setOpenGroups(prev => ({ ...prev, admin: true }));
     }
   }, [currentScreen]);
 
@@ -213,8 +216,8 @@ export const Sidebar: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={() => handleNavClick('data-management')}
-                  className={navItemClass('data-management')}
+                  onClick={() => handleNavClick('transactions')}
+                  className={navItemClass('transactions')}
                 >
                   <div className="flex items-center gap-2.5 truncate">
                     <Database className="w-4 h-4 shrink-0" />
@@ -338,6 +341,16 @@ export const Sidebar: React.FC = () => {
                   <div className="flex items-center gap-2.5 truncate">
                     <Settings className="w-4 h-4 shrink-0" />
                     <span className="truncate">Settings</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleNavClick('data-management')}
+                  className={navItemClass('data-management')}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <Database className="w-4 h-4 shrink-0" />
+                    <span className="truncate">Data Management / Import</span>
                   </div>
                 </button>
 

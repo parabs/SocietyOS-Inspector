@@ -254,7 +254,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       return {title:(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Month-wise',note:isParty?'Monthly closing is based on mapped demand less recorded receipts; allocation of receipts to specific months must be verified.':isAccount?'Balances roll forward from the earliest available reconciliation opening balance.':'Category figures show monthly movements; income and expense categories do not normally carry opening balances.',headers:isParty?['Party Type','Party Name','Opening',...months.flatMap(m=>[m+' Demand',m+' Paid',m+' Closing']),'Year-end Closing']:isAccount?['Account Name','Opening',...months.flatMap(m=>[m+' Receipts',m+' Payments',m+' Closing']),'Year-end Closing']:['Demand Group','Category Group','Category Name',...months,'Annual Net Movement'],rows};
     }
     const detailRows:any[][]=[];
-    const moneyText=(value:number)=>currencyCell(value);
+    const moneyText=(value:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(Number(value)||0);
     scopedKeys.forEach(key=>{
       const groupTransactions=sourceTx.filter(t=>getKey(t)===key&&(isAccount||t.transactionClass!=='Contra')).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||'')));
       const opening=openingFor(key);
@@ -288,32 +288,38 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         : isAccount
           ? openingBalances.some((x:any)=>String(x.accountName||'')===key||String(x.accountId||'')===key)
           : false;
-      // Separate group header; no repeated group label on each detail row.
+      // Group header and all ledger rows use exactly seven columns.
       detailRows.push([('__GROUP__'+(partyType?partyType+' / ':'')+groupLabel),'','','','','','']);
       const isMemberLedger=isParty&&!isVendor;
-      const memberBalanceMeaning=(value:number)=>value>0?'Member owes Society':value<0?'Credit / Advance with Society':'Settled — Nil balance';
+      const memberBalanceMeaning=(value:number)=>value>0?'Member to Pay':value<0?'Member Credit Balance':'No Balance Due';
       const balanceDisplay=(value:number)=>isMemberLedger
-        ? moneyText(Math.abs(value))+' '+(value>0?'Dr':value<0?'Cr':'')
+        ? moneyText(Math.abs(value))+(value>0?' Dr':value<0?' Cr':'')
         : moneyText(value);
       let running=opening;
       const openingParticulars=isMemberLedger
         ? 'Opening Balance — '+(groupOpeningKnown?memberBalanceMeaning(opening):'Not Verified')
         : 'Opening Balance';
       detailRows.push([
-        openingParticulars,'—','Brought forward','—',
+        '—',openingParticulars,'Brought forward','—',
         groupOpeningKnown?(isMemberLedger?(opening>0?moneyText(opening):'—'):(opening<0?moneyText(Math.abs(opening)):'—')):'Not Recorded',
         groupOpeningKnown?(isMemberLedger?(opening<0?moneyText(Math.abs(opening)):'—'):(opening>0?moneyText(opening):'—')):'—',
-        '—','—',groupOpeningKnown?balanceDisplay(running):'Not Verified'
+        groupOpeningKnown?balanceDisplay(running):'Not Verified'
       ]);
       events.forEach(e=>{
         running+=e.movement;
         const debit=isMemberLedger?e.movement>0:e.movement<0;
         const credit=isMemberLedger?e.movement<0:e.movement>0;
-        const detailParticulars=isMemberLedger&&e.kind==='Demand'
-          ? e.particulars+' — Payable by member'
-          : e.particulars;
+        const transactionParticulars=isMemberLedger
+          ? (e.kind==='Demand'
+              ? String(e.particulars)+' — Member to Pay'
+              : String(e.kind).toLowerCase().includes('receipt')
+                ? String(e.particulars)+' — Receipt Received'
+                : e.movement<0
+                  ? String(e.particulars)+' — Credit Adjustment'
+                  : String(e.particulars))
+          : String(e.particulars);
         detailRows.push([
-          e.date||'—',detailParticulars,e.voucher,e.category,
+          e.date||'—',transactionParticulars,e.voucher,e.category,
           debit?moneyText(Math.abs(e.movement)):'—',
           credit?moneyText(Math.abs(e.movement)):'—',
           balanceDisplay(running)
@@ -324,7 +330,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         ? 'Closing Balance — '+(closingKnown?memberBalanceMeaning(running):'Not Calculable')
         : 'Closing Balance';
       detailRows.push([
-        closingParticulars,'—','Carried forward','—','—','—','—','—',
+        '—',closingParticulars,'Carried forward','—','—','—',
         closingKnown?balanceDisplay(running):'Not Calculable'
       ]);
       detailRows.push(['','','','','','','']);
