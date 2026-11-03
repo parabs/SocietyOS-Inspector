@@ -19,7 +19,7 @@ import { DataManagement } from './components/admin/DataManagement';
 import { FY2018WorkbookImport } from './components/admin/FY2018WorkbookImport';
 
 const MainContent: React.FC = () => {
-  const { currentScreen } = useVerification();
+  const { currentScreen, setCurrentScreen } = useVerification();
 
   switch (currentScreen) {
     case 'verification-dashboard':
@@ -46,7 +46,7 @@ const MainContent: React.FC = () => {
       return <SocietyFinancialDashboards screen="reports" />;
 
     case 'data-management':
-      return <FY2018WorkbookImport />;
+      return <FY2018WorkbookImport onClose={() => setCurrentScreen('transactions')} />;
 
     case 'transactions':
       return <DataManagement />;
