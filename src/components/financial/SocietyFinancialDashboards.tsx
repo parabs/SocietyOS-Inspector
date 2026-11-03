@@ -289,8 +289,8 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
           e.particulars,
           e.voucher,
           e.category,
-          e.movement<0?moneyText(Math.abs(e.movement)):'—',
           e.movement>0?moneyText(e.movement):'—',
+          e.movement<0?moneyText(Math.abs(e.movement)):'—',
           moneyText(running)
         ]);
       });
