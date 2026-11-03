@@ -14,7 +14,9 @@ const clean = (v: unknown): any => {
 };
 const str = (v: unknown): string | null => {
   const x = clean(v);
-  return x === null ? null : String(x).trim();
+  if (x === null) return null;
+  const value = String(x).trim();
+  return /^#(?:N\/A|VALUE!|REF!|DIV\/0!|NAME\?|NUM!|NULL!)/i.test(value) ? null : value;
 };
 const num = (v: unknown): number | null => {
   const x = clean(v);
