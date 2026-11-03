@@ -91,7 +91,7 @@ export const DataManagement: React.FC = () => {
   }
   try{
    const key=cfg.key;
-   const result=isNew?await supabaseClient.from(entity).insert(payload):await supabaseClient.from(entity).update(payload).eq(key,editing[key]);
+   const result:any=isNew?await supabaseClient.from(entity).insert(payload):await supabaseClient.from(entity).update(payload).eq(key,editing[key]);
    if(result.error)throw result.error;
    setNotice(isNew?'Record created.':'Record updated.');close();await load();
   }catch(e:any){setError(e?.message||'Save failed.');}
