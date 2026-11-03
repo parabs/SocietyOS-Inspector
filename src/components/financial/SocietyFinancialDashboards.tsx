@@ -367,7 +367,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
           ? openingBalances.some((x:any)=>String(x.accountName||'')===key||String(x.accountId||'')===key)
           : false;
       // Group header and all ledger rows use exactly seven columns.
-      detailRows.push([('__GROUP__'+(partyType?partyType+' / ':'')+groupLabel),'','','','','','']);
+      detailRows.push(isParty?[('__GROUP__'+(partyType?partyType+' / ':'')+groupLabel),'','','','','']: [('__GROUP__'+groupLabel),'','','','','','']);
       const isMemberLedger=isParty&&!isVendor;
       const memberBalanceMeaning=(value:number)=>value>0?'Member to Pay':value<0?'Member Credit Balance':'No Balance Due';
       const balanceDisplay=(value:number)=>isMemberLedger
@@ -389,10 +389,15 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       const openingParticulars=isMemberLedger
         ? 'Opening Balance — '+(groupOpeningKnown?memberBalanceMeaning(opening):'Not Verified')
         : 'Opening Balance';
-      detailRows.push([
+      detailRows.push(isParty?[
+        '—',openingParticulars,'Brought forward',
+        groupOpeningKnown?(opening>0?moneyText(opening):'—'):'Not Recorded',
+        groupOpeningKnown?(opening<0?moneyText(Math.abs(opening)):'—'):'—',
+        groupOpeningKnown?balanceDisplay(running):'Not Verified'
+      ]:[
         '—',openingParticulars,'Brought forward','—',
-        groupOpeningKnown?(isMemberLedger?(opening>0?moneyText(opening):'—'):(opening<0?moneyText(Math.abs(opening)):'—')):'Not Recorded',
-        groupOpeningKnown?(isMemberLedger?(opening<0?moneyText(Math.abs(opening)):'—'):(opening>0?moneyText(opening):'—')):'—',
+        groupOpeningKnown?(opening<0?moneyText(Math.abs(opening)):'—'):'Not Recorded',
+        groupOpeningKnown?(opening>0?moneyText(opening):'—'):'—',
         groupOpeningKnown?balanceDisplay(running):'Not Verified'
       ]);
       events.forEach(e=>{
@@ -405,7 +410,12 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         const categoryParticulars=isCategory
           ? String(e.particulars)+' — '+(e.movement<0?'Expense / Debit movement':e.movement>0?'Income / Credit movement':'No movement')
           : transactionParticulars;
-        detailRows.push([
+        detailRows.push(isParty?[
+          safeText(e.date),safeText(transactionParticulars),safeText(e.voucher),
+          debit?moneyText(Math.abs(e.movement)):'—',
+          credit?moneyText(Math.abs(e.movement)):'—',
+          safeText(balanceDisplay(running))
+        ]:[
           safeText(e.date),safeText(categoryParticulars),safeText(e.voucher),safeText(e.category),
           debit?moneyText(Math.abs(e.movement)):'—',
           credit?moneyText(Math.abs(e.movement)):'—',
@@ -418,14 +428,17 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         : isCategory
           ? 'Closing Net Movement — '+(running>0?'Net Debit':running<0?'Net Credit':'Nil Movement')
           : 'Closing Balance';
-      detailRows.push([
+      detailRows.push(isParty?[
+        '—',closingParticulars,'Carried forward','—','—',
+        closingKnown?balanceDisplay(running):'Not Calculable'
+      ]:[
         '—',closingParticulars,'Carried forward','—','—','—',
         closingKnown?balanceDisplay(running):'Not Calculable'
       ]);
-      detailRows.push(['','','','','','','']);
+      detailRows.push(isParty?['','','','','','']:['','','','','','','']);
     });
 
-    return {title:isVendor?'Vendor / Payee Ledger — Detailed':selectedReport==='member-ledger'?'Member / Flat Owner Ledger — Detailed':(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Detailed',note:'Each party, account or category group is shown separately with its opening balance (where a verified source exists), dated transaction details and closing balance. Member demand entries are shown as charges and receipts reduce the receivable balance. Category groups show period movement; no unsupported opening balance is assumed.',headers:['Date','Particulars','Voucher / Receipt No.','Category','Debit / Payment','Credit / Receipt','Balance'],rows:detailRows};
+    return {title:isVendor?'Vendor / Payee Ledger — Detailed':selectedReport==='member-ledger'?'Member / Flat Owner Ledger — Detailed':(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Detailed',note:'Each party, account or category group is shown separately with its opening balance (where a verified source exists), dated transaction details and closing balance. Member demand entries are shown as charges and receipts reduce the receivable balance. Category groups show period movement; no unsupported opening balance is assumed.',headers:isParty?['Date','Particulars','Voucher / Receipt No.','Debit / Payment','Credit / Receipt','Balance']:['Date','Particulars','Voucher / Receipt No.','Category','Debit / Payment','Credit / Receipt','Balance'],rows:detailRows};
    }
    case 'member-opening-balance-register': return {title:'Member Opening Balance Register — FY 2018–19',note:'Read-only presentation of the validated v_opening_balance_register view.',headers:[],rows:[]};
    case 'receipt-allocation-review': {
@@ -633,7 +646,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    case 'rectification': return {title:'Audit Observations & Rectification Register',note:'This is a working exception register. Assign an owner, target date and authorised closure evidence in the governance workflow.',headers:['Date','Reference','Observation','Category','Status','Suggested action'],rows:[...filtered.filter(t=>t.evidenceStatus==='Missing'||t.evidenceStatus==='Discrepancy'||t.internalAuditStatus==='Failed'||t.internalAuditStatus==='Pending').map(t=>[t.date||'—',t.id||t.voucherNo||'—',t.remarks||t.description||'Evidence / verification follow-up',t.categoryName||'Transaction review',statusPill(t.internalAuditStatus||t.evidenceStatus||'Pending'),'Investigate, attach evidence and record approved closure']),...auditNotes.map(n=>[n.timestamp||'—',n.author||'Audit note',n.title||n.content||'—',n.tag||'Observation',statusPill(n.priority||'Not assessed'),'Assign owner, target date and closure approval'])]};
    default: {const months=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];const rows:any[][]=[];(openingBalances||[]).filter((a:any)=>accountFilter==='ALL'||String(a.accountId||'')===accountFilter).forEach((a:any)=>{let opening=Number(a.recordedOpeningBalance)||0;months.forEach(m=>{const tx=transactions.filter(t=>t.accountId===a.accountId&&String(t.month||t.reportingMonth||'').replace(/-/g,' ').trim().toLowerCase()===m.toLowerCase());const rec=tx.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);const pay=tx.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);const contraRows=tx.filter(t=>t.transactionClass==='Contra');const contra=contraRows.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);const closing=opening+rec-pay;const recon=Object.values(reconciliations).flat().find((x:any)=>x.accountId===a.accountId&&String(x.month||'').replace(/-/g,' ').trim().toLowerCase()===m.toLowerCase());if(period==='All months'||period===m)rows.push([m,a.accountName||a.accountId,currencyCell(opening),currencyCell(rec),currencyCell(pay),currencyCell(contra),currencyCell(closing),recon?.sourceClosingBalance==null?'Not supplied':currencyCell(Number(recon.sourceClosingBalance)),statusPill(recon?.status||'Provisional — statement balance missing')]);opening=closing;});});return {title:'Monthly Financial Control Summary',note:'Opening balances come from Account Master; monthly closing is calculated from recorded non-contra receipts and payments. Contra movements are shown separately and source closing balances remain unverified until bank/cash statement data is entered.',headers:['Month','Account','Opening Balance','Receipts','Payments','Contra Movements','Calculated Closing Balance','Source Closing Balance','Reconciliation Status'],rows}};
   }
- },[selectedReport,filtered,cumulativeOutstanding,memberFinancialBalances,demandRegister,demandAdjustments,flatOwnerMaster,cats,payments,totalRecon,unmatched,balanceRegister,partyMaster,monthly,transactions,auditNotes,query,partyTypeFilter,categoryGroupFilter,openingBalances]);
+ },[selectedReport,filtered,cumulativeOutstanding,memberFinancialBalances,demandRegister,demandAdjustments,flatOwnerMaster,cats,payments,totalRecon,unmatched,balanceRegister,partyMaster,monthly,transactions,auditNotes,query,partyTypeFilter,categoryGroupFilter,openingBalances,categoryMaster]);
  return <div className="mx-auto max-w-[1800px] space-y-4">
   {screen!=='reports'&&<header className="rounded-xl bg-gradient-to-r from-sky-950 via-blue-950 to-slate-900 p-3 text-white shadow-sm">
    <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"><div className="min-w-0"><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.18em] text-sky-200"><span className="h-2 w-2 rounded-full bg-emerald-400"/>{screen==='audit-evidence'||screen==='observations-actions'?'Audit & Compliance':'Society Financial Management'}</div><h1 className="mt-0.5 text-xl font-bold tracking-tight sm:text-2xl">{config.title}</h1><p className="mt-1 max-w-3xl text-xs text-sky-100/90">{config.sub}</p></div><div className="flex flex-wrap items-center gap-2"><label className="text-[10px] text-sky-100">Financial year <select className="ml-2 rounded-md bg-white px-2 py-2 text-xs text-slate-900"><option>FY 2018–19</option></select></label><button onClick={()=>void refetchAll()} className="inline-flex items-center gap-2 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/20"><RefreshCw className="h-4 w-4"/>Refresh</button><div className="flex items-center gap-1"><button onClick={exportRows} className="inline-flex items-center gap-1 rounded-lg bg-blue-500 px-2.5 py-2 text-xs font-semibold hover:bg-blue-400"><Download className="h-4 w-4"/>CSV</button><button onClick={exportTxt} className="rounded-lg border border-white/25 bg-white/10 px-2.5 py-2 text-xs font-semibold hover:bg-white/20">TXT</button><button onClick={exportPdf} className="rounded-lg border border-white/25 bg-white/10 px-2.5 py-2 text-xs font-semibold hover:bg-white/20">PDF</button></div></div></div>
