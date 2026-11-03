@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   LayoutDashboard,
   Home,
@@ -36,6 +36,12 @@ export const Sidebar: React.FC = () => {
     reports: false,
     admin: false,
   });
+
+  useEffect(() => {
+    if (['verification-dashboard','opening-balances','transaction-verification','monthly-reconciliation'].includes(currentScreen)) {
+      setOpenGroups(prev => ({ ...prev, verification: true }));
+    }
+  }, [currentScreen]);
 
   const toggleGroup = (key: keyof typeof openGroups) => {
     setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
