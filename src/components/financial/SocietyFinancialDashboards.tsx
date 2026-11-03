@@ -256,7 +256,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const detailRows:any[][]=[];
     const moneyText=(value:number)=>currencyCell(value);
     scopedKeys.forEach(key=>{
-      const groupTransactions=sourceTx.filter(t=>getKey(t)===key).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||'')));
+      const groupTransactions=sourceTx.filter(t=>getKey(t)===key&&(isAccount||t.transactionClass!=='Contra')).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||'')));
       const opening=openingFor(key);
       const groupLabel=isParty?key.split('¦').slice(1).join('¦'):isAccount?key:key.split('¦').join(' / ');
       const partyType=isParty?key.split('¦')[0]:'';
@@ -276,13 +276,12 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
             ? (String(t.type||'').toLowerCase()==='receipt'?-Math.abs(rawAmount):String(t.type||'').toLowerCase()==='payment'?Math.abs(rawAmount):rawAmount)
             : rawAmount;
           return {
-            date:String(t.date||''),particulars:String(t.description||t.party||t.categoryName||'Transaction'),
+            date:String(t.date||''),particulars:(isAccount&&isContra?'Contra — ':'')+(isAccount&&isAdjustment?'Adjustment — ':'')+String(t.description||t.party||t.categoryName||'Transaction'),
             voucher:String(t.voucherNo||t.receiptNo||t.id||'—'),category:String(t.categoryName||'—'),
-            movement,contra:isContra?Math.abs(rawAmount):0,adjustment:isAdjustment?Math.abs(rawAmount):0,
-            column:isContra?'contra':isAdjustment?'adjustment':'normal',kind:txKind||'transaction'
+            movement,kind:txKind||'transaction'
           };
         }),
-        ...memberDemands.map((d:any)=>({...d,contra:0,adjustment:0,column:'normal'}))
+        ...memberDemands
       ].sort((a,b)=>a.date.localeCompare(b.date));
       const groupOpeningKnown=isParty
         ? memberFinancialBalances.some((x:any)=>String(x.member_name||'')===groupLabel||String(x.flat_no||'')===groupLabel)
@@ -290,7 +289,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
           ? openingBalances.some((x:any)=>String(x.accountName||'')===key||String(x.accountId||'')===key)
           : false;
       // Separate group header; no repeated group label on each detail row.
-      detailRows.push([('__GROUP__'+(partyType?partyType+' / ':'')+groupLabel),'','','','','','','','']);
+      detailRows.push([('__GROUP__'+(partyType?partyType+' / ':'')+groupLabel),'','','','','','']);
       const isMemberLedger=isParty&&!isVendor;
       const memberBalanceMeaning=(value:number)=>value>0?'Member owes Society':value<0?'Credit / Advance with Society':'Settled — Nil balance';
       const balanceDisplay=(value:number)=>isMemberLedger
@@ -315,10 +314,8 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
           : e.particulars;
         detailRows.push([
           e.date||'—',detailParticulars,e.voucher,e.category,
-          e.column==='normal'&&debit?moneyText(Math.abs(e.movement)):'—',
-          e.column==='normal'&&credit?moneyText(Math.abs(e.movement)):'—',
-          e.column==='contra'?moneyText(e.contra):'—',
-          e.column==='adjustment'?moneyText(e.adjustment):'—',
+          debit?moneyText(Math.abs(e.movement)):'—',
+          credit?moneyText(Math.abs(e.movement)):'—',
           balanceDisplay(running)
         ]);
       });
@@ -330,10 +327,10 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         closingParticulars,'—','Carried forward','—','—','—','—','—',
         closingKnown?balanceDisplay(running):'Not Calculable'
       ]);
-      detailRows.push(['','','','','','','','','']);
+      detailRows.push(['','','','','','','']);
     });
 
-    return {title:isVendor?'Vendor / Payee Ledger — Detailed':selectedReport==='member-ledger'?'Member / Flat Owner Ledger — Detailed':(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Detailed',note:'Each party, account or category group is shown separately with its opening balance (where a verified source exists), dated transaction details and closing balance. Member demand entries are shown as charges and receipts reduce the receivable balance. Category groups show period movement; no unsupported opening balance is assumed.',headers:['Date','Particulars','Voucher / Receipt No.','Category','Debit / Payment','Credit / Receipt','Contra','Adjustment','Balance'],rows:detailRows};
+    return {title:isVendor?'Vendor / Payee Ledger — Detailed':selectedReport==='member-ledger'?'Member / Flat Owner Ledger — Detailed':(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Detailed',note:'Each party, account or category group is shown separately with its opening balance (where a verified source exists), dated transaction details and closing balance. Member demand entries are shown as charges and receipts reduce the receivable balance. Category groups show period movement; no unsupported opening balance is assumed.',headers:['Date','Particulars','Voucher / Receipt No.','Category','Debit / Payment','Credit / Receipt','Balance'],rows:detailRows};
    }
    case 'member-opening-balance-register': return {title:'Member Opening Balance Register — FY 2018–19',note:'Read-only presentation of the validated v_opening_balance_register view.',headers:[],rows:[]};
    case 'receipt-allocation-review': {
