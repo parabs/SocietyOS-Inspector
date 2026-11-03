@@ -238,7 +238,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const isParty=selectedReport.startsWith('party-')||selectedReport==='member-ledger'||isVendor, isAccount=selectedReport.startsWith('account-'), isCategory=selectedReport.startsWith('category-');
     const mode=selectedReport==='member-ledger'||isVendor?'detail':selectedReport.endsWith('summary')?'summary':selectedReport.endsWith('monthly')?'monthly':'detail';
     const months=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
-    const sourceTx=transactions.filter(t=>t.transactionClass!=='Contra'&&(!isVendor||t.type==='Payment')&&(!isAccount||accountFilter==='ALL'||String(t.accountId||'')===accountFilter||String(t.accountName||'').toUpperCase().includes(accountFilter))&&(!isCategory||categoryGroupFilter==='All category groups'||String(t.categoryGroup||categoryMaster.find((x:any)=>x.category_name===t.categoryName)?.category_group||'Unmapped')===categoryGroupFilter));
+    const sourceTx=transactions.filter(t=>(!isVendor||t.type==='Payment')&&(!isAccount||accountFilter==='ALL'||String(t.accountId||'')===accountFilter||String(t.accountName||'').toUpperCase().includes(accountFilter))&&(!isCategory||categoryGroupFilter==='All category groups'||String(t.categoryGroup||categoryMaster.find((x:any)=>x.category_name===t.categoryName)?.category_group||'Unmapped')===categoryGroupFilter));
     const demandCategory=(t:any)=>categoryMaster.find((x:any)=>String(x.category_name||'')===String(t.categoryName||''))||{}; const getKey=(t:any)=>isParty?`${String(partyMaster.find((p:any)=>String(p.party_name||'')===String(t.party||''))?.party_type||'Unclassified')}¦${String(t.party||'Unmapped party')}`:isAccount?String(t.accountName||t.accountId||'Unmapped account'):`${String(demandCategory(t).demand_group||'Unmapped Demand Group')}¦${String(t.categoryGroup||demandCategory(t).category_group||'Unmapped Category Group')}¦${String(t.categoryName||'Unclassified')}`;
     const keys=new Set<string>(sourceTx.map(getKey));
     if(isParty&&!isVendor){flatOwnerMaster.forEach((x:any)=>{const name=String(x.owner_name||x.flat_no||'');const type=String(partyMaster.find((p:any)=>String(p.party_name||'')===name)?.party_type||'Unclassified');if(name)keys.add(`${type}¦${name}`);});memberFinancialBalances.forEach((x:any)=>{const name=String(x.member_name||x.flat_no||'');const type=String(partyMaster.find((p:any)=>String(p.party_name||'')===name)?.party_type||'Unclassified');if(name)keys.add(`${type}¦${name}`);});}
@@ -256,7 +256,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const detailRows:any[][]=[];
     const moneyText=(value:number)=>currencyCell(value);
     scopedKeys.forEach(key=>{
-      const groupTransactions=sourceTx.filter(t=>getKey(t)===key).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||'')));
+      const groupTransactions=sourceTx.filter(t=>getKey(t)===key&&(isAccount||t.transactionClass!=='Contra')).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||'')));
       const opening=openingFor(key);
       const groupLabel=isParty?key.split('¦').slice(1).join('¦'):isAccount?key:key.split('¦').join(' / ');
       const partyType=isParty?key.split('¦')[0]:'';
@@ -265,12 +265,22 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         return partyName===groupLabel;
       }).map((d:any)=>({date:String(d.demand_date||d.created_at||d.month||''),particulars:'Demand / charge',voucher:String(d.demand_id||d.id||'Demand Register'),category:'Demand',movement:Number(d.total_demand||0),kind:'Demand'})):[];
       const events:any[]=[
-        ...groupTransactions.map(t=>({
-          date:String(t.date||''),particulars:String(t.description||t.party||t.categoryName||'Transaction'),
-          voucher:String(t.voucherNo||t.receiptNo||t.id||'—'),category:String(t.categoryName||'—'),
-          movement:isParty&&!isVendor?(t.type==='Receipt'?-Math.abs(Number(t.amount)||0):t.type==='Payment'?Math.abs(Number(t.amount)||0):(Number(t.amount)||0)):(Number(t.amount)||0),
-          kind:String(t.type||'Transaction')
-        })),
+        ...groupTransactions.map(t=>{
+          const rawAmount=Number(t.amount)||0;
+          const txKind=String(t.transactionClass||t.type||'').toLowerCase();
+          const isContra=txKind.includes('contra');
+          const isAdjustment=txKind.includes('adjust');
+          // Member receivable convention: demand/payment increases debit; receipt reduces it.
+          // Other ledgers preserve the signed source amount: positive = credit/inflow, negative = debit/outflow.
+          const movement=isParty&&!isVendor
+            ? (String(t.type||'').toLowerCase()==='receipt'?-Math.abs(rawAmount):String(t.type||'').toLowerCase()==='payment'?Math.abs(rawAmount):rawAmount)
+            : rawAmount;
+          return {
+            date:String(t.date||''),particulars:(isAccount&&isContra?'Contra — ':'')+(isAccount&&isAdjustment?'Adjustment — ':'')+String(t.description||t.party||t.categoryName||'Transaction'),
+            voucher:String(t.voucherNo||t.receiptNo||t.id||'—'),category:String(t.categoryName||'—'),
+            movement,kind:txKind||'transaction'
+          };
+        }),
         ...memberDemands
       ].sort((a,b)=>a.date.localeCompare(b.date));
       const groupOpeningKnown=isParty
@@ -280,21 +290,43 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
           : false;
       // Separate group header; no repeated group label on each detail row.
       detailRows.push([('__GROUP__'+(partyType?partyType+' / ':'')+groupLabel),'','','','','','']);
+      const isMemberLedger=isParty&&!isVendor;
+      const memberBalanceMeaning=(value:number)=>value>0?'Member owes Society':value<0?'Credit / Advance with Society':'Settled — Nil balance';
+      const balanceDisplay=(value:number)=>isMemberLedger
+        ? moneyText(Math.abs(value))+' '+(value>0?'Dr':value<0?'Cr':'')
+        : moneyText(value);
       let running=opening;
-      detailRows.push(['Opening Balance','—','Brought forward','—',groupOpeningKnown?moneyText(opening):'Not Recorded','—',groupOpeningKnown?moneyText(running):'Not Verified']);
+      const openingParticulars=isMemberLedger
+        ? 'Opening Balance — '+(groupOpeningKnown?memberBalanceMeaning(opening):'Not Verified')
+        : 'Opening Balance';
+      detailRows.push([
+        openingParticulars,'—','Brought forward','—',
+        groupOpeningKnown?(isMemberLedger?(opening>0?moneyText(opening):'—'):(opening<0?moneyText(Math.abs(opening)):'—')):'Not Recorded',
+        groupOpeningKnown?(isMemberLedger?(opening<0?moneyText(Math.abs(opening)):'—'):(opening>0?moneyText(opening):'—')):'—',
+        '—','—',groupOpeningKnown?balanceDisplay(running):'Not Verified'
+      ]);
       events.forEach(e=>{
         running+=e.movement;
+        const debit=isMemberLedger?e.movement>0:e.movement<0;
+        const credit=isMemberLedger?e.movement<0:e.movement>0;
+        const detailParticulars=isMemberLedger&&e.kind==='Demand'
+          ? e.particulars+' — Payable by member'
+          : e.particulars;
         detailRows.push([
-          e.date||'—',
-          e.particulars,
-          e.voucher,
-          e.category,
-          e.movement<0?moneyText(Math.abs(e.movement)):'—',
-          e.movement>0?moneyText(e.movement):'—',
-          moneyText(running)
+          e.date||'—',detailParticulars,e.voucher,e.category,
+          debit?moneyText(Math.abs(e.movement)):'—',
+          credit?moneyText(Math.abs(e.movement)):'—',
+          balanceDisplay(running)
         ]);
       });
-      detailRows.push(['Closing Balance','—','Carried forward','—','—','—',groupOpeningKnown||events.length?moneyText(running):'Not Calculable']);
+      const closingKnown=groupOpeningKnown||events.length>0;
+      const closingParticulars=isMemberLedger
+        ? 'Closing Balance — '+(closingKnown?memberBalanceMeaning(running):'Not Calculable')
+        : 'Closing Balance';
+      detailRows.push([
+        closingParticulars,'—','Carried forward','—','—','—','—','—',
+        closingKnown?balanceDisplay(running):'Not Calculable'
+      ]);
       detailRows.push(['','','','','','','']);
     });
 

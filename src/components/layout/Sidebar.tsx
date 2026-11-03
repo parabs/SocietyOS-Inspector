@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   LayoutDashboard,
   Home,
@@ -36,6 +36,15 @@ export const Sidebar: React.FC = () => {
     reports: false,
     admin: false,
   });
+
+  useEffect(() => {
+    if (['verification-dashboard','opening-balances','transaction-verification','monthly-reconciliation'].includes(currentScreen)) {
+      setOpenGroups(prev => ({ ...prev, verification: true }));
+    }
+    if (currentScreen === 'data-management') {
+      setOpenGroups(prev => ({ ...prev, financial: true }));
+    }
+  }, [currentScreen]);
 
   const toggleGroup = (key: keyof typeof openGroups) => {
     setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -204,6 +213,16 @@ export const Sidebar: React.FC = () => {
                 </button>
 
                 <button
+                  onClick={() => handleNavClick('data-management')}
+                  className={navItemClass('data-management')}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <Database className="w-4 h-4 shrink-0" />
+                    <span className="truncate">Transactions</span>
+                  </div>
+                </button>
+
+                <button
                   onClick={() => handleNavClick('party-ledger')}
                   className={navItemClass('party-ledger')}
                 >
@@ -319,16 +338,6 @@ export const Sidebar: React.FC = () => {
                   <div className="flex items-center gap-2.5 truncate">
                     <Settings className="w-4 h-4 shrink-0" />
                     <span className="truncate">Settings</span>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleNavClick('data-management')}
-                  className={navItemClass('data-management')}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Database className="w-4 h-4 shrink-0" />
-                    <span className="truncate">Data Management</span>
                   </div>
                 </button>
 
