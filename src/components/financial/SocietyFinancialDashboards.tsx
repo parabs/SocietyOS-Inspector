@@ -250,7 +250,61 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       return {title:(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Summary',note:isParty?'Party closing balances are provisional where opening balances, demand mapping or receipt allocation are incomplete.':isAccount?'Opening balances use the earliest available reconciliation record and must be checked against the approved opening balance.':'Income/expense category movement is not a brought-forward accounting balance.',headers:isParty?['Party Type','Party Name','Opening Balance','Demand / Charges','Receipts','Closing Receivable']:isAccount?['Account Name','Opening Balance','Receipts','Payments','Closing Balance']:['Demand Group','Category Group','Category Name','Receipts / Income','Payments / Expense','Net Movement'],rows};
     }
     if(mode==='monthly'){
-      const rows=scopedKeys.map(key=>{let running=openingFor(key);const opening=running;const vals=months.map(m=>{const ts=sourceTx.filter(t=>getKey(t)===key&&String(t.reportingMonth||t.month||'').replace(/\\n/g,' ').trim().toLowerCase()===m.toLowerCase()),rec=ts.filter(t=>t.type==='Receipt').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0),pay=ts.filter(t=>t.type==='Payment').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0),dem=isParty?reportDemands.filter((d:any)=>String(d.member_name||d.party_name||d.flat_no||d.member_id||'')===key&&String(d.month||'').trim().toLowerCase().startsWith(m.slice(0,3).toLowerCase())).reduce((s,d)=>s+Number(d.total_demand||0),0):0;running+=isParty?dem-rec:rec-pay;return {rec,pay,dem,closing:running,net:rec-pay};});return isParty?[key.split('¦')[0],key.split('¦').slice(1).join('¦'),currencyCell(opening),...vals.flatMap(v=>[currencyCell(v.dem),currencyCell(v.rec),currencyCell(v.closing)]),currencyCell(running)]:isAccount?[key,currencyCell(opening),...vals.flatMap(v=>[currencyCell(v.rec),currencyCell(v.pay),currencyCell(v.closing)]),currencyCell(running)]:[...key.split('¦'),...vals.map(v=>currencyCell(v.net)),currencyCell(vals.reduce((s,v)=>s+v.net,0))];});
+      // Normalize both imported reporting_month values (e.g. Apr-2018) and
+      // display labels (e.g. Apr 2018) to the same stable month key.
+      const normalizeMonth=(value:any)=>{
+        const raw=String(value??'').trim();
+        if(!raw) return '';
+        const iso=raw.match(/^(\\d{4})-(\\d{2})/);
+        if(iso) return iso[1]+'-'+iso[2];
+        const named=raw.match(/^([A-Za-z]{3,})[-\\s]+(\\d{4})$/);
+        if(named){
+          const idx=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(named[1].slice(0,3).toLowerCase());
+          return idx<0?'':named[2]+'-'+String(idx+1).padStart(2,'0');
+        }
+        const date=new Date(raw);
+        return Number.isNaN(date.getTime())?'':date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0');
+      };
+      const rows=scopedKeys.map(key=>{
+        let running=openingFor(key);
+        const opening=running;
+        const partyName=isParty?key.split('¦').slice(1).join('¦'):'';
+        const vals=months.map(m=>{
+          const monthKey=normalizeMonth(m);
+          const ts=sourceTx.filter(t=>{
+            const sameLedger=isParty
+              ? String(t.party||'').trim().toLowerCase()===partyName.trim().toLowerCase()
+              : getKey(t)===key;
+            // The context normalises the reporting month into t.month (e.g. "Jun 2018").
+            // Prefer that value; reportingMonth is the raw imported label (e.g. "Jun-2018").
+            return sameLedger&&normalizeMonth(t.month||t.reportingMonth||t.date)===monthKey;
+          });
+          const rec=ts.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra')
+            .reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);
+          const pay=ts.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra')
+            .reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);
+          const contra=ts.filter(t=>t.transactionClass==='Contra')
+            .reduce((sum,t)=>sum+(Number(t.amount)||0),0);
+          const dem=isParty?reportDemands.filter((d:any)=>{
+            const demandParty=String(
+              d.member_name||d.party_name||d.flat_no||
+              partyMaster.find((p:any)=>String(p.party_id||'')===String(d.party_id||''))?.party_name||
+              d.member_id||''
+            ).trim().toLowerCase();
+            return demandParty===partyName.trim().toLowerCase()&&
+              normalizeMonth(d.demand_month||d.month||d.reporting_month||d.demand_date||d.bill_date)===monthKey;
+          }).reduce((sum,d)=>sum+Number(d.total_demand??d.demand_amount??0),0):0;
+          const memberMovement=dem-rec;
+          const accountMovement=rec-pay+contra;
+          running+=isParty?memberMovement:isAccount?accountMovement:accountMovement;
+          return {rec,pay,contra,dem,closing:running,net:accountMovement};
+        });
+        return isParty
+          ? [key.split('¦')[0],partyName,currencyCell(opening),...vals.flatMap(v=>[currencyCell(v.dem),currencyCell(v.rec),currencyCell(v.closing)]),currencyCell(running)]
+          : isAccount
+            ? [key,currencyCell(opening),...vals.flatMap(v=>[currencyCell(v.rec),currencyCell(v.pay),currencyCell(v.closing)]),currencyCell(running)]
+            : [...key.split('¦'),...vals.map(v=>currencyCell(v.net)),currencyCell(vals.reduce((sum,v)=>sum+v.net,0))];
+      });
       return {title:(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Month-wise',note:isParty?'Monthly closing is based on mapped demand less recorded receipts; allocation of receipts to specific months must be verified.':isAccount?'Balances roll forward from the earliest available reconciliation opening balance.':'Category figures show monthly movements; income and expense categories do not normally carry opening balances.',headers:isParty?['Party Type','Party Name','Opening',...months.flatMap(m=>[m+' Demand',m+' Paid',m+' Closing']),'Year-end Closing']:isAccount?['Account Name','Opening',...months.flatMap(m=>[m+' Receipts',m+' Payments',m+' Closing']),'Year-end Closing']:['Demand Group','Category Group','Category Name',...months,'Annual Net Movement'],rows};
     }
     const detailRows:any[][]=[];
@@ -294,7 +348,19 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       const memberBalanceMeaning=(value:number)=>value>0?'Member to Pay':value<0?'Member Credit Balance':'No Balance Due';
       const balanceDisplay=(value:number)=>isMemberLedger
         ? moneyText(Math.abs(value))+(value>0?' Dr':value<0?' Cr':'')
-        : moneyText(value);
+        : isCategory
+          ? moneyText(Math.abs(value))+(value>0?' Net Debit':value<0?' Net Credit':'')
+          : moneyText(value);
+      const safeText=(value:unknown,fallback='—'):string=>{
+        if(value===null||value===undefined||value==='') return fallback;
+        if(typeof value==='string'||typeof value==='number'||typeof value==='boolean') return String(value);
+        if(typeof value==='object'){
+          const item=value as Record<string,unknown>;
+          const candidate=item.label??item.name??item.value??item.amount??item.description;
+          return candidate===undefined?fallback:safeText(candidate,fallback);
+        }
+        return fallback;
+      };
       let running=opening;
       const openingParticulars=isMemberLedger
         ? 'Opening Balance — '+(groupOpeningKnown?memberBalanceMeaning(opening):'Not Verified')
@@ -309,26 +375,25 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         running+=e.movement;
         const debit=isMemberLedger?e.movement>0:e.movement<0;
         const credit=isMemberLedger?e.movement<0:e.movement>0;
-        const transactionParticulars=isMemberLedger
-          ? (e.kind==='Demand'
-              ? String(e.particulars)+' — Member to Pay'
-              : String(e.kind).toLowerCase().includes('receipt')
-                ? String(e.particulars)+' — Receipt Received'
-                : e.movement<0
-                  ? String(e.particulars)+' — Credit Adjustment'
-                  : String(e.particulars))
-          : String(e.particulars);
+        // Keep transaction particulars exactly as recorded. Member-to-pay / credit wording
+        // belongs only on Opening Balance and Closing Balance rows.
+        const transactionParticulars=String(e.particulars);
+        const categoryParticulars=isCategory
+          ? String(e.particulars)+' — '+(e.movement<0?'Expense / Debit movement':e.movement>0?'Income / Credit movement':'No movement')
+          : transactionParticulars;
         detailRows.push([
-          e.date||'—',transactionParticulars,e.voucher,e.category,
+          safeText(e.date),safeText(categoryParticulars),safeText(e.voucher),safeText(e.category),
           debit?moneyText(Math.abs(e.movement)):'—',
           credit?moneyText(Math.abs(e.movement)):'—',
-          balanceDisplay(running)
+          safeText(balanceDisplay(running))
         ]);
       });
       const closingKnown=groupOpeningKnown||events.length>0;
       const closingParticulars=isMemberLedger
         ? 'Closing Balance — '+(closingKnown?memberBalanceMeaning(running):'Not Calculable')
-        : 'Closing Balance';
+        : isCategory
+          ? 'Closing Net Movement — '+(running>0?'Net Debit':running<0?'Net Credit':'Nil Movement')
+          : 'Closing Balance';
       detailRows.push([
         '—',closingParticulars,'Carried forward','—','—','—',
         closingKnown?balanceDisplay(running):'Not Calculable'
