@@ -73,6 +73,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
   const [authBusy, setAuthBusy] = useState(false);
   const [authMessage, setAuthMessage] = useState('');
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
+  const [tableSearch, setTableSearch] = useState('');
   const [preflightMessage, setPreflightMessage] = useState('');
   // Synchronous guard prevents rapid double-clicks before React applies the busy state.
   const importLock = useRef(false);
@@ -425,7 +426,8 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       if (finished?.error || finished?.success !== true) throw new Error(finished?.error || 'Server did not confirm all selected table counts.');
       setResults(ordered.map(row => ({ table: row.table, attempted: row.count, succeeded: row.count })));
       setComplete(true);
-      setPreflightMessage('Import completed and the server confirmed every selected table count.');
+      setSelectedTables([]);
+      setPreflightMessage('Import completed and verified. The workbook remains loaded; select the next table to continue.');
     } catch (e: any) {
       hasFailure = true;
       const message = e?.message || String(e);
@@ -453,6 +455,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
   };
 
   const totalRecords = plan.filter(row => selectedTables.includes(row.table)).reduce((sum, row) => sum + row.count, 0);
+  const filteredPlan = plan.filter(row => (row.table + ' ' + row.note).toLowerCase().includes(tableSearch.trim().toLowerCase()));
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
@@ -502,19 +505,28 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
           {previewError && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 flex gap-2"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />{previewError}</div>}
           {plan.length > 0 && (
             <div className="rounded-xl border border-slate-200 overflow-hidden">
-              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                <div><h3 className="text-sm font-bold text-slate-900">Import preview</h3><p className="text-xs text-slate-500 mt-0.5">{fileName} · {totalRecords.toLocaleString()} records across mapped tables</p></div>
-                <span className="text-xs font-semibold text-slate-600">{plan.length} destinations</span>
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div><h3 className="text-sm font-bold text-slate-900">Import preview</h3><p className="text-xs text-slate-500 mt-0.5">{fileName} · {totalRecords.toLocaleString()} records selected</p></div>
+                  <span className="text-xs font-semibold text-slate-600">{plan.length} destinations</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+                  <input type="search" value={tableSearch} onChange={e => setTableSearch(e.target.value)} placeholder="Search table name or purpose…" aria-label="Search import tables" disabled={busy} className="w-full sm:max-w-sm rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500" />
+                  <div className="flex gap-2">
+                    <button type="button" disabled={busy || selectedTables.length === plan.length} onClick={() => { setSelectedTables(plan.map(row => row.table)); setComplete(false); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-40">Select All</button>
+                    <button type="button" disabled={busy || selectedTables.length === 0} onClick={() => { setSelectedTables([]); setComplete(false); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-40">Unselect All</button>
+                  </div>
+                </div>
               </div>
               <table className="w-full text-xs">
                 <thead><tr className="text-left bg-white border-b border-slate-100"><th className="px-4 py-2">Import</th><th className="px-4 py-2">Supabase table</th><th className="px-4 py-2">Records / progress</th><th className="px-4 py-2">Purpose</th></tr></thead>
-                <tbody>{plan.map(row => {
+                <tbody>{filteredPlan.map(row => {
                   const result = results.find(r => r.table === row.table);
                   const done = result?.succeeded ?? 0;
                   const pct = row.count ? Math.min(100, Math.round((done / row.count) * 100)) : 0;
                   const checked = selectedTables.includes(row.table);
                   return <tr key={row.table} className="border-b border-slate-50">
-                    <td className="px-4 py-2"><input type="checkbox" aria-label={`Select ${row.table}`} checked={checked} disabled={busy || complete} onChange={e => setSelectedTables(prev => e.target.checked ? [...prev, row.table] : prev.filter(t => t !== row.table))} /></td>
+                    <td className="px-4 py-2"><input type="checkbox" aria-label={`Select ${row.table}`} checked={checked} disabled={busy} onChange={e => { setSelectedTables(prev => e.target.checked ? [...prev, row.table] : prev.filter(t => t !== row.table)); setComplete(false); }} /></td>
                     <td className="px-4 py-2 font-mono">{row.table}</td>
                     <td className="px-4 py-2 min-w-44"><div className="font-semibold">{done.toLocaleString()}/{row.count.toLocaleString()} {result ? (result.error ? 'completed before error' : done === row.count ? 'imported' : 'completed') : 'records'}</div>
                       <div className="mt-1 h-2 w-full rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-blue-600 transition-all duration-200" style={{ width: `${pct}%` }} /></div>
@@ -523,13 +535,14 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
                   </tr>;
                 })}</tbody>
               </table>
+              {filteredPlan.length === 0 && <p className="px-4 py-4 text-xs text-slate-500">No tables match “{tableSearch}”.</p>}
               {preflightMessage && <div className="px-4 py-2 text-xs text-slate-700 border-t border-slate-100">{preflightMessage}</div>}
               {complete && <div className="mx-4 mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="inline w-4 h-4 mr-1" />Import completed for all mapped tables. Verify table counts and monthly amount totals before production use.</div>}
             </div>
           )}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="text-[11px] text-slate-500 max-w-2xl">Uses the authenticated Supabase client and admin-only row-level security policies. No service-role key is used in the browser.</div>
-            <button onClick={() => void runImport()} disabled={busy || authBusy || !sessionEmail || !payload || plan.length === 0 || complete} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onClick={() => void runImport()} disabled={busy || authBusy || !sessionEmail || !payload || plan.length === 0 || selectedTables.length === 0} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
               {busy ? <><Loader2 className="w-4 h-4 animate-spin" />Importing…</> : <><FileSpreadsheet className="w-4 h-4" />Import {totalRecords.toLocaleString()} selected records</>}
             </button>
           </div>
