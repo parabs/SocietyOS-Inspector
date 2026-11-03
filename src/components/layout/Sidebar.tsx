@@ -41,6 +41,9 @@ export const Sidebar: React.FC = () => {
     if (['verification-dashboard','opening-balances','transaction-verification','monthly-reconciliation'].includes(currentScreen)) {
       setOpenGroups(prev => ({ ...prev, verification: true }));
     }
+    if (currentScreen === 'data-management') {
+      setOpenGroups(prev => ({ ...prev, admin: true }));
+    }
   }, [currentScreen]);
 
   const toggleGroup = (key: keyof typeof openGroups) => {
