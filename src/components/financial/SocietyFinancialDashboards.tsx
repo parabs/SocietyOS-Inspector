@@ -312,9 +312,11 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         const transactionParticulars=isMemberLedger
           ? (e.kind==='Demand'
               ? String(e.particulars)+' — Member to Pay'
-              : e.movement<0
-                ? String(e.particulars)+' — Member Credit'
-                : String(e.particulars))
+              : String(e.kind).toLowerCase().includes('receipt')
+                ? String(e.particulars)+' — Receipt Received'
+                : e.movement<0
+                  ? String(e.particulars)+' — Credit Adjustment'
+                  : String(e.particulars))
           : String(e.particulars);
         detailRows.push([
           e.date||'—',transactionParticulars,e.voucher,e.category,
