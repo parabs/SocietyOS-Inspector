@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ResponsiveContainer, ComposedChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
@@ -8,6 +8,7 @@ import {
   FileText, Landmark, RefreshCw, Search, ShieldCheck, Users, Wallet, ArrowLeftRight, ClipboardList
 } from 'lucide-react';
 import { useVerification, ScreenId } from '../../context/VerificationContext';
+import { supabaseClient } from '../../services/supabaseClient';
 
 type Props = { screen: ScreenId };
 const fmt = (n:number) => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(Number(n)||0);
@@ -44,9 +45,14 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const [accountFilter,setAccountFilter]=useState<'TDCC'|'BOM'|'CASH'|'ALL'>('TDCC');
  const [activeTab,setActiveTab]=useState('Members');
  const [partySelection,setPartySelection]=useState('');
- const [selectedReport,setSelectedReport]=useState('party-balances');
+ const [selectedReport,setSelectedReport]=useState('member-opening-balance-register');
+ const [openingRegisterRows,setOpeningRegisterRows]=useState<any[]>([]);
+ const [openingRegisterLoading,setOpeningRegisterLoading]=useState(false);
+ const [openingRegisterError,setOpeningRegisterError]=useState<string|null>(null);
+ const [openingRegisterSearch,setOpeningRegisterSearch]=useState('');
  const [reportCategory,setReportCategory]=useState('Debtors & Parties');
  const reportCatalog=[
+  {id:'member-opening-balance-register',name:'Member Opening Balance Register',category:'Debtors & Parties',description:'Approved imported opening balances, FY demand, receipts, adjustments and closing outstanding from the validated Supabase view'},
   {id:'party-balances',name:'Debtors — All Parties',category:'Debtors & Parties',description:'Party type, contact, opening, demand, receipts and closing receivable'},
   {id:'member-ledger',name:'Member / Flat Owner Ledger — Detailed',category:'Debtors & Parties',description:'Opening balance, chronological demands/receipts, running and closing balance'},
   {id:'vendor-ledger',name:'Vendor / Payee Ledger — Detailed',category:'Debtors & Parties',description:'Bills/payments where available, running payable and closing position'},
@@ -90,7 +96,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const reportCategories=['All Reports','Debtors & Parties','Demands & Payments','Ledgers','Financial Statements','Registers','Audit & Governance'];
  const categoryGroups=Array.from(new Set([...categoryMaster.map((x:any)=>String(x.category_group||'').trim()),...transactions.map((t:any)=>String(t.categoryGroup||'').trim())].filter(Boolean))).sort();
  const partyTypes=Array.from(new Set([...[],...partyMaster.map((x:any)=>String(x.party_type||x.party_type_name||'').trim())].filter(Boolean))).sort();
- const reportNumbers:Record<string,string>={'party-balances':'01','member-ledger':'02','vendor-ledger':'03','demand-summary':'04','monthly-demands':'05','monthly-payments':'06','monthly-flat-balance':'07','receipts-payments':'08','income-expense':'09','balance-sheet':'10','trial-balance':'11','monthly-summary':'12','cashbook':'13','receipts':'14','payments':'15','largest-payments-anomalies':'34','bank-recon':'16','expense-analysis':'17','missing-docs':'18','statutory':'19','rectification':'20','party-ledger-summary':'21','party-ledger-monthly':'22','party-ledger-detail':'23','account-ledger-summary':'24','account-ledger-monthly':'25','account-ledger-detail':'26','category-ledger-summary':'27','category-ledger-monthly':'28','category-ledger-detail':'29','receipt-allocation-review':'30','opening-balance-review':'31','adjustments-contra':'32','mapping-exceptions':'33','unidentified-parties':'35','unidentified-accounts':'36','unidentified-categories':'37','payment-mode-quality':'38','transaction-type-quality':'39'};
+ const reportNumbers:Record<string,string>={'member-opening-balance-register':'40','party-balances':'01','member-ledger':'02','vendor-ledger':'03','demand-summary':'04','monthly-demands':'05','monthly-payments':'06','monthly-flat-balance':'07','receipts-payments':'08','income-expense':'09','balance-sheet':'10','trial-balance':'11','monthly-summary':'12','cashbook':'13','receipts':'14','payments':'15','largest-payments-anomalies':'34','bank-recon':'16','expense-analysis':'17','missing-docs':'18','statutory':'19','rectification':'20','party-ledger-summary':'21','party-ledger-monthly':'22','party-ledger-detail':'23','account-ledger-summary':'24','account-ledger-monthly':'25','account-ledger-detail':'26','category-ledger-summary':'27','category-ledger-monthly':'28','category-ledger-detail':'29','receipt-allocation-review':'30','opening-balance-review':'31','adjustments-contra':'32','mapping-exceptions':'33','unidentified-parties':'35','unidentified-accounts':'36','unidentified-categories':'37','payment-mode-quality':'38','transaction-type-quality':'39'};
  const visibleReports=reportCatalog.filter(r=>reportCategory==='All Reports'||r.category===reportCategory);
  const reportCounts=reportCategories.map(cat=>({name:cat,count:cat==='All Reports'?reportCatalog.length:reportCatalog.filter(r=>r.category===cat).length}));
  const loading=isLoadingTransactions||isLoadingDemandRegister||isLoadingMasters;
@@ -164,6 +170,41 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const monthControl=<select value={period} onChange={e=>setPeriod(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>All months</option>{allMonths.map(m=><option key={m}>{m}</option>)}</select>;
  const filterBar=<div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3"><CalendarDays className="h-4 w-4 text-blue-700"/><span className="text-xs font-semibold text-slate-600">Period</span>{monthControl}<select value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>All categories</option>{cats.map(([c])=><option key={c}>{c}</option>)}</select><div className="relative min-w-[190px] flex-1"><Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search party, voucher, category, source…" className="w-full rounded-lg border border-slate-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-blue-400"/></div><button onClick={()=>{setPeriod('All months');setCategoryFilter('All categories');setCategoryGroupFilter('All category groups');setQuery('');setStatusFilter('All statuses');setPartyTypeFilter('All party types')}} className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">Reset</button></div>;
  const reportDemands=demandRegister.filter((d:any)=>!d.financial_year||String(d.financial_year).includes('2018-19'));
+ const openingRegisterFiltered=useMemo(()=>openingRegisterRows.filter((r:any)=>!openingRegisterSearch||[r.party_id,r.party_name,r.flat_no].some(v=>String(v||'').toLowerCase().includes(openingRegisterSearch.toLowerCase().trim()))),[openingRegisterRows,openingRegisterSearch]);
+ useEffect(()=>{
+  if(screen!=='reports'||selectedReport!=='member-opening-balance-register') return;
+  let active=true;
+  const load=async()=>{
+   setOpeningRegisterLoading(true);setOpeningRegisterError(null);
+   const [registerRes,partyRes]=await Promise.all([
+    supabaseClient.from('v_opening_balance_register').select('*').order('party_id'),
+    supabaseClient.from('party_master').select('party_id,party_name,flat_no')
+   ]);
+   if(!active)return;
+   if(registerRes.error){setOpeningRegisterError(registerRes.error.message);setOpeningRegisterRows([]);setOpeningRegisterLoading(false);return;}
+   if(partyRes.error){setOpeningRegisterError('Member names could not be loaded: '+partyRes.error.message);setOpeningRegisterRows([]);setOpeningRegisterLoading(false);return;}
+   const partyMap=new Map((partyRes.data||[]).map((p:any)=>[String(p.party_id||''),p]));
+   setOpeningRegisterRows((registerRes.data||[]).map((r:any)=>{
+    const p:any=partyMap.get(String(r.party_id||''))||{};
+    return {...r,party_name:p.party_name||'Name not available',flat_no:p.flat_no||'—'};
+   }));
+   setOpeningRegisterLoading(false);
+  };
+  load().catch((e:any)=>{if(active){setOpeningRegisterError(e?.message||'Unable to load opening balance register.');setOpeningRegisterLoading(false);}});
+  return ()=>{active=false;};
+ },[screen,selectedReport]);
+ const openingRegisterTotals=useMemo(()=>openingRegisterFiltered.reduce((a:any,r:any)=>({
+  opening:a.opening+Number(r.opening_balance||0),
+  demand:a.demand+Number(r.current_fy_demand||0),
+  receipts:a.receipts+Number(r.current_fy_receipts||0),
+  adjustments:a.adjustments+Number(r.adjustments||0),
+  outstanding:a.outstanding+Number(r.total_outstanding||0)
+ }),{opening:0,demand:0,receipts:0,adjustments:0,outstanding:0}),[openingRegisterFiltered]);
+ const exportOpeningRegister=()=>downloadCsv('member-opening-balance-register-fy2018-19.csv',[
+  ["Pearl Meadows 'C' Type 'C' Wing Chs Ltd"],['Member Opening Balance Register — FY 2018-19'],
+  ['Party ID','Member Name','Flat No','Opening Balance','Current FY Demand','Current FY Receipts','Adjustments','Total Outstanding','Financial Year','Notes','Balance Interpretation'],
+  ...openingRegisterFiltered.map((r:any)=>[r.party_id,r.party_name,r.flat_no,r.opening_balance,r.current_fy_demand,r.current_fy_receipts,r.adjustments,r.total_outstanding,r.financial_year,r.notes,Number(r.total_outstanding)<0?'Member owes Society':Number(r.total_outstanding)>0?'Society owes member':'Nil'])
+ ]);
  const reportData = useMemo(() => {
   const txRows = (kind:'Receipt'|'Payment') => filtered.filter(t=>t.type===kind&&t.transactionClass!=='Contra').map(t=>[t.date||'—',t.id||'—',t.party||'Unmapped',t.categoryName||'Unclassified',t.accountName||'Unmapped',currencyCell(Math.abs(Number(t.amount)||0)),t.voucherNo||t.receiptNo||'—',statusPill(t.evidenceStatus||'Pending')]);
   const partyPayments = Object.entries(filtered.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra').reduce((a:Record<string,{count:number;amount:number;gaps:number}>,t)=>{const k=t.party||'Unmapped payee';a[k]??={count:0,amount:0,gaps:0};a[k].count++;a[k].amount+=Math.abs(Number(t.amount)||0);if(t.evidenceStatus!=='Complete')a[k].gaps++;return a;},{})).sort((a,b)=>b[1].amount-a[1].amount).map(([k,v])=>[k,num(v.count),currencyCell(v.amount),currencyCell(v.amount/Math.max(1,v.count)),num(v.gaps)]);
@@ -729,11 +770,31 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
     <button onClick={()=>{setPartyTypeFilter('All party types');setCategoryGroupFilter('All category groups');setQuery('');setAccountFilter('ALL')}} className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px] text-slate-600">Reset report filters</button>
    </div>
    {selectedReport==='party-balances'&&<div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><Card label="Member balance records" value={num(cumulativeOutstanding.length)} detail="Cumulative outstanding register" icon={Users}/><Card label="Members with dues" value={num(cumulativeOutstanding.filter(r=>Number(r.net_outstanding||0)>0).length)} detail="Positive outstanding balance" icon={AlertTriangle} tone="amber"/><Card label="Net outstanding" value={fmt(cumulativeOutstanding.reduce((s,r)=>s+Number(r.net_outstanding||0),0))} detail="Verify opening balances and allocations" icon={Wallet} tone="red"/></div>}
-   <Panel title={'RPT-'+(reportNumbers[selectedReport]||'—')+' · '+reportData.title} action={<button onClick={()=>downloadCsv('society-report-'+selectedReport+'.csv',[[reportData.title],reportData.headers,...reportData.rows.map(row=>row.map(v=>typeof v==='object'&&v!==null&&'props' in v?String((v as any).props.children??''):String(v??'')))])} className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Export this report</button>}>
+   {selectedReport==='member-opening-balance-register'?<Panel title="RPT-40 · Member Opening Balance Register — FY 2018–19" action={<button onClick={exportOpeningRegister} disabled={openingRegisterLoading||openingRegisterRows.length===0} className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Export CSV</button>}>
+    <div className="mb-4 border-b-2 border-slate-800 pb-3 text-center"><h2 className="text-base font-bold uppercase tracking-wide text-slate-900">Pearl Meadows 'C' Type 'C' Wing Chs Ltd</h2><p className="mt-1 text-xs font-semibold text-slate-700">Regd. No. TNA/KLN/HSG(TC) 27051/2014-15/YEAR 2014</p><h3 className="mt-3 text-sm font-bold uppercase text-slate-900">Member Opening Balance Register</h3><p className="mt-1 text-[11px] text-slate-600">Financial Year: FY 2018–19 · Source: validated Supabase view · Generated: {new Date().toLocaleDateString('en-IN')}</p></div>
+    <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">Calculation is read directly from <strong>v_opening_balance_register</strong>; this screen does not recalculate or modify member balances. Total Outstanding = Opening Balance + Current FY Receipts − Current FY Demand + Adjustments. Negative balance: member owes Society. Positive balance: Society owes member / credit balance.</p>
+    <div className="mb-3"><input value={openingRegisterSearch} onChange={e=>setOpeningRegisterSearch(e.target.value)} placeholder="Search Party ID, member name or flat number…" className="w-full max-w-md rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500"/></div>
+    {openingRegisterError&&<div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">Unable to load the register: {openingRegisterError}. Check Supabase view access and RLS permissions.</div>}
+    {openingRegisterLoading?<div className="py-10 text-center text-sm text-slate-500">Loading member opening balance register…</div>:<>
+     <div className="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-5">
+      <Card label="Member Records" value={num(openingRegisterFiltered.length)} detail="Filtered member accounts" icon={Users}/>
+      <Card label="Opening Balance" value={fmt(openingRegisterTotals.opening)} detail="As imported" icon={Wallet}/>
+      <Card label="FY Demand" value={fmt(openingRegisterTotals.demand)} detail="FY 2018–19 net demand" icon={FileText}/>
+      <Card label="FY Receipts" value={fmt(openingRegisterTotals.receipts)} detail="Demand-register paid amounts" icon={Banknote} tone="green"/>
+      <Card label="Total Outstanding" value={fmt(openingRegisterTotals.outstanding)} detail="Calculated from approved formula" icon={AlertTriangle} tone="amber"/>
+     </div>
+     <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs"><span className="text-slate-600">Adjustments</span><div className="mt-1 text-lg font-bold">{fmt(openingRegisterTotals.adjustments)}</div></div>
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs"><span className="text-slate-600">Formula</span><div className="mt-1 font-semibold">Opening + Receipts − Demand + Adjustments</div></div>
+     </div>
+     <Table headers={['Party ID','Member Name','Flat No','Opening Balance','FY Demand','FY Receipts','Adjustments','Total Outstanding','Position','FY','Notes']} rows={openingRegisterFiltered.map((r:any)=>{const v=Number(r.total_outstanding)||0;return [r.party_id||'—',r.party_name||'—',r.flat_no||'—',currencyCell(Number(r.opening_balance)||0),currencyCell(Number(r.current_fy_demand)||0),currencyCell(Number(r.current_fy_receipts)||0),currencyCell(Number(r.adjustments)||0),<span className={'font-bold '+(v<0?'text-red-700':v>0?'text-emerald-700':'text-slate-700')}>{fmt(v)}</span>,v<0?'Member owes Society':v>0?'Society owes member':'Nil',r.financial_year||'—',r.notes||'—'];})}/>
+     <div className="mt-3 text-[10px] text-slate-500">Showing {openingRegisterFiltered.length} of {openingRegisterRows.length} member records. Values shown are sourced from the validated database view; names and flat numbers are looked up from Party Master. No source records are edited by this report.</div>
+    </>}
+   </Panel>:<Panel title={'RPT-'+(reportNumbers[selectedReport]||'—')+' · '+reportData.title} action={<button onClick={()=>downloadCsv('society-report-'+selectedReport+'.csv',[[reportData.title],reportData.headers,...reportData.rows.map(row=>row.map(v=>typeof v==='object'&&v!==null&&'props' in v?String((v as any).props.children??''):String(v??'')))])} className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Export this report</button>}>
 <div className="mb-4 border-b-2 border-slate-800 pb-3 text-center"><h2 className="text-base font-bold uppercase tracking-wide text-slate-900">Pearl Meadows 'C' Type 'C' Wing Chs Ltd</h2><p className="mt-1 text-xs font-semibold text-slate-700">Regd. No. TNA/KLN/HSG(TC) 27051/2014-15/YEAR 2014</p><h3 className="mt-3 text-sm font-bold uppercase text-slate-900">{reportData.title}</h3><p className="mt-1 text-[11px] text-slate-600">Financial Year: FY 2018–19 · Report No. RPT-{reportNumbers[selectedReport]||'—'} · Generated: {new Date().toLocaleDateString('en-IN')}</p></div>
     <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{reportData.note}</p>
     <Table headers={reportData.headers} rows={reportData.rows}/>
-   </Panel>
+   </Panel>}
   </>}
   </div></div>}
 
