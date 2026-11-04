@@ -964,7 +964,11 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const fyDemand=memberDemands.reduce((s:number,d:any)=>s+demandAmount(d),0);
     const receiptRows=filtered.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&isMemberParty(t));
     const fyReceipts=receiptRows.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
-    const dueRows=cumulativeOutstanding.filter((r:any)=>isMemberParty(r)&&Number(r.net_outstanding||0)<0).sort((a:any,b:any)=>Number(b.net_outstanding||0)-Number(a.net_outstanding||0));
+    // Use the FY Member Balance Register as the source of truth for this dashboard.
+    // Cumulative outstanding is a separate all-period view and can disagree with FY closing balances.
+    const dueRows=memberFinancialBalances
+     .filter((r:any)=>isMemberParty(r)&&Number(r.closing_balance||0)<0)
+     .sort((a:any,b:any)=>Number(a.closing_balance||0)-Number(b.closing_balance||0));
     const demandGroupName=(d:any)=>{
      const category=categoryMaster.find((c:any)=>String(c.category_id??c.id??'')===String(d.category_id??d.categoryId??'')||String(c.category_name??'')===demandCategory(d));
      return String(category?.demand_group??'').trim()||'Unmapped Demand Group';
@@ -1088,9 +1092,9 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      groupPerformance[group].count++;
     });
     const collectionEfficiencyData=Object.entries(groupPerformance).map(([name,g])=>({...g,name,efficiency:g.demand?g.collected/g.demand*100:0})).sort((a,b)=>a.efficiency-b.efficiency);
-    const top=dueRows.slice(0,5).map((r:any)=>({party:String(r.flat_no||r.member_name||'Unidentified'),amount:Math.abs(Number(r.net_outstanding)||0)}));
+    const top=dueRows.slice(0,5).map((r:any)=>({party:String(r.flat_no||r.member_name||'Unidentified'),amount:Math.abs(Number(r.closing_balance)||0)}));
     // Register convention: negative balance = member owes Society; positive = member credit.
-    const outstanding=cumulativeOutstanding.filter((r:any)=>isMemberParty(r)&&Number(r.net_outstanding||0)<0).reduce((sum:number,r:any)=>sum+Math.abs(Number(r.net_outstanding)||0),0);
+    const outstanding=dueRows.reduce((sum:number,r:any)=>sum+Math.abs(Number(r.closing_balance)||0),0);
     const rate=fyDemand?fyReceipts/fyDemand*100:0;
     const allocated=Array.isArray(demandAllocations)?demandAllocations.length:0;
     return <>
