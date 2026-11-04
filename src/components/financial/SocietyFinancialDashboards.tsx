@@ -777,7 +777,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const expenseTransactions=filtered.filter(t=>{
      if(!((t.type==='Payment'||t.transactionClass==='Payment')&&t.transactionClass!=='Contra'))return false;
      const category=categoryMaster.find((c:any)=>String(c.category_name||'')===String(t.categoryName||''))||{};
-     const demandGroup=String(category.demand_group||t.demandGroup||'Unmapped Demand Group');
+     const demandGroup=String(category.demand_group||'Unmapped Demand Group');
      return expenseDemandGroupFilter==='All demand groups'||demandGroup===expenseDemandGroupFilter;
     });
     const names=Array.from(new Set(expenseTransactions.map(t=>t.categoryName||'Unclassified'))).sort((a,b)=>a.localeCompare(b));
