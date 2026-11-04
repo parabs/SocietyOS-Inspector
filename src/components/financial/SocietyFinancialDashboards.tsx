@@ -310,7 +310,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     if(isParty&&!isVendor){flatOwnerMaster.forEach((x:any)=>{const name=String(x.owner_name||x.flat_no||'');const type=String(partyMaster.find((p:any)=>String(p.party_name||'')===name)?.party_type||'Unclassified');if(name)keys.add(`${type}¦${name}`);});memberFinancialBalances.forEach((x:any)=>{const name=String(x.member_name||x.flat_no||'');const type=String(partyMaster.find((p:any)=>String(p.party_name||'')===name)?.party_type||'Unclassified');if(name)keys.add(`${type}¦${name}`);});}
     if(isCategory) categoryMaster.forEach((x:any)=>keys.add(String(x.category_name||'Unclassified')));
     const scopedKeys=Array.from(keys).filter(k=>k&&(!query||k.toLowerCase().includes(query.toLowerCase()))&&(!isParty||partyTypeFilter==='All party types'||String(k.split('¦')[0]||'Unclassified')===partyTypeFilter)).sort();
-    const openingFor=(key:string)=>isParty&&!isVendor?Number(memberFinancialBalances.find((x:any)=>String(x.member_name||'')===key.split('¦').slice(1).join('¦')||String(x.flat_no||'')===key.split('¦').slice(1).join('¦'))?.opening_balance)||0:isAccount?Number(openingBalances.find((x:any)=>String(x.accountName||'')===key||String(x.accountId||'')===key)?.recordedOpeningBalance)||0:0;
+    const openingFor=(key:string)=>isParty&&!isVendor?Number(memberFinancialBalances.find((x:any)=>String(x.financial_year||'')==='FY 2018-19'&&(String(x.member_name||'')===key.split('¦').slice(1).join('¦')||String(x.flat_no||'')===key.split('¦').slice(1).join('¦')))?.opening_balance)||0:isAccount?Number(openingBalances.find((x:any)=>String(x.accountName||'')===key||String(x.accountId||'')===key)?.recordedOpeningBalance)||0:0;
     if(mode==='summary'){
       const rows=scopedKeys.map(key=>{const ts=sourceTx.filter(t=>getKey(t)===key),opening=openingFor(key),rec=ts.filter(t=>t.type==='Receipt').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0),pay=ts.filter(t=>t.type==='Payment').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0),demand=isParty?reportDemands.filter((d:any)=>String(d.member_name||d.party_name||d.flat_no||d.member_id||'')===key.split('¦').slice(1).join('¦')).reduce((s,d)=>s+Number(d.total_demand||0),0):0;return isParty?[key.split('¦')[0],key.split('¦').slice(1).join('¦'),currencyCell(opening),currencyCell(demand),currencyCell(rec),currencyCell(opening+demand-rec)]:isAccount?[key,currencyCell(opening),currencyCell(rec),currencyCell(pay),currencyCell(opening+rec-pay)]:[...key.split('¦'),currencyCell(rec),currencyCell(pay),currencyCell(rec-pay)];});
       return {title:(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Summary',note:isParty?'Party closing balances are provisional where opening balances, demand mapping or receipt allocation are incomplete.':isAccount?'Opening balances use the earliest available reconciliation record and must be checked against the approved opening balance.':'Income/expense category movement is not a brought-forward accounting balance.',headers:isParty?['Party Type','Party Name','Opening Balance','Demand / Charges','Receipts','Closing Receivable']:isAccount?['Account Name','Opening Balance','Receipts','Payments','Closing Balance']:['Demand Group','Category Group','Category Name','Receipts / Income','Payments / Expense','Net Movement'],rows};
@@ -428,7 +428,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         ...memberDemands
       ].sort((a,b)=>a.date.localeCompare(b.date));
       const groupOpeningKnown=isParty
-        ? memberFinancialBalances.some((x:any)=>String(x.member_name||'')===groupLabel||String(x.flat_no||'')===groupLabel)
+        ? memberFinancialBalances.some((x:any)=>String(x.financial_year||'')==='FY 2018-19'&&(String(x.member_name||'')===groupLabel||String(x.flat_no||'')===groupLabel))
         : isAccount
           ? openingBalances.some((x:any)=>String(x.accountName||'')===key||String(x.accountId||'')===key)
           : false;
@@ -516,7 +516,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    }
    case 'opening-balance-review': {
     const accounts=(openingBalances||[]).map((a:any)=>['Account',a.accountName||a.accountId||'Unidentified account',a.recordedOpeningBalance==null?'Not recorded':currencyCell(Number(a.recordedOpeningBalance)||0),a.verificationStatus||a.status||'Not verified',a.remarks||'Confirm against prior-year audited closing balance']);
-    const members=(memberFinancialBalances||[]).map((m:any)=>['Member / Owner',m.member_name||m.flat_no||'Unidentified member',m.opening_balance==null?'Not recorded':currencyCell(Number(m.opening_balance)||0),m.opening_balance_status||m.verification_status||'Not verified',m.notes||'Confirm against FY 2017–18 closing member ledger']);
+    const members=(memberFinancialBalances||[]).filter((m:any)=>String(m.financial_year||'')==='FY 2018-19').map((m:any)=>['Member / Owner',m.member_name||m.flat_no||'Unidentified member',m.opening_balance==null?'Not recorded':currencyCell(Number(m.opening_balance)||0),m.opening_balance_status||m.verification_status||'Not verified',m.notes||'Confirm against FY 2017–18 closing member ledger']);
     return {title:'Opening Balance Verification & Exceptions',note:'Missing opening values are labelled Not recorded; zero is not substituted. Verify account balances against prior-year audited statements and member balances against approved closing schedules.',headers:['Balance Type','Account / Party','Recorded Opening Balance','Verification Status','Action / Notes'],rows:[...accounts,...members]};
    }
    case 'adjustments-contra': {
@@ -597,7 +597,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      const id=String(d.party_id||'');if(!id)return;
      const p=partyMaster.find((x:any)=>String(x.party_id)===id);
      if(!parties.has(id)){
-      const opening=Number(memberFinancialBalances.find((b:any)=>String(b.party_id||'')===id)?.opening_balance)||0;
+      const opening=Number(memberFinancialBalances.find((b:any)=>String(b.financial_year||'')==='FY 2018-19'&&String(b.party_id||'')===id)?.opening_balance)||0;
       parties.set(id,{id,name:p?.party_name||d.member_name||id,type:p?.party_type||'Member',opening,groupAmounts:{},adjustments:0});
      }
      if(period!=='All months'&&monthKey(d.month||d.demand_month)!==monthKey(period))return;
@@ -716,28 +716,26 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     return {title:'RPT-16 · Receipts & Payments Account',note:'Cash and bank movement statement generated from connected transactions. Receipt and payment heads are grouped by Category Group → Category Name. Contra transfers are excluded from consolidated cash movement to avoid double counting. Opening balances are shown only where Account Master opening records are available. Closing balance is a calculated provisional movement, not a bank-reconciled balance. Debtors, investments and unpaid liabilities are not treated as cash receipts or payments unless represented by actual cash/bank transactions.',headers:['RECEIPTS — Particulars','Amount (₹)','PAYMENTS — Particulars','Amount (₹)'],rows,openingAccounts:accountRows,summary:{openingAvailable,openingTotal,receiptTotal,paymentTotal,closingTotal,contraTotal,transactionCount:movement.length},receiptHeads:receiptsByHead,paymentHeads:paymentsByHead};
    }
    case 'party-balances': {
-    // Party balance is calculated from opening + recorded demands - actual receipts - approved adjustments.
-    const rows=(partyMaster as any[]).filter(p=>p.party_type!=='Bank Account').map(p=>{
-      const owner=flatOwnerMaster.find((o:any)=>String(o.owner_name||'').trim().toLowerCase()===String(p.contact_person||'').trim().toLowerCase()||String(o.owner_name||'').trim().toLowerCase()===String(p.party_name||'').trim().toLowerCase());
-      const flat=String(p.flat_no||owner?.flat_no||(owner as any)?.flat_number_source_value||'');
-      const bal=memberFinancialBalances.find((b:any)=>String(b.party_id||'')===String(p.party_id||''))||memberFinancialBalances.find((b:any)=>String(b.flat_no||'')===flat||String(b.member_name||'')===String(p.party_name||''));
-      const ds=reportDemands.filter((d:any)=>String(d.party_id||'')===String(p.party_id||'')||(flat&&String(d.flat_no||'')===flat));
-      const partyLabels=new Set([p.party_name,p.contact_person,flat,owner?.owner_name].filter(Boolean).map((v:any)=>String(v).trim().toLowerCase()));
-      const demandParty=new Map<string,string>(); reportDemands.forEach((d:any)=>{const did=String(d.demand_id||d.id||'');if(did&&d.party_id)demandParty.set(did,String(d.party_id));}); const receipts=transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&(demandParty.get(transactionDemandId(t))===String(p.party_id||'')||partyLabels.has(String(t.party||'').trim().toLowerCase())));
-      const paid=receipts.reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);
-      const billed=ds.reduce((sum,d)=>sum+Number(d.total_demand??d.demand_amount??0),0);
-      const demandIds=new Set(ds.map((d:any)=>String(d.demand_id||d.id||'')));
-      const adjustment=demandAdjustments.filter((a:any)=>a.is_approved===true&&demandIds.has(String(a.demand_id||''))).reduce((sum,a)=>sum+Number(a.amount??a.adjustment_amount??0),0);
-      const opening=Number(bal?.opening_balance)||0;
-      const net=opening+billed-paid-adjustment;
-      const closing=Math.max(0,net);
-      const status=net>0.005?'Outstanding':net< -0.005?'Advance Paid':'No Dues';
-      const receiptDates=receipts.map(t=>String(t.date||'')).filter(Boolean).sort();
-      return {partyType:p.party_type||'Unclassified',name:p.party_name||owner?.owner_name||'Unidentified party',opening,billed,paid,adjustment,closing,last:receiptDates.at(-1)||'—',status};
-    }).filter(x=>!query||[x.name,x.partyType].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).filter(x=>partyTypeFilter==='All party types'||x.partyType===partyTypeFilter).sort((a,b)=>a.partyType.localeCompare(b.partyType)||a.name.localeCompare(b.name));
-    return {title:'Debtors — All Parties',note:'Sorted by Party Type and Party Name. Closing position = Opening Balance + recorded demands − actual party-matched receipts − approved demand adjustments. No Dues means zero balance; Outstanding means amount receivable; Advance Paid means receipts exceed recorded dues. This report does not infer unrecorded demands or allocate unmatched receipts.',headers:['Sr. No.','Party Type','Party Name','Opening Balance','Total Demand','Total Received','Approved Adjustments','Closing Receivable','Last Payment','Status'],rows:rows.map((x,i)=>[i+1,x.partyType,x.name,currencyCell(x.opening),currencyCell(x.billed),currencyCell(x.paid),currencyCell(x.adjustment),currencyCell(x.closing),x.last,statusPill(x.status)])};
-   }
-   case 'member-ledger': return {title:'Member / Flat Owner Ledger',note:'Combines available FY balance records with cumulative member balances. Demand-to-receipt matching is provisional where allocations are incomplete.',headers:['Flat No','Member','Opening balance','Billed','Received','Adjustments','Closing / outstanding'],rows:cumulativeOutstanding.filter(r=>!query||[r.flat_no,r.member_name].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).map(r=>{const b=memberFinancialBalances.find(x=>x.flat_no===r.flat_no);return [r.flat_no||'—',r.member_name||'Unmapped',currencyCell(Number(b?.opening_balance)||0),currencyCell(Number(r.total_billed??b?.billed_amount)||0),currencyCell(Number(r.total_received??b?.received_amount)||0),currencyCell(Number(r.total_adjustments??b?.adjusted_amount)||0),currencyCell(Number(r.net_outstanding??b?.closing_balance)||0)]})};
+     // Member receivables are sourced from the central FY balance calculation.
+     // Staff, utilities and vendors are payables and are intentionally excluded from Debtors.
+     const rows=(partyMaster as any[]).filter(p=>String(p.party_type||'')==='Member').map(p=>{
+       const bal=memberFinancialBalances.find((b:any)=>String(b.financial_year||'')==='FY 2018-19'&&String(b.party_id||'')===String(p.party_id||''));
+       const opening=Number(bal?.opening_balance)||0;
+       const billed=Number(bal?.current_fy_demand??bal?.billed_amount)||0;
+       const paid=Number(bal?.current_fy_receipts??bal?.received_amount)||0;
+       const adjustment=Number(bal?.adjustments??bal?.adjusted_amount)||0;
+       const signed=Number(bal?.total_outstanding??bal?.closing_balance);
+       const signedClosing=Number.isFinite(signed)?signed:opening-billed+paid+adjustment;
+       const closing=Math.max(0,-signedClosing);
+       const demandIds=new Set(reportDemands.filter((d:any)=>String(d.party_id||'')===String(p.party_id||'')).map((d:any)=>String(d.demand_id||d.id||'')));
+       const receipts=transactions.filter(t=>t.type==='Receipt'&&demandIds.has(transactionDemandId(t)));
+       const receiptDates=receipts.map(t=>String(t.date||'')).filter(Boolean).sort();
+       const owner=flatOwnerMaster.find((o:any)=>String(o.owner_name||'').trim().toLowerCase()===String(p.party_name||'').trim().toLowerCase());
+       return {partyType:p.party_type||'Member',name:p.party_name||owner?.owner_name||'Unidentified party',opening,billed,paid,adjustment,closing,last:receiptDates.at(-1)||'—',status:signedClosing< -0.005?'Outstanding':signedClosing>0.005?'Advance Paid':'No Dues'};
+     }).filter(x=>!query||[x.name,x.partyType].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).filter(x=>partyTypeFilter==='All party types'||x.partyType===partyTypeFilter).sort((a,b)=>a.partyType.localeCompare(b.partyType)||a.name.localeCompare(b.name));
+     return {title:'Debtors — All Member Parties',note:'Member receivables only, calculated from the central FY 2018–19 balance view. Staff, utilities and vendors are payables and are excluded from Debtors. Negative signed balance means amount receivable; positive signed balance means member credit.',headers:['Sr. No.','Party Type','Party Name','Opening Balance','Total Demand','Total Received','Approved Adjustments','Closing Receivable','Last Payment','Status'],rows:rows.map((x,i)=>[i+1,x.partyType,x.name,currencyCell(x.opening),currencyCell(x.billed),currencyCell(x.paid),currencyCell(x.adjustment),currencyCell(x.closing),x.last,statusPill(x.status)])};
+    }
+    case 'member-ledger': return {title:'Member / Flat Owner Ledger',note:'Combines available FY balance records with cumulative member balances. Demand-to-receipt matching is provisional where allocations are incomplete.',headers:['Flat No','Member','Opening balance','Billed','Received','Adjustments','Closing / outstanding'],rows:cumulativeOutstanding.filter(r=>!query||[r.flat_no,r.member_name].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).map(r=>{const b=memberFinancialBalances.find(x=>String(x.financial_year||'')==='FY 2018-19'&&x.flat_no===r.flat_no);return [r.flat_no||'—',r.member_name||'Unmapped',currencyCell(Number(b?.opening_balance)||0),currencyCell(Number(r.total_billed??b?.billed_amount)||0),currencyCell(Number(r.total_received??b?.received_amount)||0),currencyCell(Number(r.total_adjustments??b?.adjusted_amount)||0),currencyCell(Number(r.net_outstanding??b?.closing_balance)||0)]})};
    case 'vendor-ledger': return {title:'Vendor / Payee Ledger',note:'Transaction-based payments ledger. Opening payable, bills outstanding and advances need verified vendor opening balances and bill data.',headers:['Vendor / Payee','Payment entries','Total paid','Average payment','Evidence gaps'],rows:partyPayments};
    case 'receipts': return {title:'Receipts Register',note:'Receipt transactions excluding contra transfers. Cheque number is shown where applicable; missing cheque numbers are flagged only for cheque-mode receipts. Member demand/paid/balance columns are provisional unless receipt allocations are available.',headers:['Date','Transaction ID','Payer','Category Group','Category','Account','Payment Mode','Cheque No.','Amount','Receipt No.','Voucher / Reference','Evidence'],rows:filtered.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra').map(t=>[t.date||'—',t.id||'—',t.party||'Unmapped',t.categoryGroup||categoryMaster.find((x:any)=>x.category_name===t.categoryName)?.category_group||'Unmapped',t.categoryName||'Unclassified',t.accountName||'Unmapped',t.paymentMode||'—',String(t.paymentMode||'').toLowerCase().includes('cheque')?(t.chequeNo||'MISSING — REVIEW'):'N/A',currencyCell(Math.abs(Number(t.amount)||0)),t.receiptNo||'Missing',t.voucherNo||t.id||'—',statusPill(t.evidenceStatus||'Pending')])};
    case 'largest-payments-anomalies': {
@@ -967,7 +965,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     // Use the FY Member Balance Register as the source of truth for this dashboard.
     // Cumulative outstanding is a separate all-period view and can disagree with FY closing balances.
     const dueRows=memberFinancialBalances
-     .filter((r:any)=>isMemberParty(r)&&Number(r.closing_balance||0)<0)
+     .filter((r:any)=>isMemberParty(r)&&String(r.financial_year||'')==='FY 2018-19'&&Number(r.closing_balance||0)<0)
      .sort((a:any,b:any)=>Number(a.closing_balance||0)-Number(b.closing_balance||0));
     const demandGroupName=(d:any)=>{
      const category=categoryMaster.find((c:any)=>String(c.category_id??c.id??'')===String(d.category_id??d.categoryId??'')||String(c.category_name??'')===demandCategory(d));
