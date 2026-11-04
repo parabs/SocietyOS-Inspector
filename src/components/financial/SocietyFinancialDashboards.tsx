@@ -522,13 +522,12 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     // Members-only report with a fixed, audit-friendly Demand Group column order.
     const isMember=(party:any)=>/^members?$/i.test(String(party?.party_type||party?.party_type_name||'').trim());
     const categoryById=new Map(categoryMaster.map((c:any)=>[String(c.category_id||c.id||''),c]));
-    const demandGroupColumns=['Maintenance Charges','Parking Charges','Non-Occupancy Charges','Delay Charges','Other Recoveries'];
+    const demandGroupColumns=['Maintenance Charges','Non-Occupancy Charges','Delay Charges','Other Recoveries'];
     const getDemandGroupColumn=(d:any)=>{
      const c:any=categoryById.get(String(d.category_id||''))||{};
      const raw=String(c.demand_group||'').trim();
      const group=raw.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-     if(/maintenance/.test(group))return 'Maintenance Charges';
-     if(/parking/.test(group))return 'Parking Charges';
+     if(/maintenance|parking/.test(group))return 'Maintenance Charges';
      if(/non occupancy|nonoccupancy|noc/.test(group))return 'Non-Occupancy Charges';
      if(/delay|late payment|penalty/.test(group))return 'Delay Charges';
      // Remaining classified member demand groups are presented as Other Recoveries.
@@ -564,7 +563,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const headers=['Party Type','Party Name','Opening Balance',...demandGroupColumns,'Total Current Period Demand','Total Demands','Approved Adjustments'];
     const tableRows=rows.map(p=>[p.type,p.name,currencyCell(p.opening),...demandGroupColumns.map((group:string)=>currencyCell(p.groupAmounts[group]||0)),currencyCell(p.periodDemand),currencyCell(p.opening+p.periodDemand),currencyCell(p.adjustments)]);
     const totals=['TOTAL — MEMBERS','',currencyCell(rows.reduce((v:number,p:any)=>v+p.opening,0)),...demandGroupColumns.map((group:string)=>currencyCell(rows.reduce((v:number,p:any)=>v+Number(p.groupAmounts[group]||0),0))),currencyCell(rows.reduce((v:number,p:any)=>v+p.periodDemand,0)),currencyCell(rows.reduce((v:number,p:any)=>v+p.opening+p.periodDemand,0)),currencyCell(rows.reduce((v:number,p:any)=>v+p.adjustments,0))];
-    return {title:'Demand Summary — Members Only',note:'Members only. Demand Group values from Category Master are mapped into the fixed columns: Maintenance Charges, Parking Charges, Non-Occupancy Charges, Delay Charges and Other Recoveries. The selected period filter applies to all demand columns. Any member Demand Group not matching the first four classifications is included in Other Recoveries. Opening balance and approved adjustments are shown separately. Non-member parties and ad-hoc transactions are excluded.',headers,rows:[...tableRows,totals]};
+    return {title:'Demand Summary — Members Only',note:'Members only. Demand Group values from Category Master are mapped into the fixed columns: Maintenance Charges (including Parking), Non-Occupancy Charges, Delay Charges and Other Recoveries. The selected period filter applies to all demand columns. Any member Demand Group not matching the first four classifications is included in Other Recoveries. Opening balance and approved adjustments are shown separately. Non-member parties and ad-hoc transactions are excluded.',headers,rows:[...tableRows,totals]};
    }
    case 'monthly-demands': {
     const parties=new Map<string,any>();
