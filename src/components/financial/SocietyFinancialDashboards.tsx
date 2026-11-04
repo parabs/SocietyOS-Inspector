@@ -360,7 +360,8 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
             return demandParty===partyName.trim().toLowerCase()&&
               normalizeMonth(d.demand_month||d.month||d.reporting_month||d.demand_date||d.bill_date)===monthKey;
           }).reduce((sum,d)=>sum+Number(d.total_demand??d.demand_amount??0),0):0;
-          const memberMovement=dem-rec;
+          const bounceReversal=ts.filter(t=>t.transactionClass==='Contra'&&/bounce/i.test(String(t.description||''))&&!/bank charge/i.test(String(t.description||''))).reduce((sum,t)=>sum+(Number(t.amount)||0),0);
+          const memberMovement=-dem+rec+bounceReversal;
           const accountMovement=rec-pay+contra;
           running+=isParty?memberMovement:isAccount?accountMovement:accountMovement;
           return {rec,pay,contra,dem,closing:running,net:accountMovement};
@@ -376,7 +377,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const detailRows:any[][]=[];
     const moneyText=(value:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(Number(value)||0);
     scopedKeys.forEach(key=>{
-      const groupTransactions=sourceTx.filter(t=>getKey(t)===key&&(isAccount||t.transactionClass!=='Contra')).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||'')));
+      const groupTransactions=sourceTx.filter(t=>getKey(t)===key&&(isAccount||t.transactionClass!=='Contra'||(isParty&&!isVendor&&/bounce/i.test(String(t.description||''))&&!/bank charge/i.test(String(t.description||''))))).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||'')));
       const opening=openingFor(key);
       const groupLabel=isParty?key.split('¦').slice(1).join('¦'):isAccount?key:key.split('¦').join(' / ');
       const partyType=isParty?key.split('¦')[0]:'';
@@ -406,7 +407,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         const categoryName=String(d.category_name||demandCategory?.category_name||'Maintenance Charges');
         const demandMonth=formatDemandMonth(d.demand_month||d.month||d.reporting_month,d.demand_date||d.bill_date);
         const particulars=categoryName+(demandMonth?' for '+demandMonth:'');
-        return {date:String(d.demand_date||d.created_at||d.month||''),particulars,voucher:String(d.demand_id||d.id||'Demand Register'),category:categoryName,movement:Number(d.total_demand||d.demand_amount||0),kind:'Demand'};
+        return {date:String(d.demand_date||d.created_at||d.month||''),particulars,voucher:String(d.demand_id||d.id||'Demand Register'),category:categoryName,movement:-Math.abs(Number(d.total_demand||d.demand_amount||0)),kind:'Demand'};
       }):[];
       const events:any[]=[
         ...groupTransactions.map(t=>{
@@ -417,7 +418,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
           // Member receivable convention: demand/payment increases debit; receipt reduces it.
           // Other ledgers preserve the signed source amount: positive = credit/inflow, negative = debit/outflow.
           const movement=isParty&&!isVendor
-            ? (String(t.type||'').toLowerCase()==='receipt'?-Math.abs(rawAmount):String(t.type||'').toLowerCase()==='payment'?Math.abs(rawAmount):rawAmount)
+            ? (String(t.type||'').toLowerCase()==='receipt'?Math.abs(rawAmount):String(t.type||'').toLowerCase()==='payment'?-Math.abs(rawAmount):rawAmount)
             : rawAmount;
           return {
             date:String(t.date||''),particulars:(isAccount&&isContra?'Contra — ':'')+(isAccount&&isAdjustment?'Adjustment — ':'')+String(t.description||t.party||t.categoryName||'Transaction'),
@@ -435,9 +436,9 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       // Group header and all ledger rows use exactly seven columns.
       detailRows.push(isParty?[('__GROUP__'+(partyType?partyType+' / ':'')+groupLabel),'','','','','']: [('__GROUP__'+groupLabel),'','','','','','']);
       const isMemberLedger=isParty&&!isVendor;
-      const memberBalanceMeaning=(value:number)=>value>0?'Member to Pay':value<0?'Member Credit Balance':'No Balance Due';
+      const memberBalanceMeaning=(value:number)=>value<0?'Member owes Society':value>0?'Member Credit Balance':'No Balance Due';
       const balanceDisplay=(value:number)=>isMemberLedger
-        ? moneyText(Math.abs(value))+(value>0?' Dr':value<0?' Cr':'')
+        ? moneyText(Math.abs(value))+(value<0?' Dr':value>0?' Cr':'')
         : isCategory
           ? moneyText(Math.abs(value))+(value>0?' Net Debit':value<0?' Net Credit':'')
           : moneyText(value);
@@ -457,8 +458,8 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         : 'Opening Balance';
       detailRows.push(isParty?[
         '—',openingParticulars,'Brought forward',
-        groupOpeningKnown?(opening>0?moneyText(opening):'—'):'Not Recorded',
-        groupOpeningKnown?(opening<0?moneyText(Math.abs(opening)):'—'):'—',
+        groupOpeningKnown?(opening<0?moneyText(Math.abs(opening)):'—'):'Not Recorded',
+        groupOpeningKnown?(opening>0?moneyText(opening):'—'):'—',
         groupOpeningKnown?balanceDisplay(running):'Not Verified'
       ]:[
         '—',openingParticulars,'Brought forward','—',
@@ -468,8 +469,8 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       ]);
       events.forEach(e=>{
         running+=e.movement;
-        const debit=isMemberLedger?e.movement>0:e.movement<0;
-        const credit=isMemberLedger?e.movement<0:e.movement>0;
+        const debit=e.movement<0;
+        const credit=e.movement>0;
         // Keep transaction particulars exactly as recorded. Member-to-pay / credit wording
         // belongs only on Opening Balance and Closing Balance rows.
         const transactionParticulars=String(e.particulars);
