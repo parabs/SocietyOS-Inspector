@@ -667,7 +667,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     });
     memberDemands.forEach((d:any)=>{
      const id=String(d.party_id||'');if(!id||!parties.has(id))return;
-     const row=parties.get(id), category:any=categoryById.get(String(d.category_id||''))||{};
+     const row=parties.get(id), category:any=categoryMaster.find((item:any)=>String(item.category_id||item.id||'')===String(d.category_id||''))||{};
      const group=String(category.demand_group||'').toLowerCase();
      const name=String(category.category_name||'').toLowerCase();
      const amount=demandNetAmount(d);
@@ -752,10 +752,10 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      const rows=(partyMaster as any[]).filter(p=>String(p.party_type||'')==='Member').map(p=>{
        const bal=memberFinancialBalances.find((b:any)=>String(b.financial_year||'')==='FY 2018-19'&&String(b.party_id||'')===String(p.party_id||''));
        const opening=Number(bal?.opening_balance)||0;
-       const billed=Number(bal?.current_fy_demand??bal?.billed_amount)||0;
-       const paid=Number(bal?.current_fy_receipts??bal?.received_amount)||0;
-       const adjustment=Number(bal?.adjustments??bal?.adjusted_amount)||0;
-       const signed=Number(bal?.total_outstanding??bal?.closing_balance);
+       const billed=Number(bal?.billed_amount)||0;
+       const paid=Number(bal?.received_amount)||0;
+       const adjustment=Number(bal?.adjusted_amount)||0;
+       const signed=Number(bal?.closing_balance);
        const signedClosing=Number.isFinite(signed)?signed:opening-billed+paid+adjustment;
        const closing=Math.max(0,-signedClosing);
        const demandIds=new Set(reportDemands.filter((d:any)=>String(d.party_id||'')===String(p.party_id||'')).map((d:any)=>String(d.demand_id||d.id||'')));
@@ -1268,7 +1268,8 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
   </> }
   {screen==='party-ledger'&&(()=>{
    const memberRows=[...cumulativeOutstanding].sort((a,b)=>Number(a.net_outstanding||0)-Number(b.net_outstanding||0));
-   const memberReceiptRows=filtered.filter(t=>t.type==='Receipt'&&isMemberParty(t));
+   const isMemberTransaction=(record:any)=>{const id=String(record.partyId||record.party_id||record.member_id||'');const name=String(record.party||record.partyName||record.party_name||record.member_name||'').trim().toLowerCase();const p=partyMaster.find((x:any)=>(id&&String(x.party_id||x.id||'')===id)||(name&&String(x.party_name||x.name||'').trim().toLowerCase()===name));return /^members?$/i.test(String(p?.party_type||'').trim());};
+   const memberReceiptRows=filtered.filter(t=>t.type==='Receipt'&&isMemberTransaction(t));
    const memberReceiptsTotal=memberReceiptRows.reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);
    const linkedReceiptIds=new Set((demandAllocations||[]).map((a:any)=>String(a.transaction_id||a.receipt_transaction_id||a.receipt_id||'')).filter(Boolean));
    memberReceiptRows.forEach(t=>{if(transactionDemandId(t))linkedReceiptIds.add(String(t.id||''));});
@@ -1788,7 +1789,7 @@ return <Panel title="RPT-08 · Demand Register">
       <footer className="border-t pt-3 text-[10px] text-slate-500">Prepared by SocietyOS · Rule-based cash movement intelligence · Committee and auditor verification required.</footer>
      </div>
     </Panel>;
-   })():<Panel title={(selectedReport==='expense-analysis'?'REG':selectedReport==='missing-docs'?'AUD':'RPT-'+(reportNumbers[selectedReport]||'—'))+' · '+reportData.title} action={<button onClick={()=>downloadCsv('society-report-'+selectedReport+'.csv',[[reportData.title],reportData.headers,...reportData.rows.map(row=>row.map(v=>typeof v==='object'&&v!==null&&'props' in v?String((v as any).props.children??''):String(v??'')))])} className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Export this report</button>}>
+   })():<Panel title={(selectedReport==='expense-analysis'?'REG':selectedReport==='missing-docs'?'AUD':'RPT-'+(reportNumbers[selectedReport]||'—'))+' · '+reportData.title} action={<button onClick={()=>downloadCsv('society-report-'+selectedReport+'.csv',[[reportData.title],reportData.headers,...reportData.rows.map((row:any[])=>row.map((v:any)=>typeof v==='object'&&v!==null&&'props' in v?String((v as any).props.children??''):String(v??'')))])} className="rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Export this report</button>}>
 <div className="mb-4 border-b-2 border-slate-800 pb-3 text-center"><h2 className="text-base font-bold uppercase tracking-wide text-slate-900">Pearl Meadows 'C' Type 'C' Wing Chs Ltd</h2><p className="mt-1 text-xs font-semibold text-slate-700">Regd. No. TNA/KLN/HSG(TC) 27051/2014-15/YEAR 2014</p><h3 className="mt-3 text-sm font-bold uppercase text-slate-900">{reportData.title}</h3><p className="mt-1 text-[11px] text-slate-600">Financial Year: FY 2018–19 · Report No. RPT-{reportNumbers[selectedReport]||'—'} · Generated: {new Date().toLocaleDateString('en-IN')}</p></div>
     <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{reportData.note}</p>
     <Table headers={reportData.headers} rows={reportData.rows}/>
