@@ -90,7 +90,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   {id:'receipts',name:'Receipts Register',category:'Registers',description:'Receipt date, payer, category group, cheque/reference and balance where supported'},
   {id:'payments',name:'Payment Register',category:'Registers',description:'Payee, party classification, payment mode, category, account, voucher and evidence details'},
   {id:'largest-payments-anomalies',name:'Largest Payments & Potential Anomalies',category:'Audit & Governance',description:'Largest individual payments with explainable screening flags, evidence gaps and recommended review actions'},
-  {id:'bank-recon',name:'RPT-18 · Bank / UPI Reconciliation',category:'Financial Statements',description:'Account- and month-wise book-to-statement reconciliation, outstanding differences, matching status and committee action'},
+  {id:'bank-recon',name:'Bank / UPI Reconciliation',category:'Financial Statements',description:'Account- and month-wise book-to-statement reconciliation, outstanding differences, matching status and committee action'},
   {id:'expense-analysis',name:'Expense Analysis by Category',category:'Registers',description:'Category group and monthly expenditure matrix'},
   {id:'missing-docs',name:'Missing Document / Evidence Register',category:'Audit & Governance',description:'Missing bills, vouchers and transaction evidence'},
   {id:'statutory',name:'Statutory & Governance Register',category:'Audit & Governance',description:'Applicable bylaws, meetings, approvals and statutory controls'},
