@@ -769,12 +769,16 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     // Reuse the same monthly account reconciliation workpaper already shown on the Account-wise Monthly Reconciliation screen.
     // The workpaper's credits/debits/contra and calculated balances are the book-side source; bank statement closing remains separately entered.
     const accountEntries=Object.entries(reconciliations);
+    const isMonthFilter=/^(apr|may|jun|jul|aug|sep|oct|nov|dec|jan|feb|mar)(il|e|y|uary|ch|t|ember)?\\s+20\\d{2}$/i.test(String(period||'').trim());
     const reconRows=accountEntries.flatMap(([accountKey,list]:any)=>{
      const account=openingBalances.find((a:any)=>String(a.accountId||'')===String(accountKey)||String(a.accountName||'').toUpperCase().includes(String(accountKey).toUpperCase()));
-     const accountAliases=[String(accountKey),String(account?.accountId||''),String(account?.accountName||'')].filter(Boolean);
-     const accountMatches=accountFilter==='ALL'||accountAliases.some(v=>v.toUpperCase()===String(accountFilter).toUpperCase());
-     if(!accountMatches)return [];
-     return (list||[]).filter((r:any)=>period==='All months'||String(r.month||r.monthId||'').replace(/-/g,' ').trim().toLowerCase()===period.toLowerCase()).map((r:any)=>{
+     // RPT-18 is account-wise by design: never suppress accounts because of the global account selector.
+     return (list||[]).filter((r:any)=>{
+      if(!isMonthFilter)return true;
+      const rowMonth=String(r.month||r.monthId||'').replace(/-/g,' ').trim().toLowerCase();
+      const selected=String(period||'').trim().toLowerCase();
+      return rowMonth===selected||rowMonth.slice(0,3)===selected.slice(0,3)&&rowMonth.slice(-4)===selected.slice(-4);
+     }).map((r:any)=>{
       const month=String(r.month||r.monthId||'').replace(/-/g,' ').trim();
       const opening=Number(r.calculatedOpeningBalance??r.sourceOpeningBalance??0);
       const bookReceipts=Number(r.credits)||0;
@@ -792,7 +796,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const matchedRows=reconRows.filter(x=>x.status==='Matched');
     const mismatchRows=reconRows.filter(x=>x.difference!==null&&Math.abs(x.difference)>=0.005);
     const accountCount=new Set(reconRows.map(x=>x.accountId)).size;
-    const accountsWithoutRows=accountEntries.filter(([accountKey,list]:any)=>list.length===0&&(accountFilter==='ALL'||String(accountKey)===accountFilter)).length;
+    const accountsWithoutRows=accountEntries.filter(([,list]:any)=>!list||list.length===0).length;
     return {title:'RPT-18 · Bank / UPI Reconciliation',note:'Book-side monthly balances, receipts, payments and contra movements are reused from the Account-wise Monthly Reconciliation workpaper. Statement closing balances are separately supplied from bank / UPI statements. A missing statement balance is Awaiting Statement, never a zero difference or a match.',headers:['Account','Month','Opening Book Balance','Book Receipts','Book Payments','Contra / Adjustments','Calculated Book Closing','Statement Closing','Difference','Reconciliation Status','Review Notes'],rows:reconRows.map(x=>[x.accountName,x.month,currencyCell(x.opening),currencyCell(x.bookReceipts),currencyCell(x.bookPayments),currencyCell(x.bookContra+x.adjustments),currencyCell(x.calculatedClosing),x.statementClosing===null?'Awaiting statement':currencyCell(x.statementClosing),x.difference===null?'Awaiting statement':currencyCell(x.difference),statusPill(x.status),x.remarks||'—']),summary:{total:reconRows.length,matched:matchedRows.length,mismatches:mismatchRows.length,missingStatement:missingStatement.length,missingAccounts:accountsWithoutRows,accountCount,reconRows}};
    }
    case 'maintenance-performance': {
