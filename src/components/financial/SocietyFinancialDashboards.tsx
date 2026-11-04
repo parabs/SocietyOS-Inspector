@@ -574,9 +574,9 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const isMember=(p:any)=>/^members?$/i.test(String(p?.party_type||p?.party_type_name||'').trim());
     const monthIndex=(t:any)=>{
      const raw=String(t.reportingMonth||t.month||t.date||'').trim();
-     const match=raw.match(/^([A-Za-z]{3,})[- ](20\\d{2})$/);
+     const match=raw.match(/^([A-Za-z]{3,})[- ](20\d{2})$/);
      if(match){const key=match[1].slice(0,3).toLowerCase()+' '+match[2];return monthLabels.findIndex((m:string)=>m.toLowerCase()===key);}
-     const iso=raw.match(/^20\\d{2}-(0?[1-9]|1[0-2])(?:-|$)/);
+     const iso=raw.match(/^20\d{2}-(0?[1-9]|1[0-2])(?:-|$)/);
      if(iso){const n=Number(iso[1]);return n>=4?n-4:n+8;}
      return -1;
     };
@@ -966,7 +966,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const memberDemands=reportDemands.filter((d:any)=>{
      const p=partyMaster.find((x:any)=>String(x.party_id)===String(d.party_id||''));
      const demandGroup=String(categoryById.get(String(d.category_id||''))?.demand_group||'Unmapped Demand Group');
-     return Boolean(p&&isMember(p))&&(period==='All months'||monthKey(d.month||d.demand_month||d.reporting_month||d.demand_date)===monthKey(period))&&(globalPartyTypeFilter==='All party types'||String(p.party_type||'')===globalPartyTypeFilter)&&(partyTypeFilter==='All party types'||String(p.party_type||'')===partyTypeFilter)&&(globalDemandGroupFilter==='All demand groups'||demandGroup===globalDemandGroupFilter);
+     return Boolean(p&&isMember(p))&&(period==='All months'||monthKey(d.month||d.demand_month||d.reporting_month||d.demand_date)===monthKey(period))&&(globalPartyTypeFilter==='All party types'||String(p.party_type||'')===globalPartyTypeFilter)&&(partyTypeFilter==='All party types'||String(p.party_type||'')===partyTypeFilter)&&(globalDemandGroupFilter==='All demand groups'||demandGroup===globalDemandGroupFilter)&&(categoryGroupFilter==='All category groups'||String(categoryById.get(String(d.category_id||''))?.category_group||'Unmapped')===categoryGroupFilter);
     });
     const partyGroups=new Map<string,any>();
     const totals={maintenanceDemand:0,onTime:0,late:0,maintenanceOutstanding:0,excess:0,delayDemand:0,delayCollected:0,delayOutstanding:0,nocDemand:0,nocCollected:0,nocOutstanding:0};
@@ -1538,6 +1538,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     </>}
     {(selectedReport.startsWith('account-ledger')||selectedReport==='cashbook'||selectedReport==='bank-recon'||selectedReport==='monthly-summary')&&<label className="text-[11px] text-slate-600">Account <select value={accountFilter} onChange={e=>setAccountFilter(e.target.value as 'TDCC'|'BOM'|'CASH'|'ALL')} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option value="ALL">All accounts</option><option value="TDCC">TDCC</option><option value="BOM">BOM</option><option value="CASH">Cash</option></select></label>}
         {selectedReport==='expense-analysis'&&<label className="text-[11px] text-slate-600">Demand group <select value={expenseDemandGroupFilter} onChange={e=>setExpenseDemandGroupFilter(e.target.value)} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option>All demand groups</option>{Array.from(new Set(categoryMaster.map((c:any)=>String(c.demand_group||'Unmapped Demand Group')).filter(Boolean))).sort().map(v=><option key={v}>{v}</option>)}</select></label>}
+{selectedReport==='maintenance-performance'&&<label className="text-[11px] text-slate-600">Category group <select value={categoryGroupFilter} onChange={e=>setCategoryGroupFilter(e.target.value)} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option>All category groups</option>{categoryGroups.map(v=><option key={v}>{v}</option>)}</select></label>}
 {selectedReport==='demand-summary'&&<><label className="text-[11px] text-slate-600">Category <select value={demandSummaryCategoryFilter} onChange={e=>setDemandSummaryCategoryFilter(e.target.value)} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option>All categories</option>{Array.from(new Set(categoryMaster.map((c:any)=>String(c.category_name||'')).filter(Boolean))).sort().map(v=><option key={v}>{v}</option>)}</select></label><label className="text-[11px] text-slate-600">Category group <select value={demandSummaryCategoryGroupFilter} onChange={e=>setDemandSummaryCategoryGroupFilter(e.target.value)} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option>All category groups</option>{categoryGroups.map(v=><option key={v}>{v}</option>)}</select></label></>}{(selectedReport==='expense-analysis'||selectedReport==='income-expense'||selectedReport.startsWith('category-ledger'))&&<label className="text-[11px] text-slate-600">Category group <select value={categoryGroupFilter} onChange={e=>setCategoryGroupFilter(e.target.value)} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option>All category groups</option>{categoryGroups.map(v=><option key={v}>{v}</option>)}</select></label>}
     <button onClick={()=>{setPartyTypeFilter('All party types');setCategoryGroupFilter('All category groups');setExpenseDemandGroupFilter('All demand groups');setDemandSummaryCategoryFilter('All categories');setDemandSummaryCategoryGroupFilter('All category groups');setQuery('');setAccountFilter('ALL')}} className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px] text-slate-600">Reset report filters</button>
    </div>}
