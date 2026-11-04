@@ -1001,7 +1001,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const demandPaid:Record<string,number>={},qualityByMonth:Record<string,{onTime:number;late:number}>={};
     const fyEnd='2019-03-31';
     let qualityOnTime=0,qualityLate=0,qualityUndated=0,qualityOutstanding=0;
-    const ageing={current:0,days31to60:0,days61to90:0,over90:0,unknown:0};
+    const ageing={notYetDue:0,days0to30:0,days31to60:0,days61to90:0,over90:0,unknown:0};
     const ageDays=(from:string,to:string)=>Math.floor((Date.parse(to+'T00:00:00Z')-Date.parse(from+'T00:00:00Z'))/86400000);
     const qualityEntries:Array<{demandId:string;receiptId:string;amount:number}>=[];
     const qualityReceiptSeen=new Set<string>();
@@ -1021,16 +1021,20 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      const did=transactionDemandId(t);
      if(did)addQualityEntry(did,rid,Math.abs(Number(t.amount)||0));
     });
+    qualityEntries.sort((a,b)=>transactionDate(receiptById.get(a.receiptId)).localeCompare(transactionDate(receiptById.get(b.receiptId))));
     qualityEntries.forEach(({demandId,receiptId,amount})=>{
      const d=demandById.get(demandId),t=receiptById.get(receiptId);
-     demandPaid[demandId]=(demandPaid[demandId]||0)+amount;
+     const demandLimit=Math.max(0,demandNetAmount(d)),alreadyPaid=Number(demandPaid[demandId]||0);
+     const applied=Math.min(amount,Math.max(0,demandLimit-alreadyPaid));
+     if(applied<=0)return;
+     demandPaid[demandId]=alreadyPaid+applied;
      const due=String(d.due_date||'').slice(0,10),paidOn=transactionDate(t);
      const month=monthKey(t.reportingMonth||t.month||t.date);
      if(!qualityByMonth[month])qualityByMonth[month]={onTime:0,late:0};
      if(due&&paidOn){
-      if(paidOn<=due){qualityOnTime+=amount;qualityByMonth[month].onTime+=amount;}
-      else{qualityLate+=amount;qualityByMonth[month].late+=amount;}
-     }else qualityUndated+=amount;
+      if(paidOn<=due){qualityOnTime+=applied;qualityByMonth[month].onTime+=applied;}
+      else{qualityLate+=applied;qualityByMonth[month].late+=applied;}
+     }else qualityUndated+=applied;
     });
     memberDemands.forEach((d:any)=>{
      const id=String(d.demand_id||d.id||'');
@@ -1040,7 +1044,8 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      qualityOutstanding+=balance;
      if(!due){ageing.unknown+=balance;return;}
      const days=ageDays(due,fyEnd);
-     if(days<=0)ageing.current+=balance;
+     if(days<0)ageing.notYetDue+=balance;
+     else if(days<=30)ageing.days0to30+=balance;
      else if(days<=60)ageing.days31to60+=balance;
      else if(days<=90)ageing.days61to90+=balance;
      else ageing.over90+=balance;
@@ -1090,11 +1095,11 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       </Panel></div>
      </div>
      <div className="grid grid-cols-2 gap-2 xl:grid-cols-5">
-      <Card label="Outstanding — 0–30 days" value={fmt(ageing.current)} detail="Not yet overdue / due at FY end" icon={CalendarDays}/>
-      <Card label="Outstanding — 31–60 days" value={fmt(ageing.days31to60)} detail="Early overdue follow-up" icon={Clock} tone="amber"/>
-      <Card label="Outstanding — 61–90 days" value={fmt(ageing.days61to90)} detail="Escalate member follow-up" icon={AlertTriangle} tone="amber"/>
-      <Card label="Outstanding — Over 90 days" value={fmt(ageing.over90)} detail="Priority recovery cases" icon={AlertTriangle} tone="red"/>
-      <Card label="Ageing — Due date missing" value={fmt(ageing.unknown)} detail="Correct demand due dates" icon={FileWarning}/>
+      <Card label="Outstanding — Not Yet Due" value={fmt(ageing.notYetDue)} detail="Due date falls after 31 Mar 2019" icon={CalendarDays}/>
+      <Card label="Outstanding — 0–30 days" value={fmt(ageing.days0to30)} detail="Early overdue follow-up" icon={Clock} tone="amber"/>
+      <Card label="Outstanding — 31–60 days" value={fmt(ageing.days31to60)} detail="Escalate member follow-up" icon={AlertTriangle} tone="amber"/>
+      <Card label="Outstanding — 61–90 days" value={fmt(ageing.days61to90)} detail="Priority recovery cases" icon={AlertTriangle} tone="red"/>
+      <Card label="Outstanding — Over 90 days" value={fmt(ageing.over90)} detail="Priority recovery cases" icon={AlertTriangle}/>
      </div>
      <Panel title="Explore Supporting Reports" subtitle="Open the detailed registers and analysis behind this dashboard.">
       <div className="flex flex-wrap gap-2">
