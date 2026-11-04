@@ -357,17 +357,23 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setOpeningBalancesError(null);
 
     try {
-      const [accRes, balRes] = await Promise.all([
+      const [accRes, balRes, accountFyRes] = await Promise.all([
         supabaseClient.from('account_master').select('*'),
         supabaseClient.from('account_monthly_balance').select('*'),
+        supabaseClient.from('v_account_financial_year_balance').select('*').eq('financial_year','FY 2018-19'),
       ]);
 
       if (accRes.error) {
         throw new Error(`account_master query failed: ${accRes.error.message}`);
       }
+      if (accountFyRes.error) {
+        throw new Error(`v_account_financial_year_balance query failed: ${accountFyRes.error.message}`);
+      }
 
       const accounts = ((accRes.data as any[]) || []).filter((acc) => ['ACC-0001', 'ACC-0002', 'ACC-0003'].includes(String(acc.account_id || '').toUpperCase()));
       const balances = (balRes.data as any[]) || [];
+      const accountFyRows = (accountFyRes.data as any[]) || [];
+      const accountFyById = new Map(accountFyRows.map((row:any)=>[String(row.account_id||'').toUpperCase(),row]));
 
       if (accounts.length === 0) {
         // Table is empty in Supabase (0 records)
@@ -382,6 +388,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const accountId: AccountId = rawId === 'ACC-0001' ? 'TDCC' : rawId === 'ACC-0002' ? 'BOM' : 'CASH';
 
           const matchBal = balances.find((b: any) => String(b.account_id || '').toUpperCase() === rawId);
+          const accountFy:any = accountFyById.get(rawId);
 
           const recordedOp = acc.opening_balance ?? matchBal?.opening_balance ?? 0;
           const auditClosing = acc.current_balance ?? recordedOp;
@@ -405,13 +412,23 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             remarks: acc.remarks || '',
             verifiedBy: acc.verified_by || undefined,
             verifiedOn: acc.verified_at || acc.updated_at?.split('T')[0] || undefined,
+            openingBalanceRecorded: Boolean(accountFy?.opening_balance_recorded),
+            currentFYReceipts: Number(accountFy?.current_fy_receipts)||0,
+            currentFYPayments: Number(accountFy?.current_fy_payments)||0,
+            currentFYContraIn: Number(accountFy?.current_fy_contra_in)||0,
+            currentFYContraOut: Number(accountFy?.current_fy_contra_out)||0,
+            currentFYContraSigned: Number(accountFy?.current_fy_contra_signed)||0,
+            netMovement: Number(accountFy?.net_movement)||0,
+            calculatedClosingBalance: accountFy?.closing_book_balance==null?null:Number(accountFy.closing_book_balance),
+            transactionCount: Number(accountFy?.transaction_count)||0,
+            accountVerificationStatus: String(accountFy?.verification_status||acc.verification_status||'Pending'),
           };
         });
 
         setOpeningBalances(mappedRecords);
         setSupabaseSync((prev) => ({
           ...prev,
-          tablesLoaded: { ...prev.tablesLoaded, account_master: mappedRecords.length },
+          tablesLoaded: { ...prev.tablesLoaded, account_master: mappedRecords.length, v_account_financial_year_balance: accountFyRows.length },
         }));
       }
     } catch (err: any) {
