@@ -966,7 +966,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const memberDemands=reportDemands.filter((d:any)=>{
      const p=partyMaster.find((x:any)=>String(x.party_id)===String(d.party_id||''));
      const demandGroup=String(categoryById.get(String(d.category_id||''))?.demand_group||'Unmapped Demand Group');
-     return Boolean(p&&isMember(p))&&(period==='All months'||monthKey(d.month||d.demand_month||d.reporting_month||d.demand_date)===monthKey(period))&&(globalPartyTypeFilter==='All party types'||String(p.party_type||'')===globalPartyTypeFilter)&&(partyTypeFilter==='All party types'||String(p.party_type||'')===partyTypeFilter)&&(globalDemandGroupFilter==='All demand groups'||demandGroup===globalDemandGroupFilter)&&(categoryGroupFilter==='All category groups'||String(categoryById.get(String(d.category_id||''))?.category_group||'Unmapped')===categoryGroupFilter);
+     return Boolean(p&&isMember(p))&&(period==='All months'||monthKey(d.month||d.demand_month||d.reporting_month||d.demand_date)===monthKey(period))&&(globalPartyTypeFilter==='All party types'||String(p?.party_type||'')===globalPartyTypeFilter)&&(partyTypeFilter==='All party types'||String(p?.party_type||'')===partyTypeFilter)&&(globalDemandGroupFilter==='All demand groups'||demandGroup===globalDemandGroupFilter)&&(categoryGroupFilter==='All category groups'||String(categoryById.get(String(d.category_id||''))?.category_group||'Unmapped')===categoryGroupFilter);
     });
     const partyGroups=new Map<string,any>();
     const totals={maintenanceDemand:0,onTime:0,late:0,maintenanceOutstanding:0,excess:0,delayDemand:0,delayCollected:0,delayOutstanding:0,nocDemand:0,nocCollected:0,nocOutstanding:0};
