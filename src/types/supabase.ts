@@ -96,6 +96,24 @@ export interface DbBalanceRegister {
   updated_at?: string;
 }
 
+export interface DbPartyFinancialYearBalance {
+  balance_register_id?: string;
+  party_id: string;
+  name: string;
+  type: string;
+  financial_year: string;
+  opening_balance?: number;
+  current_fy_demand?: number;
+  current_fy_receipts?: number;
+  current_fy_payments_signed?: number;
+  current_fy_payments?: number;
+  adjustments?: number;
+  current_fy_contra_signed?: number;
+  total_outstanding?: number;
+  opening_balance_verification_status?: string;
+  opening_balance_notes?: string;
+}
+
 export interface DbMemberFinancialYearBalance {
   flat_no: string;
   member_name?: string;
