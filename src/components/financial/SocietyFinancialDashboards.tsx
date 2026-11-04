@@ -964,6 +964,39 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      return row;
     });
     const monthlyDemandAvailable=monthlyDemand.some(x=>x.demand>0);
+    // Attribute collections to a Demand Group only where a receipt-to-demand link exists.
+    // Allocation records take precedence; direct transaction demandId is a fallback.
+    const demandById=new Map<string,any>();
+    memberDemands.forEach((d:any)=>{const id=String(d.demand_id||d.id||'');if(id)demandById.set(id,d);});
+    const receiptById=new Map<string,any>();
+    receiptRows.forEach((t:any)=>{const id=String(t.id||'');if(id)receiptById.set(id,t);});
+    const collectedByGroup:Record<string,{amount:number;receipts:Set<string>;demands:Set<string>}>={};
+    const allocatedReceiptIds=new Set<string>();
+    const addCollection=(demandId:string,receiptId:string,amount:number)=>{
+     const demand=demandById.get(demandId);
+     if(!demand||!receiptById.has(receiptId)||!(amount>0))return;
+     const group=demandGroupName(demand);
+     collectedByGroup[group]??={amount:0,receipts:new Set<string>(),demands:new Set<string>()};
+     collectedByGroup[group].amount+=amount;
+     collectedByGroup[group].receipts.add(receiptId);
+     collectedByGroup[group].demands.add(demandId);
+     allocatedReceiptIds.add(receiptId);
+    };
+    (Array.isArray(demandAllocations)?demandAllocations:[]).forEach((a:any)=>{
+     const receiptId=String(a.transaction_id||a.receipt_transaction_id||a.receipt_id||'');
+     const demandId=String(a.demand_id||'');
+     const allocationAmount=Number(a.allocated_amount)||0;
+     if(receiptId&&demandId&&allocationAmount>0)addCollection(demandId,receiptId,allocationAmount);
+    });
+    receiptRows.forEach((t:any)=>{
+     const receiptId=String(t.id||'');
+     if(!receiptId||allocatedReceiptIds.has(receiptId))return;
+     const demandId=transactionDemandId(t);
+     if(demandId)addCollection(demandId,receiptId,Math.abs(Number(t.amount)||0));
+    });
+    const collectionGroupData=Object.entries(collectedByGroup).map(([name,v],i)=>({name,amount:v.amount,receipts:v.receipts.size,demands:v.demands.size,fill:COLORS[i%COLORS.length]})).sort((a,b)=>b.amount-a.amount);
+    const allocatedCollectionTotal=collectionGroupData.reduce((sum,g)=>sum+g.amount,0);
+    const unallocatedCollectionTotal=receiptRows.reduce((sum,t)=>sum+(allocatedReceiptIds.has(String(t.id||''))?0:Math.abs(Number(t.amount)||0)),0);
     const top=dueRows.slice(0,5).map((r:any)=>({party:String(r.flat_no||r.member_name||'Unidentified'),amount:Math.abs(Number(r.net_outstanding)||0)}));
     // Register convention: negative balance = member owes Society; positive = member credit.
     const outstanding=cumulativeOutstanding.filter((r:any)=>isMemberParty(r)&&Number(r.net_outstanding||0)<0).reduce((sum:number,r:any)=>sum+Math.abs(Number(r.net_outstanding)||0),0);
@@ -989,10 +1022,11 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       </Panel></div>
      </div>
      <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
-      <div className="xl:col-span-9"><Panel title="Demand Profile — What Makes Up Member Demand?" action={<ReportLink id="demand-summary" category="Receivables & Demand" label="Open Demand Summary"/>}>
-       <p className="mb-3 text-[11px] text-slate-600">This is the composition of member demand by the Demand Group maintained in Category Master. Amount is demand raised in FY 2018–19; share is each group’s portion of total member demand.</p>
-       <Table headers={['Demand Group','Included Categories','Demand Amount','Share','Records']} rows={chargeData.map((g:any)=>[g.name,g.categories.join(', ')||'—',currencyCell(g.amount),g.share.toFixed(1)+'%',num(g.count)])}/>
-       <p className="mt-2 text-[10px] text-slate-500">Unmapped Demand Group means the linked category has no Demand Group assigned in Category Master. Receipt amounts are not attributed to groups without demand allocations.</p>
+      <div className="xl:col-span-9"><Panel title="Collections by Demand Group" action={<ReportLink id="receipt-allocation-review" category="Demands & Payments" label="Review Unallocated Receipts"/>}>
+       <p className="mb-3 text-[11px] text-slate-600">Shows member receipts attributed to a Demand Group only when a receipt is linked to a member demand. Unallocated receipts are shown separately and are not guessed into a group.</p>
+       {collectionGroupData.length>0?<div className="h-[220px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={collectionGroupData} layout="vertical" margin={{left:12,right:20,top:4,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tick={{fontSize:10}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><YAxis type="category" dataKey="name" width={145} tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="amount" name="Allocated collections" radius={[0,4,4,0]}>{collectionGroupData.map((g:any)=><Cell key={g.name} fill={g.fill}/>)}</Bar></BarChart></ResponsiveContainer></div>:<div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No receipt-to-demand allocations are available for member demands. Group-wise collections cannot yet be calculated.</div>}
+       <div className="mt-3 grid grid-cols-2 gap-2"><Card label="Allocated to demand groups" value={fmt(allocatedCollectionTotal)} detail={num(allocatedReceiptIds.size)+' linked receipt transactions'} icon={Banknote} tone="green"/><Card label="Unallocated member receipts" value={fmt(unallocatedCollectionTotal)} detail="Requires receipt-to-demand mapping" icon={AlertTriangle} tone="amber"/></div>
+       <p className="mt-2 text-[10px] text-slate-500">A receipt can be split across multiple demands through allocation records. This chart reports allocated amounts; direct demand-linked receipts are used only where no allocation record exists for that receipt.</p>
       </Panel></div>
       <div className="xl:col-span-3"><Panel title="Key Insights & Actions">
        <div className="space-y-2 text-[11px]">
