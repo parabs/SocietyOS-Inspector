@@ -335,6 +335,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         let running=openingFor(key);
         const opening=running;
         const partyName=isParty?key.split('¦').slice(1).join('¦'):'';
+        const partyType=isParty?key.split('¦')[0]:'';
         const vals=months.map(m=>{
           const monthKey=normalizeMonth(m);
           const ts=sourceTx.filter(t=>{
@@ -361,7 +362,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
               normalizeMonth(d.demand_month||d.month||d.reporting_month||d.demand_date||d.bill_date)===monthKey;
           }).reduce((sum,d)=>sum+Number(d.total_demand??d.demand_amount??0),0):0;
           const bounceReversal=ts.filter(t=>t.transactionClass==='Contra'&&/bounce/i.test(String(t.description||''))&&!/bank charge/i.test(String(t.description||''))).reduce((sum,t)=>sum+(Number(t.amount)||0),0);
-          const memberMovement=-dem+rec+bounceReversal;
+          const memberMovement=partyType==='Member'?-dem+rec+bounceReversal:-dem-pay+rec;
           const accountMovement=rec-pay+contra;
           running+=isParty?memberMovement:isAccount?accountMovement:accountMovement;
           return {rec,pay,contra,dem,closing:running,net:accountMovement};
@@ -377,10 +378,10 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const detailRows:any[][]=[];
     const moneyText=(value:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(Number(value)||0);
     scopedKeys.forEach(key=>{
-      const groupTransactions=sourceTx.filter(t=>getKey(t)===key&&(isAccount||t.transactionClass!=='Contra'||(isParty&&!isVendor&&/bounce/i.test(String(t.description||''))&&!/bank charge/i.test(String(t.description||''))))).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||'')));
+      const partyType=isParty?key.split('¦')[0]:'';
+      const groupTransactions=sourceTx.filter(t=>getKey(t)===key&&(isAccount||(partyType==='Member'?t.type!=='Payment'&&(t.transactionClass!=='Contra'||(/bounce/i.test(String(t.description||''))&&!/bank charge/i.test(String(t.description||'')))):t.transactionClass!=='Contra'))).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||'')));
       const opening=openingFor(key);
       const groupLabel=isParty?key.split('¦').slice(1).join('¦'):isAccount?key:key.split('¦').join(' / ');
-      const partyType=isParty?key.split('¦')[0]:'';
       const formatDemandMonth=(value:any,dateValue:any)=>{
         const raw=String(value||'').trim();
         const source=raw||String(dateValue||'').trim();
@@ -407,7 +408,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         const categoryName=String(d.category_name||demandCategory?.category_name||'Maintenance Charges');
         const demandMonth=formatDemandMonth(d.demand_month||d.month||d.reporting_month,d.demand_date||d.bill_date);
         const particulars=categoryName+(demandMonth?' for '+demandMonth:'');
-        return {date:String(d.demand_date||d.created_at||d.month||''),particulars,voucher:String(d.demand_id||d.id||'Demand Register'),category:categoryName,movement:-Math.abs(Number(d.total_demand||d.demand_amount||0)),kind:'Demand'};
+        return {date:String(d.demand_date||d.created_at||d.month||''),particulars,voucher:String(d.demand_id||d.id||'Demand Register'),category:categoryName,movement:partyType==='Member'?-Math.abs(Number(d.total_demand||d.demand_amount||0)):-Number(d.total_demand||d.demand_amount||0),kind:'Demand'};
       }):[];
       const events:any[]=[
         ...groupTransactions.map(t=>{
@@ -417,7 +418,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
           const isAdjustment=txKind.includes('adjust');
           // Member receivable convention: demand/payment increases debit; receipt reduces it.
           // Other ledgers preserve the signed source amount: positive = credit/inflow, negative = debit/outflow.
-          const movement=isParty&&!isVendor
+          const movement=isParty&&!isVendor&&partyType==='Member'
             ? (String(t.type||'').toLowerCase()==='receipt'?Math.abs(rawAmount):String(t.type||'').toLowerCase()==='payment'?-Math.abs(rawAmount):rawAmount)
             : rawAmount;
           return {
@@ -435,7 +436,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
           : false;
       // Group header and all ledger rows use exactly seven columns.
       detailRows.push(isParty?[('__GROUP__'+(partyType?partyType+' / ':'')+groupLabel),'','','','','']: [('__GROUP__'+groupLabel),'','','','','','']);
-      const isMemberLedger=isParty&&!isVendor;
+      const isMemberLedger=isParty&&!isVendor&&partyType==='Member';
       const memberBalanceMeaning=(value:number)=>value<0?'Member owes Society':value>0?'Member Credit Balance':'No Balance Due';
       const balanceDisplay=(value:number)=>isMemberLedger
         ? moneyText(Math.abs(value))+(value<0?' Dr':value>0?' Cr':'')
