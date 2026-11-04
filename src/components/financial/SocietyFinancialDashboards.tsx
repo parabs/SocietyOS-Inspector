@@ -937,7 +937,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      const id=String(record.party_id??record.partyId??record.member_id??'');
      const name=String(record.party_name??record.partyName??record.member_name??record.memberName??record.party??record.flat_owner_name??'').trim().toLowerCase();
      const party=partyMaster.find((p:any)=>(id&&String(p.party_id??p.id??'')===id)||(name&&String(p.party_name??p.name??'').trim().toLowerCase()===name));
-     return !!party&&/^members?$/i.test(String(party.party_type??party.party_type_name??party.type??'').trim());
+     return !!party&&/^members?$/i.test(String(party.party_type??'').trim());
     };
     const memberDemands=reportDemands.filter((d:any)=>isMemberParty(d));
     const fyDemand=memberDemands.reduce((s:number,d:any)=>s+demandAmount(d),0);
