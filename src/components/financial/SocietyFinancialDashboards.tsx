@@ -191,7 +191,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
  const exportTxt=()=>{const x=selectedReportExport();const txt=x.rows.map(row=>row.map(v=>csvValue(v)).join('\t')).join('\r\n');const url=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='society-'+selectedReport+'.txt';a.click();URL.revokeObjectURL(url)};
  const exportPdf=()=>{
   if(screen==='reports'){
-   const dedicatedId=selectedReport==='income-expense'?'#rpt15-print-content':selectedReport==='receipts-payments'?'#rpt16-print-content':null;
+   const dedicatedId=selectedReport==='income-expense'?'#rpt15-print-content':selectedReport==='receipts-payments'?'#rpt16-print-content':selectedReport==='cashbook'?'#rpt17-print-content':selectedReport==='bank-recon'?'#rpt18-print-content':null;
    const source=(dedicatedId?document.querySelector(dedicatedId):document.querySelector('#selected-report-content')) as HTMLElement|null;
    if(!source)return;
    const clone=source.cloneNode(true) as HTMLElement;
@@ -1206,7 +1206,9 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       #selected-report-content > div:nth-child(2) { display: none !important; }
       #selected-report-content .print\\:hidden { display: none !important; }
       #selected-report-content #rpt15-print-content,
-      #selected-report-content #rpt16-print-content { display: block !important; }
+      #selected-report-content #rpt16-print-content,
+      #selected-report-content #rpt17-print-content,
+      #selected-report-content #rpt18-print-content { display: block !important; }
       #selected-report-content table { width: 100% !important; border-collapse: collapse !important; font-size: 9pt !important; }
       #selected-report-content th, #selected-report-content td { border: 1px solid #777 !important; padding: 5px !important; color: #000 !important; }
       #selected-report-content th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
