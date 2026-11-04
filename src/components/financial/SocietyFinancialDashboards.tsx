@@ -663,7 +663,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     (partyMaster as any[]).filter(isMember).forEach(p=>{
      const id=String(p.party_id||'');if(!id)return;
      const bal=memberFinancialBalances.find((b:any)=>String(b.financial_year||'')==='FY 2018-19'&&String(b.party_id||'')===id);
-     parties.set(id,{id,name:p.party_name||id,type:p.party_type||'Member',opening:Number(bal?.opening_balance)||0,openingRecorded:bal?.opening_balance_recorded===true,openingVerified:bal?.opening_balance_verified===true,monthly:Array(monthLabels.length).fill(0),categoryTotals:{maintenance:0,parking:0,noc:0,delay:0,other:0}});
+     parties.set(id,{id,name:p.party_name||id,type:p.party_type||'Member',opening:Number(bal?.opening_balance)||0,openingRecorded:bal?.opening_balance_recorded===true,openingVerified:bal?.opening_balance_verified===true,monthly:Array(monthLabels.length).fill(0),outsidePeriod:0,categoryTotals:{maintenance:0,parking:0,noc:0,delay:0,other:0}});
     });
     memberDemands.forEach((d:any)=>{
      const id=String(d.party_id||'');if(!id||!parties.has(id))return;
@@ -673,7 +673,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      const amount=demandNetAmount(d);
      const key=demandMonthKey(d.month||d.demand_month||d.demand_date);
      const idx=monthLabels.findIndex(m=>demandMonthKey(m)===key);
-     if(idx>=0)row.monthly[idx]+=amount;
+     if(idx>=0)row.monthly[idx]+=amount;else row.outsidePeriod+=amount;
      if(group.includes('maintenance'))row.categoryTotals.maintenance+=amount;
      else if(group.includes('parking'))row.categoryTotals.parking+=amount;
      else if(group.includes('non-occupancy')||name.includes('non-occupancy'))row.categoryTotals.noc+=amount;
@@ -686,12 +686,12 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      .sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
     const monthTotals=monthLabels.map((_,i)=>rows.reduce((sum:number,x:any)=>sum+Number(x.monthly[i]||0),0));
     const catTotal=(key:string)=>rows.reduce((sum:number,x:any)=>sum+Number(x.categoryTotals[key]||0),0);
-    const currentFyTotal=(x:any)=>x.monthly.reduce((sum:number,v:number)=>sum+v,0);
+    const currentFyTotal=(x:any)=>Object.values(x.categoryTotals).reduce((sum:number,v:any)=>sum+Number(v||0),0);
     const totalDue=(x:any)=>currentFyTotal(x)-x.opening;
-    const headers=['Party Type','Party Name','Opening Balance',...monthLabels,'Maintenance Total','Parking Total','NOC Total','Delay Charges Total','Other Recoveries Total','Total FY Demand','Total Amount Due incl. Opening'];
-    const tableRows=rows.map(x=>[x.type,x.name,x.openingRecorded?currencyCell(x.opening):'Not recorded',...x.monthly.map(currencyCell),currencyCell(x.categoryTotals.maintenance),currencyCell(x.categoryTotals.parking),currencyCell(x.categoryTotals.noc),currencyCell(x.categoryTotals.delay),currencyCell(x.categoryTotals.other),currencyCell(currentFyTotal(x)),currencyCell(totalDue(x))]);
-    const totals=['TOTAL — MEMBERS','',currencyCell(rows.filter(x=>x.openingRecorded).reduce((s:number,x:any)=>s+x.opening,0)),...monthTotals.map(currencyCell),currencyCell(catTotal('maintenance')),currencyCell(catTotal('parking')),currencyCell(catTotal('noc')),currencyCell(catTotal('delay')),currencyCell(catTotal('other')),currencyCell(rows.reduce((s:number,x:any)=>s+currentFyTotal(x),0)),currencyCell(rows.reduce((s:number,x:any)=>s+totalDue(x),0))];
-    return {title:'Monthly Demand Matrix — Members Only',note:'Opening Balance is brought forward separately and is not repeated in monthly demand columns. Month columns show demand raised in each month. Category totals separately disclose Maintenance, Parking, Non-Occupancy Charges, Delay Charges and Other Recoveries. Total Amount Due incl. Opening = FY Demand − signed Opening Balance; negative opening balances are brought-forward member dues. This is a demand position before collections; receipts are not deducted. Members without demand rows are retained in the report.',headers,rows:[...tableRows,totals]};
+    const headers=['Party Type','Party Name','Opening Balance',...monthLabels,'Outside FY Month / Period','Maintenance Total','Parking Total','NOC Total','Delay Charges Total','Other Recoveries Total','Total FY Demand','Total Amount Due incl. Opening'];
+    const tableRows=rows.map(x=>[x.type,x.name,x.openingRecorded?currencyCell(x.opening):'Not recorded',...x.monthly.map(currencyCell),currencyCell(x.outsidePeriod),currencyCell(x.categoryTotals.maintenance),currencyCell(x.categoryTotals.parking),currencyCell(x.categoryTotals.noc),currencyCell(x.categoryTotals.delay),currencyCell(x.categoryTotals.other),currencyCell(currentFyTotal(x)),x.openingRecorded?currencyCell(totalDue(x)):'Incomplete — opening missing']);
+    const totals=['TOTAL — MEMBERS','',currencyCell(rows.filter(x=>x.openingRecorded).reduce((s:number,x:any)=>s+x.opening,0)),...monthTotals.map(currencyCell),currencyCell(rows.reduce((s:number,x:any)=>s+Number(x.outsidePeriod||0),0)),currencyCell(catTotal('maintenance')),currencyCell(catTotal('parking')),currencyCell(catTotal('noc')),currencyCell(catTotal('delay')),currencyCell(catTotal('other')),currencyCell(rows.reduce((s:number,x:any)=>s+currentFyTotal(x),0)),currencyCell(rows.reduce((s:number,x:any)=>s+totalDue(x),0))];
+    return {title:'Monthly Demand Matrix — Members Only',note:'Opening Balance is brought forward separately and is not repeated in monthly demand columns. Month columns show demand raised in each month. Category totals separately disclose Maintenance, Parking, Non-Occupancy Charges, Delay Charges and Other Recoveries. Total FY Demand is reconciled to all member demand records, including any demand month outside the displayed April–March columns, which is disclosed separately as Outside FY Month / Period. Total Amount Due incl. Opening = Total FY Demand − signed Opening Balance; negative opening balances are brought-forward member dues. This is a demand position before collections; receipts are not deducted. Members without demand rows are retained. Missing opening records remain Not recorded and make their total due incomplete.',headers,rows:[...tableRows,totals]};
    }
    case 'monthly-payments': {
     const parties=new Map<string,any>(),demandParty=new Map<string,string>();
