@@ -158,8 +158,8 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const payments=filtered.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
  const contra=filtered.filter(t=>t.transactionClass==='Contra').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
  const net=receipts-payments;
- const demandTotal=demandRegister.reduce((s,d)=>s+Number(d.total_demand||0),0);
- const outstanding=cumulativeOutstanding.reduce((s,r)=>s+Number(r.net_outstanding||0),0);
+ const demandTotal=demandRegister.filter((d:any)=>String(d.party_type||'')==='Member').reduce((s,d)=>s+Number(d.demand_amount||d.total_demand||0),0);
+ const outstanding=cumulativeOutstanding.reduce((s,r)=>s+Math.max(0,-(Number(r.net_outstanding)||0)),0);
  const evidenceComplete=filtered.filter(t=>t.evidenceStatus==='Complete').length;
  const evidenceMissing=filtered.filter(t=>t.evidenceStatus==='Missing'||t.billStatus==='Missing'||t.voucherReceiptStatus==='Missing').length;
  const pendingApproval=filtered.filter(t=>String(t.internalAuditStatus||'').toLowerCase().includes('pending')||String(t.correctionStatus||'').toLowerCase().includes('pending')).length;
@@ -1205,6 +1205,12 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
   </> }
   {screen==='party-ledger'&&(()=>{
    const memberRows=[...cumulativeOutstanding].sort((a,b)=>Number(a.net_outstanding||0)-Number(b.net_outstanding||0));
+   const memberReceiptRows=filtered.filter(t=>t.type==='Receipt'&&isMemberParty(t));
+   const memberReceiptsTotal=memberReceiptRows.reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);
+   const linkedReceiptIds=new Set((demandAllocations||[]).map((a:any)=>String(a.transaction_id||a.receipt_transaction_id||a.receipt_id||'')).filter(Boolean));
+   memberReceiptRows.forEach(t=>{if(transactionDemandId(t))linkedReceiptIds.add(String(t.id||''));});
+   const linkedMemberReceiptCount=memberReceiptRows.filter(t=>linkedReceiptIds.has(String(t.id||''))).length;
+   const unallocatedMemberReceiptCount=Math.max(0,memberReceiptRows.length-linkedMemberReceiptCount);
    const memberDueTotal=memberRows.reduce((sum,r)=>sum+Math.max(0,-(Number(r.net_outstanding)||0)),0);
    const membersWithDues=memberRows.filter(r=>Number(r.net_outstanding||0)<0);
    const allPaymentRows=filtered.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra');
@@ -1280,10 +1286,10 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     {activeTab==='Members'?<>
      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
       <Card label="Member / flat records" value={num(flatOwnerMaster.length)} detail="Master records loaded" icon={Users}/>
-      <Card label="Recorded demand" value={fmt(demandTotal)} detail={num(demandRegister.length)+' demand records'} icon={FileText}/>
-      <Card label="Receipts recorded" value={fmt(receipts)} detail={num(filtered.filter(t=>t.type==='Receipt').length)+' receipt transactions in filter'} icon={Wallet} tone="green"/>
-      <Card label="Outstanding register" value={fmt(outstanding)} detail={num(membersWithDues.length)+' records with positive balance'} icon={AlertTriangle} tone="red"/>
-      <Card label="Allocation status" value={num(demandAllocations.length)} detail="Receipt-to-demand allocations recorded" icon={ArrowLeftRight} tone="amber"/>
+      <Card label="Recorded demand" value={fmt(demandTotal)} detail={num(demandRegister.filter((d:any)=>String(d.party_type||'')==='Member').length)+' member demand records'} icon={FileText}/>
+       <Card label="Receipts recorded" value={fmt(memberReceiptsTotal)} detail={num(memberReceiptRows.length)+' member receipt transactions in filter'} icon={Wallet} tone="green"/>
+       <Card label="Outstanding register" value={fmt(memberDueTotal)} detail={num(membersWithDues.length)+' member accounts with dues'} icon={AlertTriangle} tone="red"/>
+       <Card label="Demand-linked receipts" value={num(linkedMemberReceiptCount)} detail={num(unallocatedMemberReceiptCount)+' receipts remain unapplied'} icon={ArrowLeftRight} tone="amber"/>
      </div>
      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.15fr_.85fr]">
       <Panel title="Members with the Highest Recorded Outstanding" action={<ReportLink id="party-balances" category="Debtors & Parties" label="View all debtors"/>}>
@@ -1292,7 +1298,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       </Panel>
       <Panel title="Member Balance Coverage">
        <div className="h-[220px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={memberStatus} dataKey="value" nameKey="name" innerRadius={58} outerRadius={82} paddingAngle={3}>{memberStatus.map((d,i)=><Cell key={d.name} fill={i===0?'#ef4444':'#16a34a'}/>)}</Pie><Tooltip/><Legend/></PieChart></ResponsiveContainer></div>
-       <div className="grid grid-cols-2 gap-2"><div className="rounded-lg bg-rose-50 p-3"><div className="text-[10px] text-rose-700">Positive balances</div><div className="mt-1 text-xl font-bold text-rose-800">{num(membersWithDues.length)}</div></div><div className="rounded-lg bg-emerald-50 p-3"><div className="text-[10px] text-emerald-700">No positive balance</div><div className="mt-1 text-xl font-bold text-emerald-800">{num(memberRows.length-membersWithDues.length)}</div></div></div>
+       <div className="grid grid-cols-2 gap-2"><div className="rounded-lg bg-rose-50 p-3"><div className="text-[10px] text-rose-700">Members with dues</div><div className="mt-1 text-xl font-bold text-rose-800">{num(membersWithDues.length)}</div></div><div className="rounded-lg bg-emerald-50 p-3"><div className="text-[10px] text-emerald-700">No dues / credit balance</div><div className="mt-1 text-xl font-bold text-emerald-800">{num(memberRows.length-membersWithDues.length)}</div></div></div>
        <p className="mt-2 text-[10px] text-slate-500">Coverage reflects records in the register, not confirmed member ageing or recoverable dues.</p>
       </Panel>
      </div>
@@ -1302,7 +1308,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
        <p className="text-[10px] text-slate-500">Based on recorded receipt transactions by reporting month. It does not imply allocation to individual demand periods.</p>
       </Panel>
       <Panel title="Member Snapshot" action={<ReportLink id="member-ledger" category="Debtors & Parties" label="Detailed member ledger"/>}>
-       <div className="flex flex-wrap items-end gap-3"><label className="min-w-[180px] flex-1 text-xs font-semibold text-slate-700">Select member / flat<select value={selectedMember?memberName(selectedMember):''} onChange={e=>setPartySelection(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal"><option value="">Choose member</option>{memberRows.map((r,i)=><option key={i} value={memberName(r)}>{memberLabel(r)} — {memberName(r)}</option>)}</select></label><div className="rounded-lg bg-rose-50 px-4 py-2"><div className="text-[10px] text-rose-700">Recorded balance</div><div className="text-lg font-bold text-rose-800">{fmt(Number(selectedMember?.net_outstanding)||0)}</div></div></div>
+       <div className="flex flex-wrap items-end gap-3"><label className="min-w-[180px] flex-1 text-xs font-semibold text-slate-700">Select member / flat<select value={selectedMember?memberName(selectedMember):''} onChange={e=>setPartySelection(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal"><option value="">Choose member</option>{memberRows.map((r,i)=><option key={i} value={memberName(r)}>{memberLabel(r)} — {memberName(r)}</option>)}</select></label><div className="rounded-lg bg-rose-50 px-4 py-2"><div className="text-[10px] text-rose-700">Demand receivable</div><div className="text-lg font-bold text-rose-800">{fmt(Math.max(0,-(Number(selectedMember?.net_outstanding)||0)))}</div></div></div>
        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3"><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Member / flat</div><div className="mt-1 text-sm font-bold text-slate-800">{selectedMember?memberLabel(selectedMember):'Not available'}</div></div><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Receipt transactions</div><div className="mt-1 text-sm font-bold text-slate-800">{num(memberTx.filter(t=>t.type==='Receipt').length)}</div></div><div className="rounded-lg border border-slate-100 p-3"><div className="text-[10px] text-slate-500">Data caveat</div><div className="mt-1 text-xs font-semibold text-amber-700">Allocation unverified</div></div></div>
        <div className="mt-3"><Table headers={['Date','Description','Type','Amount','Reference']} rows={memberTx.slice(0,5).map(t=>[t.date||'—',t.description||t.categoryName||'—',t.type||'—',fmt(Math.abs(Number(t.amount)||0)),t.voucherNo||t.receiptNo||t.id||'—'])}/></div>
       </Panel>
