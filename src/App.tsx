@@ -44,7 +44,7 @@ const MainContent: React.FC = () => {
     case 'observations-actions':
     case 'reports':
     case 'ledger-reports':
-      return <SocietyFinancialDashboards screen="reports" />;
+      return <SocietyFinancialDashboards screen={currentScreen} />;
 
     case 'data-management':
       return <DataManagementControlCenter initialTab="masters" />;
