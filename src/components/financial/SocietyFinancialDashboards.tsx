@@ -197,7 +197,6 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    if(selectedReport!=='income-expense'){
     clone.querySelector(':scope > div:first-child')?.remove();
     clone.querySelector(':scope > div:first-child')?.remove();
-    clone.querySelector(':scope > div:first-child')?.remove();
    }
    clone.querySelectorAll('button,input,select,textarea,[class*="print:hidden"]').forEach(el=>el.remove());
    const w=window.open('','_blank','width=1100,height=800');if(!w)return;
@@ -1158,8 +1157,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       #selected-report-content, #selected-report-content * { visibility: visible !important; }
       #selected-report-content { position: absolute !important; inset: 0 !important; width: 100% !important; max-width: none !important; }
       #selected-report-content > div:first-child,
-      #selected-report-content > div:nth-child(2),
-      #selected-report-content > div:nth-child(3) { display: none !important; }
+      #selected-report-content > div:nth-child(2) { display: none !important; }
       #selected-report-content .print\\:hidden { display: none !important; }
       #selected-report-content #rpt15-print-content,
       #selected-report-content #rpt16-print-content { display: block !important; }
