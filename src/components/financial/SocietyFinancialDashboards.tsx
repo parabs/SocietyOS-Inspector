@@ -989,38 +989,28 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      return row;
     });
     const monthlyDemandAvailable=monthlyDemand.some(x=>x.demand>0);
-    // Attribute collections to a Demand Group only where a receipt-to-demand link exists.
-    // Allocation records take precedence; direct transaction demandId is a fallback.
+    // The database reconciliation view is the single source for demand-linked net collections.
+    // Direct Demand IDs take precedence; allocation rows are used only for receipts without a direct link.
     const demandById=new Map<string,any>();
     memberDemands.forEach((d:any)=>{const id=String(d.demand_id||d.id||'');if(id)demandById.set(id,d);});
     const receiptById=new Map<string,any>();
     receiptRows.forEach((t:any)=>{const id=String(t.id||'');if(id)receiptById.set(id,t);});
-    const collectedByGroup:Record<string,{amount:number;receipts:Set<string>;demands:Set<string>}>={};
     const allocatedReceiptIds=new Set<string>();
-    const addCollection=(demandId:string,receiptId:string,amount:number)=>{
-     const demand=demandById.get(demandId);
-     if(!demand||!receiptById.has(receiptId)||!(amount>0))return;
-     const group=demandGroupName(demand);
-     collectedByGroup[group]??={amount:0,receipts:new Set<string>(),demands:new Set<string>()};
-     collectedByGroup[group].amount+=amount;
-     collectedByGroup[group].receipts.add(receiptId);
-     collectedByGroup[group].demands.add(demandId);
-     allocatedReceiptIds.add(receiptId);
-    };
     (Array.isArray(demandAllocations)?demandAllocations:[]).forEach((a:any)=>{
      const receiptId=String(a.transaction_id||a.receipt_transaction_id||a.receipt_id||'');
-     const demandId=String(a.demand_id||'');
-     const allocationAmount=Number(a.allocated_amount)||0;
-     if(receiptId&&demandId&&allocationAmount>0)addCollection(demandId,receiptId,allocationAmount);
+     if(receiptById.has(receiptId))allocatedReceiptIds.add(receiptId);
     });
-    receiptRows.forEach((t:any)=>{
-     const receiptId=String(t.id||'');
-     if(!receiptId||allocatedReceiptIds.has(receiptId))return;
-     const demandId=transactionDemandId(t);
-     if(demandId)addCollection(demandId,receiptId,Math.abs(Number(t.amount)||0));
+    receiptRows.forEach((t:any)=>{const receiptId=String(t.id||'');if(receiptId&&transactionDemandId(t))allocatedReceiptIds.add(receiptId);});
+    const collectedByGroup:Record<string,{amount:number;receipts:number;demands:number}>={};
+    memberDemands.forEach((d:any)=>{
+     const group=demandGroupName(d);
+     collectedByGroup[group]??={amount:0,receipts:0,demands:0};
+     collectedByGroup[group].amount+=Number(d.net_collection_amount)||0;
+     collectedByGroup[group].receipts+=Number(d.receipt_count)||0;
+     collectedByGroup[group].demands++;
     });
-    const collectionGroupData=Object.entries(collectedByGroup).map(([name,v],i)=>({name,amount:v.amount,receipts:v.receipts.size,demands:v.demands.size,fill:COLORS[i%COLORS.length]})).sort((a,b)=>b.amount-a.amount);
-    const allocatedCollectionTotal=collectionGroupData.reduce((sum,g)=>sum+g.amount,0);
+    const collectionGroupData=Object.entries(collectedByGroup).map(([name,v],i)=>({name,amount:v.amount,receipts:v.receipts,demands:v.demands,fill:COLORS[i%COLORS.length]})).sort((a,b)=>b.amount-a.amount);
+    const allocatedCollectionTotal=memberDemands.reduce((sum:number,d:any)=>sum+(Number(d.receipt_amount)||0),0);
     const unallocatedCollectionTotal=receiptRows.reduce((sum,t)=>sum+(allocatedReceiptIds.has(String(t.id||''))?0:Math.abs(Number(t.amount)||0)),0);
     // Collection quality is calculated only on demand-linked / allocated receipt amounts.
     const demandPaid:Record<string,number>={},qualityByMonth:Record<string,{onTime:number;late:number}>={};
@@ -1063,8 +1053,10 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     });
     memberDemands.forEach((d:any)=>{
      const id=String(d.demand_id||d.id||'');
-     const amount=Math.max(0,demandNetAmount(d)),paid=Number(demandPaid[id]||0);
-     const due=String(d.due_date||'').slice(0,10),balance=Math.max(0,amount-paid);
+      const amount=Math.max(0,demandNetAmount(d));
+      const signedBalance=Number(d.signed_demand_balance);
+      const balance=Math.max(0,Number.isFinite(signedBalance)?-signedBalance:amount-(Number(d.net_collection_amount)||Number(demandPaid[id]||0))-(Number(d.approved_adjustment_amount)||0));
+      const due=String(d.due_date||'').slice(0,10);
      if(!balance)return;
      qualityOutstanding+=balance;
      if(!due){ageing.unknown+=balance;return;}
@@ -1083,20 +1075,23 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     // Level-2 view: compare each demand group's allocated recovery against its own demand.
     const groupPerformance:Record<string,{demand:number;collected:number;outstanding:number;efficiency:number;count:number;fill:string}>={};
     memberDemands.forEach((d:any)=>{
-     const group=demandGroupName(d),id=String(d.demand_id||d.id||'');
-     const demand=Math.max(0,demandNetAmount(d)),collected=Math.min(demand,Number(demandPaid[id]||0));
-     groupPerformance[group]??={demand:0,collected:0,outstanding:0,efficiency:0,count:0,fill:COLORS[Object.keys(groupPerformance).length%COLORS.length]};
-     groupPerformance[group].demand+=demand;
-     groupPerformance[group].collected+=collected;
-     groupPerformance[group].outstanding+=Math.max(0,demand-collected);
-     groupPerformance[group].count++;
+      const group=demandGroupName(d);
+      const demand=Math.max(0,demandNetAmount(d));
+      const netCollected=Number(d.net_collection_amount)||0;
+      const adjustment=Number(d.approved_adjustment_amount)||0;
+      const collected=Math.min(demand,Math.max(0,netCollected+adjustment));
+      groupPerformance[group]??={demand:0,collected:0,outstanding:0,efficiency:0,count:0,fill:COLORS[Object.keys(groupPerformance).length%COLORS.length]};
+      groupPerformance[group].demand+=demand;
+      groupPerformance[group].collected+=collected;
+      groupPerformance[group].outstanding+=Math.max(0,demand-netCollected-adjustment);
+      groupPerformance[group].count++;
     });
     const collectionEfficiencyData=Object.entries(groupPerformance).map(([name,g])=>({...g,name,efficiency:g.demand?g.collected/g.demand*100:0})).sort((a,b)=>a.efficiency-b.efficiency);
     const top=dueRows.slice(0,5).map((r:any)=>({party:String(r.flat_no||r.member_name||'Unidentified'),amount:Math.abs(Number(r.closing_balance)||0)}));
     // Register convention: negative balance = member owes Society; positive = member credit.
     const outstanding=dueRows.reduce((sum:number,r:any)=>sum+Math.abs(Number(r.closing_balance)||0),0);
     const rate=fyDemand?fyReceipts/fyDemand*100:0;
-    const allocated=Array.isArray(demandAllocations)?demandAllocations.length:0;
+    const allocated=receiptRows.filter((t:any)=>allocatedReceiptIds.has(String(t.id||''))).length;
     return <>
      <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
       <Card label="Members / Flat Owners" value={num(flatOwnerMaster.length)} detail={num(dueRows.length)+' member accounts with dues'} icon={Users}/>
@@ -1104,7 +1099,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       <Card label="Receipts Collected" value={fmt(fyReceipts)} detail={num(receiptRows.length)+' receipt transactions'} icon={Banknote} tone="green"/>
       <Card label="Member Dues Outstanding" value={fmt(outstanding)} detail="Sum of member debit balances; credits excluded" icon={AlertTriangle} tone="red"/>
       <Card label="Receipts / Demand (FY)" value={fyDemand?rate.toFixed(1)+'%':'Not available'} detail="Not a collection rate; receipts may include earlier dues" icon={ArrowUpRight} tone="violet"/>
-      <Card label="Unallocated Receipts" value={num(allocated===0?receiptRows.length:Math.max(0,receiptRows.length-allocated))} detail={allocated===0?'No allocations recorded':'Review allocation coverage'} icon={AlertTriangle} tone="amber"/>
+      <Card label="Unallocated Receipts" value={num(Math.max(0,receiptRows.length-allocated))} detail={num(allocated)+' receipts linked to demands'} icon={AlertTriangle} tone="amber"/>
      </div>
      <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
       <div className="xl:col-span-7"><Panel title="Collection Efficiency by Demand Group" action={<ReportLink id="demand-summary" category="Receivables & Demand" label="View Demand Summary"/>}>
@@ -1509,7 +1504,7 @@ return <div className="space-y-3"><div className="mb-3 flex flex-wrap items-end 
 <div className="overflow-x-auto [&_table]:min-w-[1600px] [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap"><Table headers={['Sr. No.','Financial Year','Reporting Month','Receipt Date','Receipt / Voucher No.','Party Name','Party Classification','Demand Month','Payment Mode','Category Name','Category Group','Description','Account Name','Amount',...(showChequeReference?['Cheque / Bank Reference']:[]),...(showRemarks?['Remarks']:[])]} rows={filteredReceipts.map((r:any,i:number)=>[i+1,r.fy||'—',r.reportingMonth||'—',r.date||'—',r.receiptNo||'—',r.party,r.classification,r.demandMonth||'—',r.paymentMode||'—',r.category||'—',r.group||'—',r.description||'—',r.account||'—',currencyCell(r.amount),...(showChequeReference?[r.chequeRef||'—']:[]),...(showRemarks?[r.remarks||'—']:[])])}/></div>
 <div className="mt-3 text-[10px] text-slate-500">Showing {filteredReceipts.length} of {receiptRows.length} receipt transactions. Unmapped / no-demand receipts are retained. Contra transactions are excluded. Demand IDs remain internal and are not displayed.</div></Panel></div>;
 })():selectedReport==='demand-register'?(()=>{
-const rows=(demandRegister||[]).map((d:any)=>{const party=partyMaster.find((p:any)=>String(p.party_id)===String(d.party_id));const flat=flatOwnerMaster.find((x:any)=>String(x.owner_name||'').trim().toLowerCase()===String(party?.party_name||d.party_name||'').trim().toLowerCase());const cat=categoryMaster.find((x:any)=>String(x.category_id)===String(d.category_id));const tx=(transactions||[]).filter((t:any)=>transactionDemandId(t)===String(d.demand_id||d.id||'')&&t.type==='Receipt'&&t.transactionClass!=='Contra');const paid=tx.reduce((s:number,t:any)=>s+Math.abs(Number(t.amount)||0),0);const note=String(d.notes||'');const adjMatch=note.match(/Adjustment amount:\\s*(-?[0-9.]+)/i);const approved=(demandAdjustments||[]).filter((a:any)=>String(a.demand_id||'')===String(d.demand_id||d.id||'')&&a.is_approved===true);const adjustments=approved.length?approved.reduce((s:number,a:any)=>s+Number(a.amount||0),0):Number(adjMatch?.[1]||0);const demand=demandNetAmount(d);const outstanding=demand-paid+adjustments;const status=outstanding<0?'Excess Paid':outstanding===0?'Fully Paid':paid>0?'Partially Paid':'Pending';return {fy:String(d.financial_year||''),month:String(d.demand_month||''),date:String(d.demand_date||''),due:String(d.due_date||''),flat:String(flat?.flat_no||d.flat_no||''),party:String(party?.party_name||d.party_name||'Unmapped Party'),classification:String(party?.party_type||'Unclassified'),group:String(cat?.demand_group||'Unclassified'),demand,paid,adjustments,outstanding,paidMonths:Array.from(new Set(tx.map((t:any)=>String(t.reportingMonth||t.month||'').trim()).filter(Boolean))).sort().join(', '),status};});
+const rows=(demandRegister||[]).map((d:any)=>{const party=partyMaster.find((p:any)=>String(p.party_id)===String(d.party_id));const flat=flatOwnerMaster.find((x:any)=>String(x.owner_name||'').trim().toLowerCase()===String(party?.party_name||d.party_name||'').trim().toLowerCase());const cat=categoryMaster.find((x:any)=>String(x.category_id)===String(d.category_id));const tx=(transactions||[]).filter((t:any)=>transactionDemandId(t)===String(d.demand_id||d.id||'')&&t.type==='Receipt'&&t.transactionClass!=='Contra');const paid=Number(d.net_collection_amount)||0;const adjustments=Number(d.approved_adjustment_amount)||0;const demand=Number(d.demand_amount??demandNetAmount(d))||0;const outstanding=Number.isFinite(Number(d.signed_demand_balance))?-Number(d.signed_demand_balance):demand-paid-adjustments;const status=outstanding<0?'Excess Paid':outstanding===0?'Fully Paid':paid>0?'Partially Paid':'Pending';return {fy:String(d.financial_year||''),month:String(d.demand_month||''),date:String(d.demand_date||''),due:String(d.due_date||''),flat:String(flat?.flat_no||d.flat_no||''),party:String(party?.party_name||d.party_name||'Unmapped Party'),classification:String(party?.party_type||'Unclassified'),group:String(cat?.demand_group||d.demand_group||'Unclassified'),demand,paid,adjustments,outstanding,paidMonths:Array.from(new Set(tx.map((t:any)=>String(t.reportingMonth||t.month||'').trim()).filter(Boolean))).sort().join(', '),status};});
 const filteredRows=rows.filter((r:any)=>(demandFyFilter==='All FY'||r.fy===demandFyFilter)&&(demandMonthFilter==='All months'||r.month===demandMonthFilter)&&(demandPartyClassFilter==='All classifications'||r.classification===demandPartyClassFilter)&&(demandGroupFilter==='All demand groups'||r.group===demandGroupFilter)&&(demandPaymentStatusFilter==='All statuses'||r.status===demandPaymentStatusFilter)&&(!demandPartySearch||r.party.toLowerCase().includes(demandPartySearch.toLowerCase().trim())));
 const total=(k:string)=>filteredRows.reduce((s:number,r:any)=>s+Number(r[k]||0),0);const shortCount=filteredRows.filter((r:any)=>Number(r.paid)>0&&Number(r.outstanding)>0).length;const excessCount=filteredRows.filter((r:any)=>Number(r.paid)>0&&Number(r.outstanding)<0).length;const short=filteredRows.reduce((s:number,r:any)=>s+Math.max(0,r.outstanding),0);
 return <Panel title="RPT-08 · Demand Register">
