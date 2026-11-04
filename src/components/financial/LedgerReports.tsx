@@ -5,14 +5,14 @@ import { supabaseClient } from '../../services/supabaseClient';
 type LedgerMode = 'demand' | 'party' | 'account';
 type Row = {
   id: string; date: string; type: string; voucher: string; particulars: string;
-  amount: number; account: string; party: string; partyType: string;
+  amount: number; account: string; party: string; partyType: string; paymentMode: string;
   demandGroup: string; categoryGroup: string; category: string; demandId: string;
 };
 const money = (n:number) => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);
 const clean = (v:any, fallback='Unclassified') => String(v??'').trim() || fallback;
 const exportCsv = (rows:Row[], name:string) => {
- const header=['Date','Particulars','Voucher Type','Voucher No.','Account','Party','Category','Demand ID','Amount'];
- const values=rows.map(r=>[r.date,r.particulars,r.type,r.voucher,r.account,r.party,r.category,r.demandId,r.amount.toFixed(2)]);
+ const header=['Transaction ID','Date','Particulars','Voucher Type','Voucher No.','Account','Party Type','Party','Payment Mode','Demand Group','Category Group','Category','Demand ID','Amount'];
+ const values=rows.map(r=>[r.id,r.date,r.particulars,r.type,r.voucher,r.account,r.partyType,r.party,r.paymentMode,r.demandGroup,r.categoryGroup,r.category,r.demandId,r.amount.toFixed(2)]);
  const csv=[header,...values].map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
  const url=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
  const a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);
@@ -48,7 +48,7 @@ export const LedgerReports:React.FC = () => {
      type:clean(t.transaction_type||t.type,'Other'),voucher:clean(t.voucher_receipt_no||t.voucher_no,''),
      particulars:clean(t.description||t.narration,'—'),amount:Number(t.amount)||0,
      account:clean(a.account_name||t.account_name),party:clean(p.party_name||t.party_name),
-     partyType:clean(p.party_type),demandGroup:clean(c.demand_group),categoryGroup:clean(c.category_group),
+     partyType:clean(p.party_type),paymentMode:clean(t.payment_mode,''),demandGroup:clean(c.demand_group),categoryGroup:clean(c.category_group),
      category:clean(c.category_name||t.category_name),demandId:clean(t.demand_id,'')
     };
    }));
@@ -85,9 +85,9 @@ export const LedgerReports:React.FC = () => {
    const open=expanded[group]!==false;const net=items.reduce((s,r)=>s+r.amount,0);
    return <section key={group} className="overflow-hidden rounded-xl border bg-white">
     <button onClick={()=>setExpanded(prev=>({...prev,[group]:!open}))} className="flex w-full flex-wrap items-center justify-between gap-2 bg-slate-50 px-4 py-3 text-left"><span className="text-sm font-bold text-slate-800">{group}</span><span className="text-xs text-slate-600">{items.length} entries · Net {money(net)} · {open?'Hide':'Show'}</span></button>
-    {open&&<div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-xs"><thead className="bg-white text-[10px] uppercase tracking-wide text-slate-500"><tr>{['Date','Particulars','Voucher Type','Voucher No.','Account / Party','Category','Amount','Running Net'].map(h=><th key={h} className="border-b px-3 py-2">{h}</th>)}</tr></thead><tbody>{(()=>{let running=0;return items.map((r,i)=>{running+=r.amount;return <tr key={r.id||i} className="border-b last:border-0 hover:bg-slate-50"><td className="whitespace-nowrap px-3 py-2">{r.date||'—'}</td><td className="px-3 py-2">{r.particulars}</td><td className="px-3 py-2">{r.type}</td><td className="px-3 py-2">{r.voucher||'—'}</td><td className="px-3 py-2">{mode==='account'?r.party:r.account}</td><td className="px-3 py-2">{r.category}</td><td className={'whitespace-nowrap px-3 py-2 font-semibold '+(r.amount<0?'text-rose-700':'text-emerald-700')}>{money(r.amount)}</td><td className="whitespace-nowrap px-3 py-2 font-semibold">{money(running)}</td></tr>;});})()}</tbody><tfoot className="bg-slate-50 font-bold"><tr><td colSpan={6} className="px-3 py-2 text-right">Group Total</td><td className="px-3 py-2">{money(net)}</td><td className="px-3 py-2">—</td></tr></tfoot></table></div>}
+    {open&&<div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-xs"><thead className="bg-white text-[10px] uppercase tracking-wide text-slate-500"><tr>{['Transaction ID','Date','Particulars','Voucher Type','Voucher No.','Account / Party','Payment Mode','Demand ID','Category','Amount','Running Net'].map(h=><th key={h} className="border-b px-3 py-2">{h}</th>)}</tr></thead><tbody>{(()=>{let running=0;return items.map((r,i)=>{running+=r.amount;return <tr key={r.id||i} className="border-b last:border-0 hover:bg-slate-50"><td className="whitespace-nowrap px-3 py-2">{r.id||'—'}</td><td className="whitespace-nowrap px-3 py-2">{r.date||'—'}</td><td className="px-3 py-2">{r.particulars}</td><td className="px-3 py-2">{r.type}</td><td className="px-3 py-2">{r.voucher||'—'}</td><td className="px-3 py-2">{mode==='account'?r.party:r.account}</td><td className="px-3 py-2">{r.paymentMode||'—'}</td><td className="px-3 py-2">{r.demandId||'—'}</td><td className="px-3 py-2">{r.category}</td><td className={'whitespace-nowrap px-3 py-2 font-semibold '+(r.amount<0?'text-rose-700':'text-emerald-700')}>{money(r.amount)}</td><td className="whitespace-nowrap px-3 py-2 font-semibold">{money(running)}</td></tr>;});})()}</tbody><tfoot className="bg-slate-50 font-bold"><tr><td colSpan={9} className="px-3 py-2 text-right">Group Total</td><td className="px-3 py-2">{money(net)}</td><td className="px-3 py-2">—</td></tr></tfoot></table></div>}
    </section>;
   })}{!groupRows.length&&<div className="rounded-xl border bg-white p-8 text-center text-sm text-slate-500">No transactions match the selected filters.</div>}</div>}
-  <p className="text-[10px] text-slate-500">Amounts retain the sign stored in the source: positive and negative movements are shown as recorded. Running Net starts at zero for the filtered transaction list; it is not an opening-balance or audited closing-balance figure. Demand IDs remain available in CSV for traceability.</p>
+  <p className="text-[10px] text-slate-500">Amounts retain the sign stored in the source. Running Net starts at zero for the filtered transaction list; it is not an opening-balance or audited closing-balance figure. Transaction ID, Demand ID, payment mode and classification fields are included for traceability. Blank Demand IDs are shown as blank and are not auto-assigned by this report.</p>
  </div>;
 };
