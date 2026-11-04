@@ -460,7 +460,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
           if(x.transaction_type==='Receipt'&&Number(x.amount)<0)add('RECEIPT_SIGN_REVIEW','Medium','Receipt has a negative signed amount.','Review source sign; do not auto-flip.');
         });
         if(importedFindings.length) {
-          const {error:qualityError}=await supabaseClient.from('data_quality_exceptions').upsert(importedFindings,{onConflict:'exception_key'});
+          const {error:qualityError}=await (supabaseClient as any).from('data_quality_exceptions').upsert(importedFindings,{onConflict:'exception_key'});
           if(qualityError) throw new Error('Import completed but quality exception registration failed: '+qualityError.message);
         }
       }
