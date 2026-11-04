@@ -11,6 +11,7 @@ import { useVerification, ScreenId } from '../../context/VerificationContext';
 import { supabaseClient } from '../../services/supabaseClient';
 
 type Props = { screen: ScreenId };
+type ReportTransaction = { demandId?: string; [key: string]: any };
 const fmt = (n:number) => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(Number(n)||0);
 const num = (n:number) => new Intl.NumberFormat('en-IN').format(Number(n)||0);
 const COLORS = ['#16a34a','#ef4444','#2563eb','#f59e0b','#8b5cf6','#06b6d4','#64748b'];
@@ -189,7 +190,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
  const monthControl=<select value={period} onChange={e=>setPeriod(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>All months</option>{allMonths.map(m=><option key={m}>{m}</option>)}</select>;
  const filterBar=<div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3"><CalendarDays className="h-4 w-4 text-blue-700"/><span className="text-xs font-semibold text-slate-600">Period</span>{monthControl}<select value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>All categories</option>{cats.map(([c])=><option key={c}>{c}</option>)}</select><div className="relative min-w-[190px] flex-1"><Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search party, voucher, category, source…" className="w-full rounded-lg border border-slate-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-blue-400"/></div><button onClick={()=>{setPeriod('All months');setCategoryFilter('All categories');setCategoryGroupFilter('All category groups');setQuery('');setStatusFilter('All statuses');setPartyTypeFilter('All party types')}} className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">Reset</button></div>;
  const reportDemands=demandRegister.filter((d:any)=>!d.financial_year||String(d.financial_year).includes('2018-19'));
- const transactionDemandId=(t:EnrichedTransaction)=>String((t as any).demandId||'');
+ const transactionDemandId=(t:ReportTransaction)=>String(t.demandId||'');
  const openingRegisterClassifications=useMemo(()=>Array.from(new Set(openingRegisterRows.map((r:any)=>String(r.party_type||'Unclassified').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b)),[openingRegisterRows]);
   const openingRegisterFiltered=useMemo(()=>openingRegisterRows
    .filter((r:any)=>(openingRegisterClassification==='All classifications'||String(r.party_type||'Unclassified')===openingRegisterClassification)&&(!openingRegisterSearch||[r.party_name,r.party_type].some(v=>String(v||'').toLowerCase().includes(openingRegisterSearch.toLowerCase().trim()))))
