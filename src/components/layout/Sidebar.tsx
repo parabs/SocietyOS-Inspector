@@ -238,18 +238,12 @@ export const Sidebar: React.FC = () => {
             </button>
             {openGroups.data && (
               <div className="mt-1 space-y-1 pl-1">
-                <button onClick={() => handleNavClick('transactions')} className={navItemClass('transactions')}>
-                  <div className="flex items-center gap-2.5 truncate"><Database className="w-4 h-4 shrink-0"/><span className="truncate">Transactions</span></div>
-                </button>
                 <button onClick={() => handleNavClick('data-management')} className={navItemClass('data-management')}>
-                  <div className="flex items-center gap-2.5 truncate"><Database className="w-4 h-4 shrink-0"/><span className="truncate">Master Data</span></div>
+                  <div className="flex items-center gap-2.5 truncate"><Database className="w-4 h-4 shrink-0"/><span className="truncate">Data Management Workspace</span></div>
                 </button>
                 <button onClick={() => handleNavClick('import-wizard')} className={navItemClass('import-wizard')}>
                   <div className="flex items-center gap-2.5 truncate"><Files className="w-4 h-4 shrink-0"/><span className="truncate">Import Wizard</span></div>
                 </button>
-                <button onClick={() => handleNavClick('data-quality')} className={navItemClass('data-quality')}><div className="flex items-center gap-2.5 truncate"><ShieldCheck className="w-4 h-4 shrink-0"/><span className="truncate">Data Quality</span></div></button>
-                <button onClick={() => handleNavClick('options-config')} className={navItemClass('options-config')}><div className="flex items-center gap-2.5 truncate"><Settings className="w-4 h-4 shrink-0"/><span className="truncate">Options &amp; Configuration</span></div></button>
-                <button onClick={() => handleNavClick('data-audit-trail')} className={navItemClass('data-audit-trail')}><div className="flex items-center gap-2.5 truncate"><FileText className="w-4 h-4 shrink-0"/><span className="truncate">Change History</span></div></button>
               </div>
             )}
           </div>
