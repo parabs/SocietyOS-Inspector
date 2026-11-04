@@ -995,7 +995,21 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       <Card label="Cheque Bounce Charges" value={fmt(chequeBounce)} detail="Validate charge mapping and bank evidence" icon={AlertTriangle} tone="amber"/>
       <Card label="Additional Funds / Special Levies" value={fmt(additionalFunds)} detail="Verify approved resolution and member allocation" icon={Wallet}/>
      </div>
-     <div className="flex flex-wrap gap-2"><ReportLink id="monthly-demands" category="Demands & Payments" label="Monthly Demand Matrix"/><ReportLink id="monthly-payments" category="Demands & Payments" label="Monthly Receipts Matrix"/><ReportLink id="receipt-allocation-review" category="Demands & Payments" label="Review Unmatched Receipts"/><ReportLink id="opening-balance-review" category="Audit & Governance" label="Verify Previous FY Balances"/><ReportLink id="receipts" category="Registers" label="Receipt Register"/></div>
+     <Panel title="Explore Supporting Reports" subtitle="Open the detailed registers and analysis behind this dashboard.">
+      <div className="flex flex-wrap gap-2">
+       <ReportLink id="demand-register" category="Demands & Payments" label="Demand Register"/>
+       <ReportLink id="demand-summary" category="Receivables & Demand" label="Demand Summary"/>
+       <ReportLink id="monthly-demands" category="Receivables & Demand" label="Monthly Demand Matrix"/>
+       <ReportLink id="monthly-payments" category="Receivables & Demand" label="Monthly Collection Matrix"/>
+       <ReportLink id="monthly-flat-balance" category="Receivables & Demand" label="Monthly Flat Owner Balance"/>
+       <ReportLink id="maintenance-performance" category="Receivables & Demand" label="Maintenance & Delay Analysis"/>
+       <ReportLink id="party-balances" category="Receivables & Demand" label="Debtors — All Parties"/>
+       <ReportLink id="member-ledger" category="Debtors & Parties" label="Detailed Member Ledger"/>
+       <ReportLink id="receipt-allocation-review" category="Demands & Payments" label="Unmatched Receipt Review"/>
+       <ReportLink id="opening-balance-review" category="Audit & Governance" label="Opening Balance Verification"/>
+       <ReportLink id="receipts" category="Registers" label="Receipt Register"/>
+      </div>
+     </Panel>
     </>;
    })()}
   </>}
