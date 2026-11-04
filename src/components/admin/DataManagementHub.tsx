@@ -20,6 +20,7 @@ const section=initialSection,[entity,setEntity]=useState<Entity>('account_master
 const cfg=CONFIG[entity];
 const load=useCallback(async()=>{setLoading(true);setError('');const r=await supabaseClient.from(entity).select('*').limit(5000);if(r.error)setError(r.error.message);else setRows(r.data||[]);setLoading(false);},[entity]);
 useEffect(()=>{void load();},[load]);
+useEffect(()=>{setPage(1);setSortKey('');},[search,entity]);
 const filtered=useMemo(()=>rows.filter(r=>JSON.stringify(r).toLowerCase().includes(search.toLowerCase())).sort((a,b)=>{const k=sortKey||cfg.key;const n=String(a[k]??'').localeCompare(String(b[k]??''),undefined,{numeric:true,sensitivity:'base'});return sortDir==='asc'?n:-n;}),[rows,search,sortKey,sortDir,cfg.key]);
 const pageCount=Math.max(1,Math.ceil(filtered.length/pageSize));
 const pageRows=filtered.slice((page-1)*pageSize,page*pageSize);
