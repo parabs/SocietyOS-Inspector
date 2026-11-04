@@ -41,6 +41,12 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const [rpt15PeriodMode,setRpt15PeriodMode]=useState<'FY'|'YTD'|'MTD'>('FY');
  const [rpt15Month,setRpt15Month]=useState('Mar 2019');
  const [query,setQuery]=useState('');
+ const [globalDemandGroupFilter,setGlobalDemandGroupFilter]=useState('All demand groups');
+ const [globalPartyTypeFilter,setGlobalPartyTypeFilter]=useState('All party types');
+ const [globalAccountFilter,setGlobalAccountFilter]=useState('All accounts');
+ const [globalPaymentModeFilter,setGlobalPaymentModeFilter]=useState('All modes');
+ const [demandSummaryCategoryFilter,setDemandSummaryCategoryFilter]=useState('All categories');
+ const [demandSummaryCategoryGroupFilter,setDemandSummaryCategoryGroupFilter]=useState('All category groups');
  const [categoryFilter,setCategoryFilter]=useState('All categories');
  const [categoryGroupFilter,setCategoryGroupFilter]=useState('All category groups');
  const [expenseDemandGroupFilter,setExpenseDemandGroupFilter]=useState('All demand groups');
@@ -133,15 +139,22 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   const m=String(t.reportingMonth||t.month||'');
   const periodOk=period==='All months'||m===period;
   const cat=String(t.categoryName||'Unclassified');
-  const catOk=categoryFilter==='All categories'||cat===categoryFilter;
-  const group=String(t.categoryGroup||categoryMaster.find((x:any)=>x.category_name===cat)?.category_group||'Unmapped');
+  const category=categoryMaster.find((x:any)=>String(x.category_name||'')===cat)||{};
+  const demandGroup=String(category.demand_group||'Unmapped Demand Group');
+  const demandGroupOk=globalDemandGroupFilter==='All demand groups'||demandGroup===globalDemandGroupFilter;
+  const party=partyMaster.find((p:any)=>String(p.party_name||'')===String(t.party||''));
+  const partyType=String(party?.party_type||'Unclassified');
+  const partyTypeOk=globalPartyTypeFilter==='All party types'||partyType===globalPartyTypeFilter;
+  const accountOk=globalAccountFilter==='All accounts'||String(t.accountName||'')===globalAccountFilter;
+  const paymentModeOk=globalPaymentModeFilter==='All modes'||String((t as any).paymentMode||(t as any).payment_mode||'Unspecified')===globalPaymentModeFilter;
+  const group=String(t.categoryGroup||category.category_group||'Unmapped');
   const groupOk=categoryGroupFilter==='All category groups'||group===categoryGroupFilter;
   const q=query.toLowerCase().trim();
   const qOk=!q||[t.id,t.party,t.description,t.categoryName,t.accountName,t.voucherNo,t.receiptNo,t.sourceFile].some(v=>String(v||'').toLowerCase().includes(q));
   const status=String(t.evidenceStatus||'Pending');
   const statusOk=statusFilter==='All statuses'||status===statusFilter;
-  return periodOk&&catOk&&groupOk&&qOk&&statusOk;
- }),[transactions,period,categoryFilter,categoryGroupFilter,categoryMaster,query,statusFilter]);
+  return periodOk&&demandGroupOk&&partyTypeOk&&accountOk&&paymentModeOk&&groupOk&&qOk&&statusOk;
+ }),[transactions,period,globalDemandGroupFilter,globalPartyTypeFilter,globalAccountFilter,globalPaymentModeFilter,categoryGroupFilter,categoryMaster,partyMaster,query,statusFilter]);
  const receipts=filtered.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
  const payments=filtered.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
  const contra=filtered.filter(t=>t.transactionClass==='Contra').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
@@ -225,7 +238,11 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
  const currencyCell=(n:number)=><span className="font-semibold tabular-nums">{fmt(n)}</span>;
  const statusPill=(s:string)=><span className={'inline-flex rounded-full px-2 py-1 text-[10px] font-semibold '+(s==='Complete'||s==='Matched'||s==='Verified'?'bg-emerald-100 text-emerald-800':s==='Missing'||s==='Mismatch'||s==='Failed'?'bg-red-100 text-red-800':'bg-amber-100 text-amber-800')}>{s||'Not assessed'}</span>;
  const monthControl=<select value={period} onChange={e=>setPeriod(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>All months</option>{allMonths.map(m=><option key={m}>{m}</option>)}</select>;
- const filterBar=<div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3"><CalendarDays className="h-4 w-4 text-blue-700"/><span className="text-xs font-semibold text-slate-600">Period</span>{monthControl}<select value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>All categories</option>{cats.map(([c])=><option key={c}>{c}</option>)}</select><div className="relative min-w-[190px] flex-1"><Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search party, voucher, category, source…" className="w-full rounded-lg border border-slate-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-blue-400"/></div><button onClick={()=>{setPeriod('All months');setCategoryFilter('All categories');setCategoryGroupFilter('All category groups');setQuery('');setStatusFilter('All statuses');setPartyTypeFilter('All party types')}} className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">Reset</button></div>;
+ const globalDemandGroups=Array.from(new Set(categoryMaster.map((c:any)=>String(c.demand_group||'Unmapped Demand Group')).filter(Boolean))).sort();
+ const globalPartyTypes=Array.from(new Set(partyMaster.map((p:any)=>String(p.party_type||'Unclassified')).filter(Boolean))).sort();
+ const globalAccounts=Array.from(new Set(transactions.map((t:any)=>String(t.accountName||'')).filter(Boolean))).sort();
+ const globalPaymentModes=Array.from(new Set(transactions.map((t:any)=>String(t.paymentMode||t.payment_mode||'Unspecified')).filter(Boolean))).sort();
+ const filterBar=<div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3"><CalendarDays className="h-4 w-4 text-blue-700"/><span className="text-xs font-semibold text-slate-600">Period</span>{monthControl}<label className="text-xs text-slate-600">Demand Group <select value={globalDemandGroupFilter} onChange={e=>setGlobalDemandGroupFilter(e.target.value)} className="ml-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>All demand groups</option>{globalDemandGroups.map(v=><option key={v}>{v}</option>)}</select></label><label className="text-xs text-slate-600">Party Type <select value={globalPartyTypeFilter} onChange={e=>setGlobalPartyTypeFilter(e.target.value)} className="ml-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>All party types</option>{globalPartyTypes.map(v=><option key={v}>{v}</option>)}</select></label><label className="text-xs text-slate-600">Account <select value={globalAccountFilter} onChange={e=>setGlobalAccountFilter(e.target.value)} className="ml-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>All accounts</option>{globalAccounts.map(v=><option key={v}>{v}</option>)}</select></label><label className="text-xs text-slate-600">Payment Mode <select value={globalPaymentModeFilter} onChange={e=>setGlobalPaymentModeFilter(e.target.value)} className="ml-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>All modes</option>{globalPaymentModes.map(v=><option key={v}>{v}</option>)}</select></label><div className="relative min-w-[150px] flex-1"><Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search party, voucher, category, source…" className="w-full rounded-lg border border-slate-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-blue-400"/></div><button onClick={()=>{setPeriod('All months');setGlobalDemandGroupFilter('All demand groups');setGlobalPartyTypeFilter('All party types');setGlobalAccountFilter('All accounts');setGlobalPaymentModeFilter('All modes');setCategoryGroupFilter('All category groups');setQuery('');setStatusFilter('All statuses')}} className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">Reset</button></div>;
  const reportDemands=demandRegister.filter((d:any)=>!d.financial_year||String(d.financial_year).includes('2018-19'));
  const demandNetAmount=(d:any)=>{
   const note=String(d.notes||'');
@@ -583,6 +600,9 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       parties.set(id,{id,name:p?.party_name||d.member_name||id,type:p?.party_type||'Member',opening,groupAmounts:{},adjustments:0});
      }
      if(period!=='All months'&&monthKey(d.month||d.demand_month)!==monthKey(period))return;
+     const category:any=categoryById.get(String(d.category_id||''))||{};
+     if(demandSummaryCategoryFilter!=='All categories'&&String(category.category_name||'')!==demandSummaryCategoryFilter)return;
+     if(demandSummaryCategoryGroupFilter!=='All category groups'&&String(category.category_group||'Unmapped')!==demandSummaryCategoryGroupFilter)return;
      const group=getDemandGroupColumn(d);
      const amount=demandNetAmount(d);
      const row=parties.get(id);
@@ -1404,8 +1424,8 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     </>}
     {(selectedReport.startsWith('account-ledger')||selectedReport==='cashbook'||selectedReport==='bank-recon'||selectedReport==='monthly-summary')&&<label className="text-[11px] text-slate-600">Account <select value={accountFilter} onChange={e=>setAccountFilter(e.target.value as 'TDCC'|'BOM'|'CASH'|'ALL')} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option value="ALL">All accounts</option><option value="TDCC">TDCC</option><option value="BOM">BOM</option><option value="CASH">Cash</option></select></label>}
         {selectedReport==='expense-analysis'&&<label className="text-[11px] text-slate-600">Demand group <select value={expenseDemandGroupFilter} onChange={e=>setExpenseDemandGroupFilter(e.target.value)} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option>All demand groups</option>{Array.from(new Set(categoryMaster.map((c:any)=>String(c.demand_group||'Unmapped Demand Group')).filter(Boolean))).sort().map(v=><option key={v}>{v}</option>)}</select></label>}
-{(selectedReport==='expense-analysis'||selectedReport==='income-expense'||selectedReport.startsWith('category-ledger'))&&<label className="text-[11px] text-slate-600">Category group <select value={categoryGroupFilter} onChange={e=>setCategoryGroupFilter(e.target.value)} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option>All category groups</option>{categoryGroups.map(v=><option key={v}>{v}</option>)}</select></label>}
-    <button onClick={()=>{setPartyTypeFilter('All party types');setCategoryGroupFilter('All category groups');setExpenseDemandGroupFilter('All demand groups');setQuery('');setAccountFilter('ALL')}} className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px] text-slate-600">Reset report filters</button>
+{selectedReport==='demand-summary'&&<><label className="text-[11px] text-slate-600">Category <select value={demandSummaryCategoryFilter} onChange={e=>setDemandSummaryCategoryFilter(e.target.value)} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option>All categories</option>{Array.from(new Set(categoryMaster.map((c:any)=>String(c.category_name||'')).filter(Boolean))).sort().map(v=><option key={v}>{v}</option>)}</select></label><label className="text-[11px] text-slate-600">Category group <select value={demandSummaryCategoryGroupFilter} onChange={e=>setDemandSummaryCategoryGroupFilter(e.target.value)} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option>All category groups</option>{categoryGroups.map(v=><option key={v}>{v}</option>)}</select></label></>}{(selectedReport==='expense-analysis'||selectedReport==='income-expense'||selectedReport.startsWith('category-ledger'))&&<label className="text-[11px] text-slate-600">Category group <select value={categoryGroupFilter} onChange={e=>setCategoryGroupFilter(e.target.value)} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option>All category groups</option>{categoryGroups.map(v=><option key={v}>{v}</option>)}</select></label>}
+    <button onClick={()=>{setPartyTypeFilter('All party types');setCategoryGroupFilter('All category groups');setExpenseDemandGroupFilter('All demand groups');setDemandSummaryCategoryFilter('All categories');setDemandSummaryCategoryGroupFilter('All category groups');setQuery('');setAccountFilter('ALL')}} className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px] text-slate-600">Reset report filters</button>
    </div>}
    {selectedReport==='party-balances'&&<div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><Card label="Member balance records" value={num(cumulativeOutstanding.length)} detail="Cumulative outstanding register" icon={Users}/><Card label="Members with dues" value={num(cumulativeOutstanding.filter(r=>Number(r.net_outstanding||0)>0).length)} detail="Positive outstanding balance" icon={AlertTriangle} tone="amber"/><Card label="Net outstanding" value={fmt(cumulativeOutstanding.reduce((s,r)=>s+Number(r.net_outstanding||0),0))} detail="Verify opening balances and allocations" icon={Wallet} tone="red"/></div>}
    {selectedReport==='payments'?(()=>{
