@@ -36,6 +36,7 @@ import {
   DbMemberOpeningBalance,
   DbBalanceRegister,
   DbMemberFinancialYearBalance,
+  DbPartyFinancialYearBalance,
   DbMemberCumulativeOutstanding,
   DbDemandRegister,
   DbDemandAdjustment,
@@ -165,6 +166,7 @@ interface VerificationContextType {
   memberOpeningBalances: DbMemberOpeningBalance[];
   balanceRegister: DbBalanceRegister[];
   memberFinancialBalances: DbMemberFinancialYearBalance[];
+  partyFinancialBalances: DbPartyFinancialYearBalance[];
   cumulativeOutstanding: DbMemberCumulativeOutstanding[];
   isLoadingMemberBalances: boolean;
   memberBalancesError: string | null;
@@ -265,6 +267,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [memberOpeningBalances, setMemberOpeningBalances] = useState<DbMemberOpeningBalance[]>([]);
   const [balanceRegister, setBalanceRegister] = useState<DbBalanceRegister[]>([]);
   const [memberFinancialBalances, setMemberFinancialBalances] = useState<DbMemberFinancialYearBalance[]>([]);
+  const [partyFinancialBalances, setPartyFinancialBalances] = useState<DbPartyFinancialYearBalance[]>([]);
   const [cumulativeOutstanding, setCumulativeOutstanding] = useState<DbMemberCumulativeOutstanding[]>([]);
   const [demandRegister, setDemandRegister] = useState<DbDemandRegister[]>([]);
   const [demandAdjustments, setDemandAdjustments] = useState<DbDemandAdjustment[]>([]);
@@ -636,10 +639,11 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsLoadingMemberBalances(true);
     setMemberBalancesError(null);
     try {
-      const [opRes, balRes, finRes, cumRes, partyRes, flatRes] = await Promise.all([
+      const [opRes, balRes, finRes, partyFinRes, cumRes, partyRes, flatRes] = await Promise.all([
         supabaseClient.from('member_opening_balances').select('*'),
         supabaseClient.from('balance_register').select('*'),
         supabaseClient.from('v_member_financial_year_balance').select('*'),
+        supabaseClient.from('v_party_financial_year_balance').select('*'),
         supabaseClient.from('v_member_cumulative_outstanding').select('*'),
         supabaseClient.from('party_master').select('party_id, party_name, party_type'),
         supabaseClient.from('flat_owner_master').select('flat_number_source_value, owner_name, owner_type, asset_type'),
@@ -647,9 +651,11 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (opRes.error) throw new Error(`member_opening_balances: ${opRes.error.message}`);
       if (balRes.error) throw new Error(`balance_register: ${balRes.error.message}`);
+      if (partyFinRes.error) throw new Error(`v_party_financial_year_balance: ${partyFinRes.error.message}`);
 
       setMemberOpeningBalances((opRes.data as DbMemberOpeningBalance[]) || []);
       setBalanceRegister((balRes.data as DbBalanceRegister[]) || []);
+      setPartyFinancialBalances((partyFinRes.data as DbPartyFinancialYearBalance[]) || []);
       const partyRows=(partyRes.data||[]) as any[];
       const flatRows=(flatRes.data||[]) as any[];
       const partyNames=new Map(partyRows.map((p:any)=>[String(p.party_id||''),String(p.party_name||'')]));
@@ -685,6 +691,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           ...prev.tablesLoaded,
           member_opening_balances: opRes.data?.length || 0,
           balance_register: balRes.data?.length || 0,
+          v_party_financial_year_balance: partyFinRes.data?.length || 0,
         },
       }));
     } catch (err: any) {
@@ -693,6 +700,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setMemberBalancesError(err.message || 'Failed to fetch member balances');
       setMemberOpeningBalances([]);
       setBalanceRegister([]);
+      setPartyFinancialBalances([]);
     } finally {
       setIsLoadingMemberBalances(false);
     }
@@ -1534,6 +1542,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         memberOpeningBalances,
         balanceRegister,
         memberFinancialBalances,
+        partyFinancialBalances,
         cumulativeOutstanding,
         isLoadingMemberBalances,
         memberBalancesError,
