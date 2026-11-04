@@ -35,6 +35,7 @@ export const Sidebar: React.FC = () => {
     audit: false,
     reports: false,
     admin: false,
+    data: true,
   });
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export const Sidebar: React.FC = () => {
       setOpenGroups(prev => ({ ...prev, financial: true }));
     }
     if (currentScreen === 'data-management') {
-      setOpenGroups(prev => ({ ...prev, admin: true }));
+      setOpenGroups(prev => ({ ...prev, data: true }));
     }
   }, [currentScreen]);
 
@@ -239,6 +240,24 @@ export const Sidebar: React.FC = () => {
             )}
           </div>
 
+          {/* DATA MANAGEMENT — independent top-level workspace */}
+          <div>
+            <button
+              onClick={() => toggleGroup('data')}
+              className="w-full flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 hover:text-slate-200 cursor-pointer"
+            >
+              <span>Data Management</span>
+              {openGroups.data ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </button>
+            {openGroups.data && (
+              <div className="mt-1 space-y-1 pl-1">
+                <button onClick={() => handleNavClick('data-management')} className={navItemClass('data-management')}>
+                  <div className="flex items-center gap-2.5 truncate"><Database className="w-4 h-4 shrink-0"/><span className="truncate">Masters &amp; Import Wizard</span></div>
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Group 3: AUDIT & COMPLIANCE */}
           <div>
             <button
@@ -341,16 +360,6 @@ export const Sidebar: React.FC = () => {
                   <div className="flex items-center gap-2.5 truncate">
                     <Settings className="w-4 h-4 shrink-0" />
                     <span className="truncate">Settings</span>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleNavClick('data-management')}
-                  className={navItemClass('data-management')}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Database className="w-4 h-4 shrink-0" />
-                    <span className="truncate">Data Management / Import</span>
                   </div>
                 </button>
 

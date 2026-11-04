@@ -16,7 +16,7 @@ import { MonthlyReconciliation } from './components/verification/MonthlyReconcil
 import { SocietyFinancialDashboards } from './components/financial/SocietyFinancialDashboards';
 import { SettingsView } from './components/admin/SettingsView';
 import { DataManagement } from './components/admin/DataManagement';
-import { FY2018WorkbookImport } from './components/admin/FY2018WorkbookImport';
+import { DataManagementHub } from './components/admin/DataManagementHub';
 
 const MainContent: React.FC = () => {
   const { currentScreen, setCurrentScreen } = useVerification();
@@ -46,7 +46,7 @@ const MainContent: React.FC = () => {
       return <SocietyFinancialDashboards screen="reports" />;
 
     case 'data-management':
-      return <FY2018WorkbookImport onClose={() => setCurrentScreen('transactions')} />;
+      return <DataManagementHub />;
 
     case 'transactions':
       return <DataManagement />;
