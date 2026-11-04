@@ -452,7 +452,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
 
     return {title:isVendor?'Vendor / Payee Ledger — Detailed':selectedReport==='member-ledger'?'Member / Flat Owner Ledger — Detailed':(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Detailed',note:'Each party, account or category group is shown separately with its opening balance (where a verified source exists), dated transaction details and closing balance. Member demand entries are shown as charges and receipts reduce the receivable balance. Category groups show period movement; no unsupported opening balance is assumed.',headers:isParty?['Date','Particulars','Voucher / Receipt No.','Debit / Payment','Credit / Receipt','Balance']:['Date','Particulars','Voucher / Receipt No.','Category','Debit / Payment','Credit / Receipt','Balance'],rows:detailRows};
    }
-   case 'member-opening-balance-register': return {title:'Member Opening Balance Register — FY 2018–19',note:'Read-only presentation of the validated v_opening_balance_register view.',headers:[],rows:[]};
+   case 'member-opening-balance-register': return {title:'Member Opening Balance Register — FY 2018–19',note:'Opening-position register only: shows the approved brought-forward member balances at the start of FY 2018–19. It does not include current-year demands or receipts. Debtors — All Parties is the current-year position report, calculated from opening balance plus recorded demands less actual receipts and approved adjustments.',headers:[],rows:[]};
    case 'receipt-allocation-review': {
     const allocations=Array.isArray(demandAllocations)?demandAllocations:[];
     const receiptTx=transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra');
