@@ -703,9 +703,9 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const isMember=(p:any)=>/^members?$/i.test(String(p?.party_type||p?.party_type_name||'').trim());
     const monthIndex=(t:any)=>{
      const raw=String(t.reportingMonth||t.month||t.date||'').trim();
-     const match=raw.match(/^([A-Za-z]{3,})[- ](20\\d{2})$/);
+     const match=raw.match(/^([A-Za-z]{3,})[- ](20\d{2})$/);
      if(match){const key=match[1].slice(0,3).toLowerCase()+' '+match[2];return monthLabels.findIndex((m:string)=>m.toLowerCase()===key);}
-     const iso=raw.match(/^20\\d{2}-(0?[1-9]|1[0-2])(?:-|$)/);
+     const iso=raw.match(/^20\d{2}-(0?[1-9]|1[0-2])(?:-|$)/);
      if(iso){const n=Number(iso[1]);return n>=4?n-4:n+8;}
      return -1;
     };
