@@ -510,7 +510,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       const p=partyMaster.find((x:any)=>String(x.party_id)===matchedId);
       if(!parties.has(key))parties.set(key,{id:key,name:p?.party_name||payer||'Unidentified payer',type:p?.party_type||'Unmapped / Review',flat:p?.flat_no||'—',monthly:Array(12).fill(0),count:0,last:'—'});
       const date=transactionDate(t);
-      const dateParts=date.match(/^\\d{4}-(\\d{2})-/); const monthNumber=dateParts?Number(dateParts[1]):0; const idx=monthNumber>=1&&monthNumber<=12?(monthNumber+8)%12:-1;
+      const dateParts=date.match(/^\d{4}-(\d{2})-/); const monthNumber=dateParts?Number(dateParts[1]):0; const idx=monthNumber>=1&&monthNumber<=12?(monthNumber+8)%12:-1;
       if(idx>=0){const row=parties.get(key);row.monthly[idx]+=Math.abs(Number(t.amount)||0);row.count++;if(date>row.last)row.last=date;}
     });
     const rows=Array.from(parties.values()).filter(x=>!query||[x.name,x.type].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim()))).sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
@@ -548,7 +548,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       const p=partyMaster.find((x:any)=>String(x.party_id)===matchedId);
       if(!parties.has(key))parties.set(key,{id:key,name:p?.party_name||payer||'Unidentified payer',type:p?.party_type||'Unmapped / Review',monthly:Array(12).fill(0)});
       const date=transactionDate(t);
-      const dateParts=date.match(/^\\d{4}-(\\d{2})-/); const monthNumber=dateParts?Number(dateParts[1]):0; const idx=monthNumber>=1&&monthNumber<=12?(monthNumber+8)%12:-1;
+      const dateParts=date.match(/^\d{4}-(\d{2})-/); const monthNumber=dateParts?Number(dateParts[1]):0; const idx=monthNumber>=1&&monthNumber<=12?(monthNumber+8)%12:-1;
       if(idx>=0)parties.get(key).monthly[idx]+=Math.abs(Number(t.amount)||0);
     });
     const rows=Array.from(parties.values()).map(x=>({...x,cumulative:x.monthly.map((_:number,i:number)=>x.monthly.slice(0,i+1).reduce((a:number,b:number)=>a+b,0))})).filter(x=>!query||[x.name,x.type].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim()))).sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
