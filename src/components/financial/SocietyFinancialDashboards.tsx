@@ -571,19 +571,32 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    case 'monthly-flat-balance': {
     const parties=new Map<string,any>(),demandParty=new Map<string,string>();
     reportDemands.forEach((d:any)=>{const id=String(d.party_id||''),did=String(d.demand_id||d.id||'');if(id&&did)demandParty.set(did,id);});
+    const isMember=(p:any)=>/^members?$/i.test(String(p?.party_type||p?.party_type_name||'').trim());
+    const monthIndex=(t:any)=>{
+     const raw=String(t.reportingMonth||t.month||t.date||'').trim();
+     const match=raw.match(/^([A-Za-z]{3,})[- ](20\\d{2})$/);
+     if(match){const key=match[1].slice(0,3).toLowerCase()+' '+match[2];return monthLabels.findIndex((m:string)=>m.toLowerCase()===key);}
+     const iso=raw.match(/^20\\d{2}-(0?[1-9]|1[0-2])(?:-|$)/);
+     if(iso){const n=Number(iso[1]);return n>=4?n-4:n+8;}
+     return -1;
+    };
     receiptRows.forEach(t=>{
-      const matchedId=partyIdForReceipt(t,demandParty);
-      const payer=String(t.party||'').trim();
-      const key=matchedId||('UNMAPPED:'+payer.toLowerCase());
+      const did=transactionDemandId(t),linkedPartyId=demandParty.get(did)||'';
+      const matchedId=linkedPartyId||partyIdForReceipt(t,demandParty);
       const p=partyMaster.find((x:any)=>String(x.party_id)===matchedId);
-      if(!parties.has(key))parties.set(key,{id:key,name:p?.party_name||payer||'Unidentified payer',type:p?.party_type||'Unmapped / Review',flat:p?.flat_no||'—',monthly:Array(12).fill(0),count:0,last:'—'});
-      const date=transactionDate(t);
-      const dateParts=date.match(/^\d{4}-(\d{2})-/); const monthNumber=dateParts?Number(dateParts[1]):0; const idx=monthNumber>=1&&monthNumber<=12?(monthNumber+8)%12:-1;
-      if(idx>=0){const row=parties.get(key);row.monthly[idx]+=Math.abs(Number(t.amount)||0);row.count++;if(date>row.last)row.last=date;}
+      if(!p||!isMember(p))return;
+      const key=String(p.party_id);
+      if(!parties.has(key))parties.set(key,{id:key,name:p.party_name||key,type:p.party_type||'Member',flat:p.flat_no||'—',monthly:Array(12).fill(0),otherReceipts:0,count:0,last:'—'});
+      const row=parties.get(key),amount=Math.abs(Number(t.amount)||0),idx=monthIndex(t);
+      if(did&&linkedPartyId&&idx>=0){row.monthly[idx]+=amount;row.count++;const date=String(t.date||'');if(date&&date>row.last)row.last=date;}
+      else row.otherReceipts+=amount;
     });
-    const rows=Array.from(parties.values()).filter(x=>!query||[x.name,x.type].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim()))).sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
+    const rows=Array.from(parties.values())
+     .filter(x=>!query||[x.name,x.type,x.flat].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim())))
+     .filter(x=>partyTypeFilter==='All party types'||x.type===partyTypeFilter)
+     .sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
     const totalByMonth=monthLabels.map((_,i)=>rows.reduce((sum:number,x:any)=>sum+x.monthly[i],0));
-    return {title:'Monthly Flat Owner Collection Report',note:'This is a collection report: each month shows actual non-contra receipts by transaction date, grouped by matched party. Receipts that cannot be matched to a Party Master record remain visible under Unmapped / Review using the original payer label; they are not assigned to a guessed member.',headers:['Party Type','Party Name','Flat / Shop No.',...monthLabels,'Total FY Collections','Receipt Count','Last Receipt Date'],rows:[...rows.map(x=>[x.type,x.name,x.flat,...x.monthly.map(currencyCell),currencyCell(x.monthly.reduce((a:number,b:number)=>a+b,0)),x.count,x.last]),['TOTAL — ALL RECORDED RECEIPTS','','',...totalByMonth.map(currencyCell),currencyCell(totalByMonth.reduce((a:number,b:number)=>a+b,0)),rows.reduce((sum:number,x:any)=>sum+x.count,0),'']]};
+    return {title:'Monthly Flat Owner Collection Report',note:'Monthly demand-linked member receipts are grouped by source Reporting Month (transaction date is used only when Reporting Month is absent). Receipts without a valid Demand ID, including additional funds, are excluded from monthly demand-linked collections and shown separately as Other / Unallocated Receipts. No missing dates or allocations are inferred.',headers:['Party Type','Party Name','Flat / Shop No.',...monthLabels,'Total FY Demand-linked Collections','Other / Unallocated Receipts (FY Total)','Receipt Count','Last Receipt Date'],rows:[...rows.map(x=>[x.type,x.name,x.flat,...x.monthly.map(currencyCell),currencyCell(x.monthly.reduce((a:number,b:number)=>a+b,0)),currencyCell(x.otherReceipts),x.count,x.last]),['TOTAL — MEMBER RECEIPTS','','',...totalByMonth.map(currencyCell),currencyCell(totalByMonth.reduce((a:number,b:number)=>a+b,0)),currencyCell(rows.reduce((s:number,x:any)=>s+Number(x.otherReceipts||0),0)),rows.reduce((sum:number,x:any)=>sum+x.count,0),'']]};
    }
    case 'demand-summary': {
     // Members-only report with a fixed, audit-friendly Demand Group column order.
@@ -952,7 +965,8 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     };
     const memberDemands=reportDemands.filter((d:any)=>{
      const p=partyMaster.find((x:any)=>String(x.party_id)===String(d.party_id||''));
-     return Boolean(p&&isMember(p))&&(period==='All months'||monthKey(d.month||d.demand_month)===monthKey(period));
+     const demandGroup=String(categoryById.get(String(d.category_id||''))?.demand_group||'Unmapped Demand Group');
+     return Boolean(p&&isMember(p))&&(period==='All months'||monthKey(d.month||d.demand_month||d.reporting_month||d.demand_date)===monthKey(period))&&(globalPartyTypeFilter==='All party types'||String(p.party_type||'')===globalPartyTypeFilter)&&(partyTypeFilter==='All party types'||String(p.party_type||'')===partyTypeFilter)&&(globalDemandGroupFilter==='All demand groups'||demandGroup===globalDemandGroupFilter);
     });
     const partyGroups=new Map<string,any>();
     const totals={maintenanceDemand:0,onTime:0,late:0,maintenanceOutstanding:0,excess:0,delayDemand:0,delayCollected:0,delayOutstanding:0,nocDemand:0,nocCollected:0,nocOutstanding:0};
@@ -994,7 +1008,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       totals.nocDemand+=amount;totals.nocCollected+=collected;totals.nocOutstanding+=outstanding;
      }
     });
-    const rows=Array.from(partyGroups.values()).sort((a:any,b:any)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
+    const rows=Array.from(partyGroups.values()).filter((x:any)=>!query||String(x.name||'').toLowerCase().includes(query.toLowerCase().trim())).sort((a:any,b:any)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
     const headers=['Party Type','Party Name','Maintenance Demanded (incl. Parking)','Collected On Time','Collected Late','Outstanding Maintenance (incl. Parking)','Excess Receipts (incl. Parking)','Delay Charges Demanded','Delay Charges Collected','Delay Charges Outstanding','NOC Demanded','NOC Collected','NOC Outstanding'];
     const tableRows=rows.map((x:any)=>[x.type,x.name,currencyCell(x.maintenanceDemand),currencyCell(x.onTime),currencyCell(x.late),currencyCell(x.maintenanceOutstanding),currencyCell(x.excess),currencyCell(x.delayDemand),currencyCell(x.delayCollected),currencyCell(x.delayOutstanding),currencyCell(x.nocDemand),currencyCell(x.nocCollected),currencyCell(x.nocOutstanding)]);
     const totalRow=['SOCIETY TOTAL','',currencyCell(totals.maintenanceDemand),currencyCell(totals.onTime),currencyCell(totals.late),currencyCell(totals.maintenanceOutstanding),currencyCell(totals.excess),currencyCell(totals.delayDemand),currencyCell(totals.delayCollected),currencyCell(totals.delayOutstanding),currencyCell(totals.nocDemand),currencyCell(totals.nocCollected),currencyCell(totals.nocOutstanding)];
@@ -1518,7 +1532,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
   {screen==='reports'&&<>
    {selectedReport!=='member-opening-balance-register'&&selectedReport!=='demand-register'&&selectedReport!=='receipts'&&selectedReport!=='payments'&&selectedReport!=='adjustments-contra'&&<div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
     <span className="px-1 text-[11px] font-semibold text-slate-600">Report filters</span>
-    {(selectedReport==='party-balances'||selectedReport.startsWith('party-ledger')||selectedReport==='member-ledger'||selectedReport==='vendor-ledger'||selectedReport==='demand-summary'||selectedReport==='monthly-demands'||selectedReport==='monthly-payments'||selectedReport==='monthly-flat-balance')&&<>
+    {(selectedReport==='party-balances'||selectedReport.startsWith('party-ledger')||selectedReport==='member-ledger'||selectedReport==='vendor-ledger'||selectedReport==='demand-summary'||selectedReport==='monthly-demands'||selectedReport==='monthly-payments'||selectedReport==='monthly-flat-balance'||selectedReport==='maintenance-performance')&&<>
      <label className="text-[11px] text-slate-600">Party type <select value={partyTypeFilter} onChange={e=>setPartyTypeFilter(e.target.value)} className="ml-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option>All party types</option>{(selectedReport==='demand-summary'?memberPartyTypes:partyTypes).map(v=><option key={v}>{v}</option>)}</select></label>
      <label className="text-[11px] text-slate-600">Party name <select value={query} onChange={e=>setQuery(e.target.value)} className="ml-1 max-w-[220px] rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px]"><option value="">All parties</option>{Array.from(new Set([...flatOwnerMaster.map((x:any)=>String(x.owner_name||'')),...partyMaster.map((x:any)=>String(x.party_name||x.name||''))].filter(Boolean))).sort().map(v=><option key={v} value={v}>{v}</option>)}</select></label>
     </>}
