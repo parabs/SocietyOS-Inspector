@@ -1204,9 +1204,9 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    })()}
   </> }
   {screen==='party-ledger'&&(()=>{
-   const memberRows=[...cumulativeOutstanding].sort((a,b)=>Number(b.net_outstanding||0)-Number(a.net_outstanding||0));
-   const memberDueTotal=memberRows.reduce((sum,r)=>sum+Math.max(0,Number(r.net_outstanding)||0),0);
-   const membersWithDues=memberRows.filter(r=>Number(r.net_outstanding||0)>0);
+   const memberRows=[...cumulativeOutstanding].sort((a,b)=>Number(a.net_outstanding||0)-Number(b.net_outstanding||0));
+   const memberDueTotal=memberRows.reduce((sum,r)=>sum+Math.max(0,-(Number(r.net_outstanding)||0)),0);
+   const membersWithDues=memberRows.filter(r=>Number(r.net_outstanding||0)<0);
    const allPaymentRows=filtered.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra');
    const utilityPattern=/electric|mseb|water|lift|security|housekeeping|cleaning|sweeper|diesel|federation|internet|telephone|utility/i;
    const paymentRows=activeTab==='Utilities'?allPaymentRows.filter(t=>utilityPattern.test(String(t.categoryName||'')+' '+String(t.party||'')+' '+String(t.description||''))):activeTab==='Ad-hoc'?allPaymentRows.filter(t=>!utilityPattern.test(String(t.categoryName||'')+' '+String(t.party||'')+' '+String(t.description||''))):allPaymentRows;
@@ -1250,7 +1250,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     return {name:u.name,count:matched.length,total:matched.reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0),lastDate:dated[0]?.date||'',lastMonth:dated[0]?.reportingMonth||dated[0]?.month||'',firstMonth:firstObserved==null?'':allMonths[firstObserved],missing,monthsSinceLast,consecutiveGap};
    });
    const utilityCoverageMonths=allMonths.length;
-   const maxMember= Math.max(1,...memberRows.slice(0,5).map(r=>Number(r.net_outstanding)||0));
+   const maxMember= Math.max(1,...memberRows.slice(0,5).map(r=>Math.abs(Number(r.net_outstanding)||0)));
    const maxVendor= Math.max(1,...vendorRows.slice(0,5).map(r=>r.paid));
    const memberStatus=[{name:'With dues',value:membersWithDues.length},{name:'No recorded dues',value:Math.max(0,memberRows.length-membersWithDues.length)}];
    const vendorEvidence=[{name:'Evidence gaps',value:vendorRows.reduce((sum,v)=>sum+v.gaps,0)},{name:'Complete evidence',value:Math.max(0,paymentRows.length-vendorRows.reduce((sum,v)=>sum+v.gaps,0))}];
@@ -1287,7 +1287,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      </div>
      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.15fr_.85fr]">
       <Panel title="Members with the Highest Recorded Outstanding" action={<ReportLink id="party-balances" category="Debtors & Parties" label="View all debtors"/>}>
-       <div className="space-y-3">{memberRows.slice(0,5).map((r,i)=>{const amount=Math.max(0,Number(r.net_outstanding)||0);return <div key={String(r.member_name||r.flat_no||i)}><div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="font-semibold text-slate-800">{memberLabel(r)}</span><span className="font-bold text-rose-700">{fmt(amount)}</span></div><div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-rose-500" style={{width:(amount/maxMember*100)+'%'}}/></div></div>})}{!memberRows.length&&<p className="text-xs text-slate-500">No member outstanding records are available.</p>}</div>
+       <div className="space-y-3">{memberRows.slice(0,5).map((r,i)=>{const amount=Math.max(0,-(Number(r.net_outstanding)||0));return <div key={String(r.member_name||r.flat_no||i)}><div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="font-semibold text-slate-800">{memberLabel(r)}</span><span className="font-bold text-rose-700">{fmt(amount)}</span></div><div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-rose-500" style={{width:(amount/maxMember*100)+'%'}}/></div></div>})}{!memberRows.length&&<p className="text-xs text-slate-500">No member outstanding records are available.</p>}</div>
        <p className="mt-3 text-[10px] text-slate-500">Sorted from the available cumulative outstanding register. This is not an ageing calculation; opening balances and receipt allocations still require verification.</p>
       </Panel>
       <Panel title="Member Balance Coverage">
