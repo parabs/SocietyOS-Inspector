@@ -128,6 +128,7 @@ export interface DbMemberFinancialYearBalance {
 }
 
 export interface DbMemberCumulativeOutstanding {
+  party_id?: string;
   flat_no: string;
   member_name?: string;
   contact_number?: string;
@@ -135,6 +136,10 @@ export interface DbMemberCumulativeOutstanding {
   total_received?: number;
   total_adjustments?: number;
   net_outstanding?: number;
+  opening_balance?: number;
+  opening_balance_recorded?: boolean;
+  unallocated_receipts?: number;
+  total_party_balance?: number;
   last_payment_date?: string;
   status?: string;
 }
