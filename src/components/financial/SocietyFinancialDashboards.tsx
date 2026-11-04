@@ -194,6 +194,11 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    const source=document.querySelector(selectedReport==='income-expense'?'#rpt15-print-content':'#selected-report-content') as HTMLElement|null;
    if(!source)return;
    const clone=source.cloneNode(true) as HTMLElement;
+   if(selectedReport!=='income-expense'){
+    clone.querySelector(':scope > div:first-child')?.remove();
+    clone.querySelector(':scope > div:first-child')?.remove();
+    clone.querySelector(':scope > div:first-child')?.remove();
+   }
    clone.querySelectorAll('button,input,select,textarea,[class*="print:hidden"]').forEach(el=>el.remove());
    const w=window.open('','_blank','width=1100,height=800');if(!w)return;
    const title=reportCatalog.find(r=>r.id===selectedReport)?.name||'Selected Report';
@@ -1152,6 +1157,12 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       body * { visibility: hidden !important; }
       #selected-report-content, #selected-report-content * { visibility: visible !important; }
       #selected-report-content { position: absolute !important; inset: 0 !important; width: 100% !important; max-width: none !important; }
+      #selected-report-content > div:first-child,
+      #selected-report-content > div:nth-child(2),
+      #selected-report-content > div:nth-child(3) { display: none !important; }
+      #selected-report-content .print\\:hidden { display: none !important; }
+      #selected-report-content #rpt15-print-content,
+      #selected-report-content #rpt16-print-content { display: block !important; }
       #selected-report-content table { width: 100% !important; border-collapse: collapse !important; font-size: 9pt !important; }
       #selected-report-content th, #selected-report-content td { border: 1px solid #777 !important; padding: 5px !important; color: #000 !important; }
       #selected-report-content th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
