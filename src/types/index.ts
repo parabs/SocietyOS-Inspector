@@ -84,6 +84,9 @@ export interface OpeningBalanceRecord {
   verifiedBy?: string;
   verifiedOn?: string;
   openingBalanceRecorded?: boolean;
+  sourceOpeningBalance?: number;
+  preFYMovement?: number;
+  calculatedOpeningBalance?: number | null;
   currentFYReceipts?: number;
   currentFYPayments?: number;
   currentFYContraIn?: number;
