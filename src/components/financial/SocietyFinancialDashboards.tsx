@@ -661,12 +661,16 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const paymentsByHead=Array.from(paymentGroups.values()).sort((x,y)=>x.group.localeCompare(y.group)||x.name.localeCompare(y.name));
     const openingRows=(openingBalances||[]).map((x:any)=>({account:String(x.accountName||x.account_name||x.accountId||'Unmapped account'),amount:Number(x.recordedOpeningBalance??x.calculatedOpeningBalance??x.sourceOpeningBalance??0)}));
     const openingAvailable=openingRows.length>0;
-    const openingTotal=openingRows.reduce((sum,x)=>sum+x.amount,0);
+    const fyOpeningTotal=openingRows.reduce((sum,x)=>sum+x.amount,0);
+    const selectedMonthIndex=period==='All months'?-1:monthOrder.indexOf(period);
+    const priorMovements=selectedMonthIndex>0?transactions.filter(t=>t.transactionClass!=='Contra'&&(t.type==='Receipt'||t.type==='Payment')&&monthOrder.indexOf(String(t.reportingMonth||t.month||''))>=0&&monthOrder.indexOf(String(t.reportingMonth||t.month||''))<selectedMonthIndex):[];
+    const periodOpeningTotal=fyOpeningTotal+priorMovements.reduce((sum,t)=>sum+(t.type==='Receipt'?1:-1)*Math.abs(Number(t.amount)||0),0);
+    const openingTotal=selectedMonthIndex>=0?periodOpeningTotal:fyOpeningTotal;
     const receiptTotal=receiptsByHead.reduce((sum,x)=>sum+x.amount,0);
     const paymentTotal=paymentsByHead.reduce((sum,x)=>sum+x.amount,0);
     const closingTotal=openingTotal+receiptTotal-paymentTotal;
     const contraTotal=filtered.filter(t=>t.transactionClass==='Contra').reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);
-    const leftRows:any[][]=[...(openingAvailable?openingRows.map(x=>['Opening Balance · '+x.account,currencyCell(x.amount)]):[['Opening Cash & Bank Balance','Not available']]),...receiptsByHead.map(x=>[x.group+' · '+x.name,currencyCell(x.amount)])];
+    const leftRows:any[][]=[...(openingAvailable?(selectedMonthIndex>=0?[['Opening Cash & Bank Balance',currencyCell(openingTotal)]]:openingRows.map(x=>['Opening Balance · '+x.account,currencyCell(x.amount)])):[['Opening Cash & Bank Balance','Not available']]),...receiptsByHead.map(x=>[x.group+' · '+x.name,currencyCell(x.amount)])];
     const rightRows:any[][]=[...paymentsByHead.map(x=>[x.group+' · '+x.name,currencyCell(x.amount)]),['Closing Cash & Bank Balance',openingAvailable?currencyCell(closingTotal):'Not available']];
     const count=Math.max(leftRows.length,rightRows.length,1);
     const rows:any[][]=[];
