@@ -80,7 +80,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   {id:'category-ledger-summary',name:'Demand Group-wise Ledger — Summary',category:'Ledgers',description:'Demand Group → Category Group → Category Name hierarchy and period movement totals'},
   {id:'category-ledger-monthly',name:'Demand Group-wise Ledger — Month-wise',category:'Ledgers',description:'Monthly movements grouped by Demand Group → Category Group → Category Name'},
   {id:'category-ledger-detail',name:'Demand Group-wise Ledger — Detailed',category:'Ledgers',description:'Chronological transactions grouped by Demand Group → Category Group → Category Name'},
-  {id:'receipts-payments',name:'Receipts & Payments Account',category:'Financial Statements',description:'Cash movement statement, provisional until matched to auditor format'},
+  {id:'receipts-payments',name:'RPT-16 · Receipts & Payments Account',category:'Financial Statements',description:'Cash and bank movement statement with opening balances, receipts, payments, calculated closing position and reconciliation limitations'},
   {id:'income-expense',name:'RPT-15 · Income & Expenditure Account',category:'Financial Statements',description:'Society income and expenditure statement with category-wise details and surplus / deficit'},
   {id:'profit-loss',name:'Profit & Loss Statement (Management View)',category:'Financial Statements',description:'Management presentation of income, expenses and net surplus / deficit; reconciled to the Income & Expenditure Account'},
   {id:'balance-sheet',name:'Balance Sheet Working Statement',category:'Financial Statements',description:'Available balances and reconciliation exceptions'},
@@ -646,28 +646,37 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     return {title:'Monthly Cumulative Collection Matrix — Party-wise',note:'Each month shows cumulative actual non-contra receipts from FY start, grouped by actual transaction date and party. Party-matched receipts appear under the Party Master name; unmatched payer labels remain visible as Unmapped / Review. This is cumulative collections, not a closing receivable balance or demand allocation.',headers:['Party Type','Party Name',...monthLabels,'FY Cumulative Receipts'],rows:[...rows.map(x=>[x.type,x.name,...x.cumulative.map(currencyCell),currencyCell(x.cumulative[11]||0)]),['TOTAL — ALL RECORDED RECEIPTS','',...totals.map(currencyCell),currencyCell(totals[11]||0)]]};
    }
    case 'receipts-payments': {
-    const auditorReceipts=[['Opening Balance',166440.30,'opening'],['  Bank Accounts',138462.30,'opening-bank'],['  Cash-in-Hand',27978,'opening-cash'],['Current Assets — Sundry Debtors',993765,'debtors'],['Indirect Incomes — Bank Interest',6618,'Bank Interest'],['Indirect Incomes — Car Parking Charges',2700,'CAR PARKING CHARGES'],['Indirect Incomes — Cheque Charges',600,'Cheque Charges'],['Indirect Incomes — Delay Charges',30,'Delay Charges'],['Indirect Incomes — Other Charges',1869,'Other Charges'],['Indirect Incomes — Penal Interest',4060,'Penal Interest']];
-    const auditorPayments=[['Current Liabilities — Audit Fees Payable',2924,'AUDIT FEES PAYABLE'],['Investments — Sinking Fund FD 20.08.18',120000,'Sinking Fund FD'],['Current Assets — Sundry Debtors',17950,'payment-debtors'],['Indirect Expenses — Bank Charges',401.20,'Bank Charges'],['Indirect Expenses — Cleaning Expenses',1850,'CLEANING EXPENSES'],['Indirect Expenses — Diesel',37302,'Diesel'],['Indirect Expenses — Diwali Expenses',820,'Diwali Expenses'],['Indirect Expenses — Drainage Cleaning & Repair',2650,'Drainage Cleaning'],['Indirect Expenses — Electrical Bill & Repairs',95450,'Electrical Bill'],['Indirect Expenses — Federation Fees',70168,'Federation Fees'],['Indirect Expenses — Lift Repairs & Maintenance',28524,'Lift Repairs'],['Indirect Expenses — Misc Expenses',3690,'Misc Expenses'],['Indirect Expenses — Plumbing Material',8500,'Plumbing Material'],['Indirect Expenses — Printing & Stationery',1980,'PRINTING & STATIONARY'],['Indirect Expenses — Refreshment Expenses',850,'Refreshment'],['Indirect Expenses — Repairs & Maintenance',32670,'Repairs & Maintenances'],['Indirect Expenses — Security Services',288168,'Security Services'],['Indirect Expenses — Sweeper Salary & Bonus',42000,'Sweeper Salary'],['Indirect Expenses — Travelling Expenses',500,'Travelling Expenses'],['Indirect Expenses — Water Charges',57069,'Water Charges'],['Closing Balance',362616.10,'closing'],['  Bank Accounts',315690.10,'closing-bank'],['  Cash-in-Hand',46926,'closing-cash']];
-    const openingRecon=(openingBalances||[]) as any[];
-    const closingRecon=openingRecon.map((a:any)=>({...a,calculatedClosingBalance:Number(a.recordedOpeningBalance||0)+transactions.filter(t=>t.accountId===a.accountId&&t.transactionClass!=='Contra').reduce((s,t)=>s+(t.type==='Receipt'?Math.abs(Number(t.amount)||0):-Math.abs(Number(t.amount)||0)),0)}));
-    const liveFor=(key:string,side:'receipt'|'payment'):number|string=>{
-      if(key==='opening')return openingRecon.length?openingRecon.reduce((s:number,x:any)=>s+Number(x.recordedOpeningBalance??x.calculatedOpeningBalance??x.sourceOpeningBalance??0),0):'Not available';
-      if(key==='opening-bank')return openingRecon.filter((x:any)=>String(x.accountId||'').toUpperCase()!=='CASH').reduce((s:number,x:any)=>s+Number(x.recordedOpeningBalance??x.calculatedOpeningBalance??x.sourceOpeningBalance??0),0);
-      if(key==='opening-cash')return openingRecon.filter((x:any)=>String(x.accountId||'').toUpperCase()==='CASH').reduce((s:number,x:any)=>s+Number(x.recordedOpeningBalance??x.calculatedOpeningBalance??x.sourceOpeningBalance??0),0);
-      if(key==='closing')return closingRecon.length?closingRecon.reduce((s:number,x:any)=>s+Number(x.calculatedClosingBalance||0),0):'Not available';
-      if(key==='closing-bank')return closingRecon.filter((x:any)=>String(x.accountId||'').toUpperCase()!=='CASH').reduce((s:number,x:any)=>s+Number(x.calculatedClosingBalance||0),0);
-      if(key==='closing-cash')return closingRecon.filter((x:any)=>String(x.accountId||'').toUpperCase()==='CASH').reduce((s:number,x:any)=>s+Number(x.calculatedClosingBalance||0),0);
-      if(key==='debtors')return cumulativeOutstanding.length?cumulativeOutstanding.reduce((s:number,x:any)=>s+Math.max(0,Number(x.net_outstanding)||0),0):'Not available';
-      if(key==='payment-debtors'||key==='AUDIT FEES PAYABLE'||key==='Sinking Fund FD')return 'Not mapped';
-      const kind=side==='receipt'?'Receipt':'Payment';
-      const found=transactions.filter(t=>t.type===kind&&t.transactionClass!=='Contra'&&[t.categoryName,t.description,t.party].some(v=>String(v||'').toLowerCase().includes(key.toLowerCase())));
-      return found.length?found.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0):0;
+    const movement=filtered.filter(t=>t.transactionClass!=='Contra'&&(t.type==='Receipt'||t.type==='Payment'));
+    const receiptGroups=new Map<string,{group:string;name:string;amount:number;count:number}>();
+    const paymentGroups=new Map<string,{group:string;name:string;amount:number;count:number}>();
+    const addGroup=(map:Map<string,{group:string;name:string;amount:number;count:number}>,t:any)=>{
+     const name=String(t.categoryName||'Unclassified');
+     const group=String(t.categoryGroup||categoryMaster.find((c:any)=>c.category_name===name)?.category_group||'Unmapped');
+     const key=group+'::'+name;
+     const row=map.get(key)||{group,name,amount:0,count:0};
+     row.amount+=Math.abs(Number(t.amount)||0);row.count++;map.set(key,row);
     };
-    const count=Math.max(auditorReceipts.length,auditorPayments.length);
+    movement.forEach(t=>addGroup(t.type==='Receipt'?receiptGroups:paymentGroups,t));
+    const receiptsByHead=Array.from(receiptGroups.values()).sort((x,y)=>x.group.localeCompare(y.group)||x.name.localeCompare(y.name));
+    const paymentsByHead=Array.from(paymentGroups.values()).sort((x,y)=>x.group.localeCompare(y.group)||x.name.localeCompare(y.name));
+    const openingRows=(openingBalances||[]).map((x:any)=>({account:String(x.accountName||x.account_name||x.accountId||'Unmapped account'),amount:Number(x.recordedOpeningBalance??x.calculatedOpeningBalance??x.sourceOpeningBalance??0)}));
+    const openingAvailable=openingRows.length>0;
+    const openingTotal=openingRows.reduce((sum,x)=>sum+x.amount,0);
+    const receiptTotal=receiptsByHead.reduce((sum,x)=>sum+x.amount,0);
+    const paymentTotal=paymentsByHead.reduce((sum,x)=>sum+x.amount,0);
+    const closingTotal=openingTotal+receiptTotal-paymentTotal;
+    const contraTotal=filtered.filter(t=>t.transactionClass==='Contra').reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);
+    const count=Math.max(receiptsByHead.length,paymentsByHead.length,openingRows.length,1);
     const rows:any[][]=[];
-    for(let i=0;i<count;i++){const l:any=auditorReceipts[i],p:any=auditorPayments[i];const lv=l?liveFor(l[2] as string,'receipt'):'',pv=p?liveFor(p[2] as string,'payment'):'';rows.push([l?.[0]||'',l?currencyCell(Number(l[1])):'',typeof lv==='number'?currencyCell(lv):lv,l&&typeof lv==='number'?currencyCell(lv-Number(l[1])):'—',p?.[0]||'',p?currencyCell(Number(p[1])):'',typeof pv==='number'?currencyCell(pv):pv,p&&typeof pv==='number'?currencyCell(pv-Number(p[1])):'—']);}
-    rows.push(['TOTAL — auditor statement',currencyCell(1176082.30),'—','—','TOTAL — auditor statement',currencyCell(1176082.30),'—','—']);
-    return {title:'Receipts & Payments Account — Auditor Format (Provisional)',note:'Line items and reference amounts reproduce the supplied FY 2018–19 auditor statement. Connected-data values are independently calculated where the source data supports mapping; “Not mapped” or “Not available” must be resolved before this report is used as a revised financial statement. Reference totals are source-reported, not independently certified.',headers:['RECEIPTS — Particulars','Auditor Report (₹)','Connected Data (₹)','Variance (₹)','PAYMENTS — Particulars','Auditor Report (₹)','Connected Data (₹)','Variance (₹)'],rows};
+    for(let i=0;i<count;i++){
+     const r=receiptsByHead[i],p=paymentsByHead[i],o=openingRows[i];
+     rows.push([r?r.group+' · '+r.name:'',r?currencyCell(r.amount):'',p?p.group+' · '+p.name:'',p?currencyCell(p.amount):'']);
+    }
+    rows.push(['TOTAL RECEIPTS',currencyCell(receiptTotal),'TOTAL PAYMENTS',currencyCell(paymentTotal)]);
+    rows.push(['Opening cash & bank balance',openingAvailable?currencyCell(openingTotal):'Not available','Closing cash & bank balance',openingAvailable?currencyCell(closingTotal):'Not available']);
+    rows.push(['Opening balance availability',openingAvailable?num(openingRows.length)+' account balance records':'No verified opening balance records','Contra transfers excluded',currencyCell(contraTotal)]);
+    const accountRows=openingRows.map(x=>[x.account,currencyCell(x.amount)]);
+    return {title:'RPT-16 · Receipts & Payments Account',note:'Cash and bank movement statement generated from connected transactions. Receipt and payment heads are grouped by Category Group → Category Name. Contra transfers are excluded from consolidated cash movement to avoid double counting. Opening balances are shown only where Account Master opening records are available. Closing balance is a calculated provisional movement, not a bank-reconciled balance. Debtors, investments and unpaid liabilities are not treated as cash receipts or payments unless represented by actual cash/bank transactions.',headers:['RECEIPTS — Particulars','Amount (₹)','PAYMENTS — Particulars','Amount (₹)'],rows,openingAccounts:accountRows,summary:{openingAvailable,openingTotal,receiptTotal,paymentTotal,closingTotal,contraTotal,transactionCount:movement.length}};
    }
    case 'party-balances': {
     // Party balance is calculated from opening + recorded demands - actual receipts - approved adjustments.
