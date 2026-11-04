@@ -766,25 +766,34 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    case 'expense-analysis': {const months=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];const names=Array.from(new Set(filtered.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra').map(t=>t.categoryName||'Unclassified')));return {title:'Expense Analysis by Category',note:'Monthly payments grouped by category group and category. Contra transfers are excluded. Values reflect recorded cash payments, not necessarily accrual-basis expenditure.',headers:['Category Group','Category',...months,'Annual Total'],rows:names.filter(n=>!query||n.toLowerCase().includes(query.toLowerCase())).map(n=>{const group=categoryMaster.find((x:any)=>x.category_name===n)?.category_group||filtered.find(t=>t.categoryName===n)?.categoryGroup||'Unmapped';const vals=months.map(m=>filtered.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra'&&(t.categoryName||'Unclassified')===n&&String(t.reportingMonth||t.month||'').replace(/\\n/g,' ').trim().toLowerCase()===m.toLowerCase()).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0));return [group,n,...vals.map(currencyCell),currencyCell(vals.reduce((s,v)=>s+v,0))]})}};
    case 'missing-docs': return {title:'Missing Document / Evidence Register',note:'Transactions with incomplete evidence, missing bills or missing voucher/receipt references.',headers:['Date','Transaction ID','Party','Category','Amount','Voucher / receipt','Bill status','Evidence status'],rows:filtered.filter(t=>t.evidenceStatus!=='Complete'||t.billStatus==='Missing'||t.voucherReceiptStatus==='Missing').map(t=>[t.date||'—',t.id||'—',t.party||'Unmapped',t.categoryName||'Unclassified',currencyCell(Math.abs(Number(t.amount)||0)),t.voucherNo||t.receiptNo||'Missing',statusPill(t.billStatus||'Not assessed'),statusPill(t.evidenceStatus||'Pending')])};
    case 'bank-recon': {
-    const reconRows=Object.entries(reconciliations).filter(([accountId])=>accountFilter==='ALL'||String(accountId)===accountFilter).flatMap(([accountId,list]:any)=>list.filter((r:any)=>period==='All months'||String(r.month||r.monthId||'').replace(/-/g,' ').trim().toLowerCase()===period.toLowerCase()).map((r:any)=>{
-     const month=String(r.month||r.monthId||'').replace(/-/g,' ').trim();
-     const account=openingBalances.find((a:any)=>String(a.accountId||'')===String(accountId));
-     const tx=transactions.filter(t=>String(t.accountId||'')===String(accountId)&&String(t.reportingMonth||t.month||'').replace(/-/g,' ').trim().toLowerCase()===month.toLowerCase());
-     const bookReceipts=tx.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra').reduce((v,t)=>v+Math.abs(Number(t.amount)||0),0);
-     const bookPayments=tx.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra').reduce((v,t)=>v+Math.abs(Number(t.amount)||0),0);
-     const bookContra=tx.filter(t=>t.transactionClass==='Contra').reduce((v,t)=>v+Math.abs(Number(t.amount)||0),0);
-     const opening=Number(r.calculatedOpeningBalance??account?.recordedOpeningBalance??0);
-     const calculatedClosing=Number(r.calculatedClosingBalance??(opening+bookReceipts-bookPayments));
-     const statementClosing=r.sourceClosingBalance==null?null:Number(r.sourceClosingBalance);
-     const difference=statementClosing===null?null:calculatedClosing-statementClosing;
-     const effectiveStatus=statementClosing===null?'Statement balance missing':Math.abs(Number(difference))<0.005?'Matched':String(r.status||'Pending');
-     return {accountId,accountName:account?.accountName||tx[0]?.accountName||String(accountId),month,opening,bookReceipts,bookPayments,bookContra,calculatedClosing,statementClosing,difference,status:effectiveStatus,remarks:r.remarks||'',adjustments:Number(r.adjustments)||0,openingConfirmed:Boolean(r.openingConfirmed),transactionsConfirmed:Boolean(r.transactionsConfirmed),closingConfirmed:Boolean(r.closingConfirmed),confirmationNotes:r.confirmationNotes||''};
-    }));
-    const missing=openingBalances.filter((a:any)=>!reconRows.some(x=>String(x.accountId)===String(a.accountId)));
-    const matchedRows=reconRows.filter(x=>x.status==='Matched'||x.status==='Reconciled'||x.status==='Mismatch Accepted');
-    const mismatchRows=reconRows.filter(x=>x.difference!==null&&Math.abs(x.difference)>=0.005);
+    // Reuse the same monthly account reconciliation workpaper already shown on the Account-wise Monthly Reconciliation screen.
+    // The workpaper's credits/debits/contra and calculated balances are the book-side source; bank statement closing remains separately entered.
+    const accountEntries=Object.entries(reconciliations);
+    const reconRows=accountEntries.flatMap(([accountKey,list]:any)=>{
+     const account=openingBalances.find((a:any)=>String(a.accountId||'')===String(accountKey)||String(a.accountName||'').toUpperCase().includes(String(accountKey).toUpperCase()));
+     const accountAliases=[String(accountKey),String(account?.accountId||''),String(account?.accountName||'')].filter(Boolean);
+     const accountMatches=accountFilter==='ALL'||accountAliases.some(v=>v.toUpperCase()===String(accountFilter).toUpperCase());
+     if(!accountMatches)return [];
+     return (list||[]).filter((r:any)=>period==='All months'||String(r.month||r.monthId||'').replace(/-/g,' ').trim().toLowerCase()===period.toLowerCase()).map((r:any)=>{
+      const month=String(r.month||r.monthId||'').replace(/-/g,' ').trim();
+      const opening=Number(r.calculatedOpeningBalance??r.sourceOpeningBalance??0);
+      const bookReceipts=Number(r.credits)||0;
+      const bookPayments=Number(r.debits)||0;
+      const bookContra=Number(r.contra)||0;
+      const adjustments=Number(r.adjustments)||0;
+      const calculatedClosing=Number(r.calculatedClosingBalance??(opening+bookReceipts-bookPayments+bookContra+adjustments));
+      const statementClosing=r.sourceClosingBalance===null||r.sourceClosingBalance===undefined?null:Number(r.sourceClosingBalance);
+      const difference=statementClosing===null?null:Number((calculatedClosing-statementClosing).toFixed(2));
+      const status=statementClosing===null?'Awaiting Statement':Math.abs(Number(difference))<0.005?'Matched':String(r.status||'Difference');
+      return {accountId:accountKey,accountName:account?.accountName||String(accountKey),month,opening,bookReceipts,bookPayments,bookContra,adjustments,calculatedClosing,statementClosing,difference,status,remarks:r.remarks||'',openingConfirmed:Boolean(r.openingConfirmed),transactionsConfirmed:Boolean(r.transactionsConfirmed),closingConfirmed:Boolean(r.closingConfirmed),confirmationNotes:r.confirmationNotes||''};
+     });
+    });
     const missingStatement=reconRows.filter(x=>x.statementClosing===null);
-    return {title:'RPT-18 · Bank / UPI Reconciliation',note:'This report compares account-wise monthly book closing balances with saved bank / UPI statement closing balances where provided. It does not invent statement transactions or infer matches from totals alone. Missing statement balances remain outstanding. Verify deposits in transit, unpresented cheques, bank charges, UPI settlement timing and transfers with source statements and transaction references.',headers:['Account','Month','Opening Book Balance','Book Receipts','Book Payments','Contra','Calculated Book Closing','Statement Closing','Difference','Reconciliation Status','Review Notes'],rows:reconRows.map(x=>[x.accountName,x.month,currencyCell(x.opening),currencyCell(x.bookReceipts),currencyCell(x.bookPayments),currencyCell(x.bookContra),currencyCell(x.calculatedClosing),x.statementClosing===null?'Not supplied':currencyCell(x.statementClosing),x.difference===null?'Not calculable':currencyCell(x.difference),statusPill(x.status),x.remarks||'—']),summary:{total:reconRows.length,matched:matchedRows.length,mismatches:mismatchRows.length,missingStatement:missingStatement.length,missingAccounts:missing.length,reconRows}};
+    const matchedRows=reconRows.filter(x=>x.status==='Matched');
+    const mismatchRows=reconRows.filter(x=>x.difference!==null&&Math.abs(x.difference)>=0.005);
+    const accountCount=new Set(reconRows.map(x=>x.accountId)).size;
+    const accountsWithoutRows=accountEntries.filter(([accountKey,list]:any)=>list.length===0&&(accountFilter==='ALL'||String(accountKey)===accountFilter)).length;
+    return {title:'RPT-18 · Bank / UPI Reconciliation',note:'Book-side monthly balances, receipts, payments and contra movements are reused from the Account-wise Monthly Reconciliation workpaper. Statement closing balances are separately supplied from bank / UPI statements. A missing statement balance is Awaiting Statement, never a zero difference or a match.',headers:['Account','Month','Opening Book Balance','Book Receipts','Book Payments','Contra / Adjustments','Calculated Book Closing','Statement Closing','Difference','Reconciliation Status','Review Notes'],rows:reconRows.map(x=>[x.accountName,x.month,currencyCell(x.opening),currencyCell(x.bookReceipts),currencyCell(x.bookPayments),currencyCell(x.bookContra+x.adjustments),currencyCell(x.calculatedClosing),x.statementClosing===null?'Awaiting statement':currencyCell(x.statementClosing),x.difference===null?'Awaiting statement':currencyCell(x.difference),statusPill(x.status),x.remarks||'—']),summary:{total:reconRows.length,matched:matchedRows.length,mismatches:mismatchRows.length,missingStatement:missingStatement.length,missingAccounts:accountsWithoutRows,accountCount,reconRows}};
    }
    case 'maintenance-performance': {
     const isMember=(party:any)=>/^members?$/i.test(String(party?.party_type||'').trim());
