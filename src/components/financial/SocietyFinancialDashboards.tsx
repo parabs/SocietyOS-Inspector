@@ -197,7 +197,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
  const filterBar=<div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3"><CalendarDays className="h-4 w-4 text-blue-700"/><span className="text-xs font-semibold text-slate-600">Period</span>{monthControl}<select value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"><option>All categories</option>{cats.map(([c])=><option key={c}>{c}</option>)}</select><div className="relative min-w-[190px] flex-1"><Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search party, voucher, category, source…" className="w-full rounded-lg border border-slate-200 py-2 pl-8 pr-3 text-xs outline-none focus:border-blue-400"/></div><button onClick={()=>{setPeriod('All months');setCategoryFilter('All categories');setCategoryGroupFilter('All category groups');setQuery('');setStatusFilter('All statuses');setPartyTypeFilter('All party types')}} className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">Reset</button></div>;
  const reportDemands=demandRegister.filter((d:any)=>!d.financial_year||String(d.financial_year).includes('2018-19'));
  const transactionDemandId=(t:ReportTransaction)=>String(t.demandId||'');
- const monthKey=(value:any)=>{const raw=String(value||'').trim();const m=raw.match(/^([A-Za-z]{3,})[- ](\\d{4})$/);return m?m[1].slice(0,3).toLowerCase()+' '+m[2]:raw.toLowerCase();};
+ const monthKey=(value:any)=>{const raw=String(value||'').trim();const m=raw.match(/^([A-Za-z]{3,})[- ](\d{4})$/);return m?m[1].slice(0,3).toLowerCase()+' '+m[2]:raw.toLowerCase();};
  const monthLabels=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
  const transactionDate=(t:any)=>String(t.date||'').slice(0,10);
  const receiptRows=transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra');
@@ -268,9 +268,9 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       const normalizeMonth=(value:any)=>{
         const raw=String(value??'').trim();
         if(!raw) return '';
-        const iso=raw.match(/^(\\d{4})-(\\d{2})/);
+        const iso=raw.match(/^(\d{4})-(\d{2})/);
         if(iso) return iso[1]+'-'+iso[2];
-        const named=raw.match(/^([A-Za-z]{3,})[-\\s]+(\\d{4})$/);
+        const named=raw.match(/^([A-Za-z]{3,})[-\\s]+(\d{4})$/);
         if(named){
           const idx=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(named[1].slice(0,3).toLowerCase());
           return idx<0?'':named[2]+'-'+String(idx+1).padStart(2,'0');
@@ -572,15 +572,15 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      const raw=String(value??'').trim();
      if(!raw)return '';
      const monthNames=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-     const monthMatch=raw.match(/\\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|october|oct|november|nov|december|dec)\\b/i);
-     const yearMatch=raw.match(/\\b(20\\d{2}|\\d{2})\\b/);
+     const monthMatch=raw.match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|october|oct|november|nov|december|dec)\b/i);
+     const yearMatch=raw.match(/\b(20\d{2}|\d{2})\b/);
      if(monthMatch&&yearMatch){
       const monthName=monthMatch[1].slice(0,3).toLowerCase();
       const month=monthNames.indexOf(monthName);
       let year=Number(yearMatch[1]);if(year<100)year+=year>=70?1900:2000;
       return month>=0?monthNames[month]+' '+year:'';
      }
-     const isoMatch=raw.match(/\\b(20\\d{2})[-/](0?[1-9]|1[0-2])\\b/);
+     const isoMatch=raw.match(/\b(20\d{2})[-/](0?[1-9]|1[0-2])\b/);
      if(isoMatch)return monthNames[Number(isoMatch[2])-1]+' '+isoMatch[1];
      return '';
     };
