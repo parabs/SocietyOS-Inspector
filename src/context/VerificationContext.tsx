@@ -68,6 +68,7 @@ export type ScreenId =
   | 'ledger-reports'
   | 'settings'
   | 'data-management'
+  | 'import-wizard'
   | 'transactions'
   | 'user-access';
 
