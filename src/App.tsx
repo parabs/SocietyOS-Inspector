@@ -17,7 +17,6 @@ import { SocietyFinancialDashboards } from './components/financial/SocietyFinanc
 import { SettingsView } from './components/admin/SettingsView';
 import { DataManagement } from './components/admin/DataManagement';
 import { DataManagementHub } from './components/admin/DataManagementHub';
-import { FY2018WorkbookImport } from './components/admin/FY2018WorkbookImport';
 
 const MainContent: React.FC = () => {
   const { currentScreen, setCurrentScreen } = useVerification();
