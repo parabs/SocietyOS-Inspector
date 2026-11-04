@@ -42,10 +42,7 @@ export const Sidebar: React.FC = () => {
     if (['verification-dashboard','opening-balances','transaction-verification','monthly-reconciliation'].includes(currentScreen)) {
       setOpenGroups(prev => ({ ...prev, verification: true }));
     }
-    if (currentScreen === 'transactions') {
-      setOpenGroups(prev => ({ ...prev, financial: true }));
-    }
-    if (currentScreen === 'data-management') {
+    if (currentScreen === 'transactions' || currentScreen === 'data-management' || currentScreen === 'import-wizard' || currentScreen === 'data-quality' || currentScreen === 'options-config' || currentScreen === 'data-audit-trail') {
       setOpenGroups(prev => ({ ...prev, data: true }));
     }
   }, [currentScreen]);
@@ -217,16 +214,6 @@ export const Sidebar: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={() => handleNavClick('transactions')}
-                  className={navItemClass('transactions')}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Database className="w-4 h-4 shrink-0" />
-                    <span className="truncate">Transactions</span>
-                  </div>
-                </button>
-
-                <button
                   onClick={() => handleNavClick('party-ledger')}
                   className={navItemClass('party-ledger')}
                 >
@@ -251,9 +238,18 @@ export const Sidebar: React.FC = () => {
             </button>
             {openGroups.data && (
               <div className="mt-1 space-y-1 pl-1">
-                <button onClick={() => handleNavClick('data-management')} className={navItemClass('data-management')}>
-                  <div className="flex items-center gap-2.5 truncate"><Database className="w-4 h-4 shrink-0"/><span className="truncate">Masters &amp; Import Wizard</span></div>
+                <button onClick={() => handleNavClick('transactions')} className={navItemClass('transactions')}>
+                  <div className="flex items-center gap-2.5 truncate"><Database className="w-4 h-4 shrink-0"/><span className="truncate">Transactions</span></div>
                 </button>
+                <button onClick={() => handleNavClick('data-management')} className={navItemClass('data-management')}>
+                  <div className="flex items-center gap-2.5 truncate"><Database className="w-4 h-4 shrink-0"/><span className="truncate">Master Data</span></div>
+                </button>
+                <button onClick={() => handleNavClick('import-wizard')} className={navItemClass('import-wizard')}>
+                  <div className="flex items-center gap-2.5 truncate"><Files className="w-4 h-4 shrink-0"/><span className="truncate">Import Wizard</span></div>
+                </button>
+                <button onClick={() => handleNavClick('data-quality')} className={navItemClass('data-quality')}><div className="flex items-center gap-2.5 truncate"><ShieldCheck className="w-4 h-4 shrink-0"/><span className="truncate">Data Quality</span></div></button>
+                <button onClick={() => handleNavClick('options-config')} className={navItemClass('options-config')}><div className="flex items-center gap-2.5 truncate"><Settings className="w-4 h-4 shrink-0"/><span className="truncate">Options &amp; Configuration</span></div></button>
+                <button onClick={() => handleNavClick('data-audit-trail')} className={navItemClass('data-audit-trail')}><div className="flex items-center gap-2.5 truncate"><FileText className="w-4 h-4 shrink-0"/><span className="truncate">Change History</span></div></button>
               </div>
             )}
           </div>

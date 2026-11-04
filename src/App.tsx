@@ -17,6 +17,7 @@ import { SocietyFinancialDashboards } from './components/financial/SocietyFinanc
 import { SettingsView } from './components/admin/SettingsView';
 import { DataManagement } from './components/admin/DataManagement';
 import { DataManagementHub } from './components/admin/DataManagementHub';
+import { DataManagementControlCenter } from './components/admin/DataManagementControlCenter';
 
 const MainContent: React.FC = () => {
   const { currentScreen, setCurrentScreen } = useVerification();
@@ -46,10 +47,22 @@ const MainContent: React.FC = () => {
       return <SocietyFinancialDashboards screen="reports" />;
 
     case 'data-management':
-      return <DataManagementHub />;
+      return <DataManagementControlCenter initialTab="masters" />;
+
+    case 'import-wizard':
+      return <DataManagementHub initialSection="import" />;
+
+    case 'data-quality':
+      return <DataManagementControlCenter initialTab="quality" />;
+
+    case 'options-config':
+      return <DataManagementControlCenter initialTab="options" />;
+
+    case 'data-audit-trail':
+      return <DataManagementControlCenter initialTab="audit" />;
 
     case 'transactions':
-      return <DataManagement />;
+      return <DataManagementControlCenter initialTab="transactions" />;
 
     case 'settings':
     case 'user-access':

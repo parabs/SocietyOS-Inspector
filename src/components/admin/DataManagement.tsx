@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabaseClient } from '../../services/supabaseClient';
 import { Database, RefreshCw, Search, Plus, Pencil, Trash2, ShieldAlert, CheckCircle2, AlertTriangle } from 'lucide-react';
 
-type Entity = 'transactions' | 'account_master' | 'party_master' | 'category_master';
+type Entity = 'transactions';
 type Field = { key: string; label: string; type?: string; required?: boolean; options?: string[] };
 const CONFIG: Record<Entity, { label: string; key: string; fields: Field[] }> = {
   transactions: { label: 'Transactions', key: 'transaction_id', fields: [
@@ -11,23 +11,6 @@ const CONFIG: Record<Entity, { label: string; key: string; fields: Field[] }> = 
     {key:'account_id',label:'Account',options:[]},{key:'party_id',label:'Party',options:[]},{key:'category_id',label:'Category',options:[]},
     {key:'description',label:'Particulars'},{key:'amount',label:'Amount',type:'number',required:true},
     {key:'payment_mode',label:'Payment Mode'},{key:'demand_id',label:'Demand ID'},{key:'notes',label:'Notes'}
-  ]},
-  account_master: { label: 'Account Master', key: 'account_id', fields: [
-    {key:'account_id',label:'Account ID',required:true},{key:'account_name',label:'Account Name',required:true},
-    {key:'account_type',label:'Account Type',options:['Bank','Cash','Other']},{key:'bank_name',label:'Bank Name'},
-    {key:'account_number_masked',label:'Masked Account No.'},{key:'opening_balance',label:'Opening Balance',type:'number'},
-    {key:'opening_balance_date',label:'Opening Balance Date',type:'date'},{key:'status',label:'Status',options:['Active','Inactive']},{key:'notes',label:'Notes'}
-  ]},
-  party_master: { label: 'Party Master', key: 'party_id', fields: [
-    {key:'party_id',label:'Party ID',required:true},{key:'party_name',label:'Party Name',required:true},
-    {key:'party_type',label:'Party Type',options:['Member','Vendor','Bank','Authority','Other']},
-    {key:'contact_person',label:'Contact Person'},{key:'mobile',label:'Mobile'},{key:'email',label:'Email',type:'email'},
-    {key:'address',label:'Address'},{key:'status',label:'Status',options:['Active','Inactive']},{key:'notes',label:'Notes'}
-  ]},
-  category_master: { label: 'Category Master', key: 'category_id', fields: [
-    {key:'category_id',label:'Category ID',required:true},{key:'category_name',label:'Category Name',required:true},
-    {key:'category_group',label:'Category Group'},{key:'demand_group',label:'Demand Group'},
-    {key:'transaction_type',label:'Transaction Type',options:['Receipt','Payment','Both']},{key:'active',label:'Active',options:['true','false']},{key:'notes',label:'Notes'}
   ]}
 };
 const textVal=(v:any)=>v===null||v===undefined?'':String(v);
@@ -85,9 +68,6 @@ export const DataManagement: React.FC = () => {
   cfg.fields.forEach(f=>{const v=form[f.key];if(v!==''&&v!==undefined){payload[f.key]=f.type==='number'?Number(v):f.key==='active'?v==='true':v;}else if(isNew)payload[f.key]=null;});
   if(isNew&&entity==='transactions'){
    Object.assign(payload,{bank_verified:'Pending',is_correction:false,correction_status:'Not Required',bill_status:'Pending',voucher_receipt_status:'Pending',evidence_status:'Pending',internal_audit_status:'Pending'});
-  }
-  if(isNew&&entity==='account_master'){
-   Object.assign(payload,{verification_status:'Pending',supporting_records:[]});
   }
   try{
    const key=cfg.key;
