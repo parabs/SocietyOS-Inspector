@@ -104,6 +104,7 @@ export interface DbPartyFinancialYearBalance {
   financial_year: string;
   opening_balance?: number;
   opening_balance_recorded?: boolean;
+  opening_balance_verified?: boolean;
   current_fy_demand?: number;
   current_fy_receipts?: number;
   current_fy_payments_signed?: number;
@@ -123,6 +124,7 @@ export interface DbMemberFinancialYearBalance {
   financial_year: string;
   opening_balance?: number;
   opening_balance_recorded?: boolean;
+  opening_balance_verified?: boolean;
   unallocated_receipts?: number;
   total_party_balance?: number;
   billed_amount?: number;
@@ -142,6 +144,7 @@ export interface DbMemberCumulativeOutstanding {
   net_outstanding?: number;
   opening_balance?: number;
   opening_balance_recorded?: boolean;
+  opening_balance_verified?: boolean;
   unallocated_receipts?: number;
   total_party_balance?: number;
   last_payment_date?: string;
