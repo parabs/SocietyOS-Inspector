@@ -519,18 +519,40 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    }
    case 'demand-summary': {
     const parties=new Map<string,any>();
-    reportDemands.forEach((d:any)=>{const id=String(d.party_id||'');if(!id)return;if(!parties.has(id)){const p=partyMaster.find((x:any)=>String(x.party_id)===id);const opening=Number(memberFinancialBalances.find((b:any)=>String(b.party_id||'')===id)?.opening_balance)||0;parties.set(id,{id,name:p?.party_name||d.member_name||id,type:p?.party_type||'Unclassified',opening,maintenance:0,delay:0,other:0,adjustments:0});}
-      const m=monthKey(d.month||d.demand_month);if(period!=='All months'&&m!==monthKey(period))return;
-      const amount=Number(d.total_demand??d.demand_amount)||0;const cat=String(d.category_id||'');
-      if(cat==='CAT-0001')parties.get(id).maintenance+=amount;
-      else if(cat==='CAT-0003')parties.get(id).delay+=amount;
-      else if(cat!=='CAT-0002')parties.get(id).other+=amount;
+    const previousDueCategories=new Set(['CAT-0002','CAT-0022','CAT-0024']);
+    const maintenanceCategories=new Set(['CAT-0001','CAT-0025']);
+    const parkingCategories=new Set(['CAT-0021']);
+    const nocCategories=new Set(['CAT-0023']);
+    reportDemands.forEach((d:any)=>{
+      const id=String(d.party_id||''); if(!id)return;
+      if(!parties.has(id)){
+        const p=partyMaster.find((x:any)=>String(x.party_id)===id);
+        const opening=Number(memberFinancialBalances.find((b:any)=>String(b.party_id||'')===id)?.opening_balance)||0;
+        parties.set(id,{id,name:p?.party_name||d.member_name||id,type:p?.party_type||'Unclassified',opening,maintenance:0,parking:0,noc:0,delay:0,other:0,adjustments:0});
+      }
+      const m=monthKey(d.month||d.demand_month);
+      if(period!=='All months'&&m!==monthKey(period))return;
+      const amount=Number(d.total_demand??d.demand_amount)||0;
+      const cat=String(d.category_id||'');
+      const row=parties.get(id);
+      if(previousDueCategories.has(cat))return; // brought forward in opening balance, not current-period demand
+      if(maintenanceCategories.has(cat))row.maintenance+=amount;
+      else if(parkingCategories.has(cat))row.parking+=amount;
+      else if(nocCategories.has(cat))row.noc+=amount;
+      else if(cat==='CAT-0003')row.delay+=amount;
+      else row.other+=amount;
     });
-    const rows=Array.from(parties.values()).map(p=>{const ids=new Set(reportDemands.filter((d:any)=>String(d.party_id||'')===p.id&&(period==='All months'||monthKey(d.month||d.demand_month)===monthKey(period))).map((d:any)=>String(d.demand_id||d.id||'')));p.adjustments=demandAdjustments.filter((a:any)=>a.is_approved===true&&ids.has(String(a.demand_id||''))).reduce((v:number,a:any)=>v+Number(a.amount??a.adjustment_amount??0),0);p.total=p.opening+p.maintenance+p.delay+p.other;return p;})
-      .filter(x=>!query||[x.name,x.type].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim())))
+    const rows=Array.from(parties.values()).map(p=>{
+      const ids=new Set(reportDemands.filter((d:any)=>String(d.party_id||'')===p.id&&(period==='All months'||monthKey(d.month||d.demand_month)===monthKey(period))&&!previousDueCategories.has(String(d.category_id||''))).map((d:any)=>String(d.demand_id||d.id||'')));
+      p.adjustments=demandAdjustments.filter((a:any)=>a.is_approved===true&&ids.has(String(a.demand_id||''))).reduce((v:number,a:any)=>v+Number(a.amount??a.adjustment_amount??0),0);
+      p.total=p.opening+p.maintenance+p.parking+p.noc+p.delay+p.other;
+      return p;
+    }).filter(x=>!query||[x.name,x.type].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim())))
       .filter(x=>partyTypeFilter==='All party types'||x.type===partyTypeFilter)
       .sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
-    return {title:'Demand Summary by Party',note:'Opening balance is brought forward separately. The selected period controls current-year demand: CAT-0001 Maintenance, CAT-0003 Delay Charges, CAT-0002 Previous Dues excluded to avoid duplicating opening balance, and remaining categories grouped as Other Demands. Total Demands = Opening Balance + Maintenance + Delay Charges + Other Demands. Approved adjustments are shown separately.',headers:['Party Type','Party Name','Opening Balance','Maintenance for Selected Period','Delay Charges','Other Demands','Total Demands','Approved Adjustments'],rows:rows.map(x=>[x.type,x.name,currencyCell(x.opening),currencyCell(x.maintenance),currencyCell(x.delay),currencyCell(x.other),currencyCell(x.total),currencyCell(x.adjustments)])};
+    const totals={opening:0,maintenance:0,parking:0,noc:0,delay:0,other:0,total:0,adjustments:0};
+    rows.forEach(x=>Object.keys(totals).forEach(k=>(totals as any)[k]+=Number(x[k])||0));
+    return {title:'Demand Summary by Party',note:'Demand categories are separated using the Society category master: Maintenance (CAT-0001 and Ad-hoc Maintenance CAT-0025), Parking (CAT-0021), Non-Occupancy Charges (CAT-0023), Delay Charges (CAT-0003), and remaining current demand categories under Other Demands. Previous Dues categories CAT-0002, CAT-0022 and CAT-0024 are excluded from current-period demand to avoid duplicating brought-forward opening balances. Total Demands = Opening Balance + current-period Maintenance + Parking + NOC + Delay Charges + Other Demands. Approved adjustments are displayed separately.',headers:['Party Type','Party Name','Opening Balance','Maintenance Charges','Parking Charges','Non-Occupancy Charges','Delay Charges','Other Demands','Total Demands','Approved Adjustments'],rows:[...rows.map(x=>[x.type,x.name,currencyCell(x.opening),currencyCell(x.maintenance),currencyCell(x.parking),currencyCell(x.noc),currencyCell(x.delay),currencyCell(x.other),currencyCell(x.total),currencyCell(x.adjustments)]),['TOTAL','',currencyCell(totals.opening),currencyCell(totals.maintenance),currencyCell(totals.parking),currencyCell(totals.noc),currencyCell(totals.delay),currencyCell(totals.other),currencyCell(totals.total),currencyCell(totals.adjustments)]]};
    }
    case 'monthly-demands': {
     const parties=new Map<string,any>();
