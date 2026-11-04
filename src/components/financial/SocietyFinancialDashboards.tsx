@@ -1179,7 +1179,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    <div id="selected-report-content" className="min-w-0 space-y-4">
     <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
      <button onClick={()=>void refetchAll()} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><RefreshCw className="h-4 w-4"/>Refresh</button>
-     <button onClick={()=>window.print()} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Print</button>
+     <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Print</button>
      <button onClick={exportRows} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500"><Download className="h-4 w-4"/>CSV</button>
      <button onClick={exportTxt} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">TXT</button>
      <button onClick={exportPdf} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">PDF</button>
