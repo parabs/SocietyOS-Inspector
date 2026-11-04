@@ -644,14 +644,14 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      const raw=String(value??'').trim();
      if(!raw)return '';
      const monthNames=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-     const monthMatch=raw.match(/\\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|october|oct|november|nov|december|dec)\\b/i);
-     const yearMatch=raw.match(/\\b(20\\d{2}|\\d{2})\\b/);
+     const monthMatch=raw.match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|october|oct|november|nov|december|dec)\b/i);
+     const yearMatch=raw.match(/\b(20\\d{2}|\\d{2})\b/);
      if(monthMatch&&yearMatch){
       const month=monthNames.indexOf(monthMatch[1].slice(0,3).toLowerCase());
       let year=Number(yearMatch[1]);if(year<100)year+=year>=70?1900:2000;
       return month>=0?monthNames[month]+' '+year:'';
      }
-     const isoMatch=raw.match(/\\b(20\\d{2})[-/](0?[1-9]|1[0-2])\\b/);
+     const isoMatch=raw.match(/\b(20\\d{2})[-/](0?[1-9]|1[0-2])\b/);
      if(isoMatch)return monthNames[Number(isoMatch[2])-1]+' '+isoMatch[1];
      return '';
     };
