@@ -566,10 +566,43 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     return {title:'Demand Summary — Members Only',note:'Members only. Demand Group values from Category Master are mapped into the fixed columns: Maintenance Charges (including Parking), Non-Occupancy Charges, Delay Charges and Other Recoveries. The selected period filter applies to all demand columns. Any member Demand Group not matching the first four classifications is included in Other Recoveries. Opening balance and approved adjustments are shown separately. Non-member parties and ad-hoc transactions are excluded.',headers,rows:[...tableRows,totals]};
    }
    case 'monthly-demands': {
+    // Monthly drill-up of Demand Summary: members only, with one column per demand month.
+    const isMember=(party:any)=>/^members?$/i.test(String(party?.party_type||party?.party_type_name||'').trim());
+    const demandMonthKey=(value:any)=>{
+     const raw=String(value??'').trim();
+     if(!raw)return '';
+     const monthNames=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+     const monthMatch=raw.match(/\\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|october|oct|november|nov|december|dec)\\b/i);
+     const yearMatch=raw.match(/\\b(20\\d{2}|\\d{2})\\b/);
+     if(monthMatch&&yearMatch){
+      const monthName=monthMatch[1].slice(0,3).toLowerCase();
+      const month=monthNames.indexOf(monthName);
+      let year=Number(yearMatch[1]);if(year<100)year+=year>=70?1900:2000;
+      return month>=0?monthNames[month]+' '+year:'';
+     }
+     const isoMatch=raw.match(/\\b(20\\d{2})[-/](0?[1-9]|1[0-2])\\b/);
+     if(isoMatch)return monthNames[Number(isoMatch[2])-1]+' '+isoMatch[1];
+     return '';
+    };
+    const memberDemands=reportDemands.filter((d:any)=>{
+     const p=partyMaster.find((x:any)=>String(x.party_id)===String(d.party_id||''));
+     return Boolean(p&&isMember(p));
+    });
     const parties=new Map<string,any>();
-    reportDemands.forEach((d:any)=>{const id=String(d.party_id||'');if(!id)return;if(!parties.has(id)){const p=partyMaster.find((x:any)=>String(x.party_id)===id);parties.set(id,{id,name:p?.party_name||d.member_name||id,type:p?.party_type||'Unclassified',monthly:Array(12).fill(0)});}const idx=monthLabels.findIndex(m=>monthKey(m)===monthKey(d.month||d.demand_month));if(idx>=0)parties.get(id).monthly[idx]+=Number(d.total_demand??d.demand_amount)||0;});
-    const rows=Array.from(parties.values()).filter(x=>!query||[x.name,x.type].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim()))).sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
-    return {title:'Monthly Demand Matrix',note:'Current-year demands grouped by demand month and party. Opening balances are deliberately excluded and shown in the Member Opening Balance Register / Demand Summary.',headers:['Party Type','Party Name',...monthLabels,'Total Demand'],rows:[...rows.map(x=>[x.type,x.name,...x.monthly.map(currencyCell),currencyCell(x.monthly.reduce((a:number,b:number)=>a+b,0))]),['TOTAL','',...monthLabels.map((_,i)=>currencyCell(rows.reduce((v:number,x:any)=>v+x.monthly[i],0))),currencyCell(rows.reduce((v:number,x:any)=>v+x.monthly.reduce((a:number,b:number)=>a+b,0),0))]]};
+    memberDemands.forEach((d:any)=>{
+     const id=String(d.party_id||'');if(!id)return;
+     const p=partyMaster.find((x:any)=>String(x.party_id)===id);
+     if(!parties.has(id))parties.set(id,{id,name:p?.party_name||d.member_name||id,type:p?.party_type||'Member',monthly:Array(monthLabels.length).fill(0)});
+     const key=demandMonthKey(d.month||d.demand_month||d.demand_date);
+     const idx=monthLabels.findIndex(m=>demandMonthKey(m)===key);
+     if(idx>=0)parties.get(id).monthly[idx]+=Number(d.total_demand??d.demand_amount)||0;
+    });
+    const rows=Array.from(parties.values())
+     .filter(x=>!query||[x.name,x.type].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim())))
+     .filter(x=>partyTypeFilter==='All party types'||x.type===partyTypeFilter)
+     .sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
+    const monthTotals=monthLabels.map((_,i)=>rows.reduce((sum:number,x:any)=>sum+Number(x.monthly[i]||0),0));
+    return {title:'Monthly Demand Matrix — Members Only',note:'Monthly drill-up of Demand Summary. Includes only member demands and uses demand month (not receipt month). Maintenance and Parking remain included in member demand totals, as in Demand Summary. Opening balances are excluded; each month shows demand raised in that month. Separate Party Master records remain separate rows.',headers:['Party Type','Party Name',...monthLabels,'Total Demand'],rows:[...rows.map(x=>[x.type,x.name,...x.monthly.map(currencyCell),currencyCell(x.monthly.reduce((sum:number,v:number)=>sum+v,0))]),['TOTAL — MEMBERS','',...monthTotals.map(currencyCell),currencyCell(monthTotals.reduce((sum:number,v:number)=>sum+v,0))]};
    }
    case 'monthly-payments': {
     const parties=new Map<string,any>(),demandParty=new Map<string,string>();
