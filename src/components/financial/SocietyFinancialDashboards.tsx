@@ -32,7 +32,7 @@ const downloadCsv = (name:string, rows:(any[])[]) => {
 
 export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const {
-  transactions, openingBalances, reconciliations, demandRegister, demandAdjustments, demandAllocations, memberFinancialBalances,
+  transactions, openingBalances, reconciliations, demandRegister, demandAdjustments, demandAllocations, memberFinancialBalances, partyFinancialBalances,
   cumulativeOutstanding, balanceRegister, partyMaster, flatOwnerMaster, categoryMaster, sourceRegister, stats,
   auditNotes, isLoadingTransactions, isLoadingDemandRegister, isLoadingMasters, refetchAll, setCurrentScreen,
   selectedAccountId, setSelectedAccountId, selectedMonthFilter, setSelectedMonthFilter, supabaseSync
