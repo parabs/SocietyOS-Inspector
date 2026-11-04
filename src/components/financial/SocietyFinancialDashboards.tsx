@@ -109,7 +109,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const categoryGroups=Array.from(new Set([...categoryMaster.map((x:any)=>String(x.category_group||'').trim()),...transactions.map((t:any)=>String(t.categoryGroup||'').trim())].filter(Boolean))).sort();
  const partyTypes=Array.from(new Set([...[],...partyMaster.map((x:any)=>String(x.party_type||x.party_type_name||'').trim())].filter(Boolean))).sort();
  const memberPartyTypes=partyTypes.filter(v=>/^members?$/i.test(v.trim()));
- const reportNumbers:Record<string,string>={'member-opening-balance-register':'40','party-balances':'01','member-ledger':'02','vendor-ledger':'03','demand-summary':'04','monthly-demands':'05','monthly-payments':'06','monthly-flat-balance':'07','maintenance-performance':'41','demand-register':'08','receipts-payments':'08','income-expense':'15','profit-loss':'15A','balance-sheet':'10','trial-balance':'11','monthly-summary':'12','cashbook':'13','receipts':'14','payments':'15','largest-payments-anomalies':'34','bank-recon':'16','expense-analysis':'17','missing-docs':'18','statutory':'19','rectification':'20','party-ledger-summary':'21','party-ledger-monthly':'22','party-ledger-detail':'23','account-ledger-summary':'24','account-ledger-monthly':'25','account-ledger-detail':'26','category-ledger-summary':'27','category-ledger-monthly':'28','category-ledger-detail':'29','receipt-allocation-review':'30','opening-balance-review':'31','adjustments-contra':'32','mapping-exceptions':'33','unidentified-parties':'35','unidentified-accounts':'36','unidentified-categories':'37','payment-mode-quality':'38','transaction-type-quality':'39'};
+ const reportNumbers:Record<string,string>={'member-opening-balance-register':'40','party-balances':'01','member-ledger':'02','vendor-ledger':'03','demand-summary':'04','monthly-demands':'05','monthly-payments':'06','monthly-flat-balance':'07','maintenance-performance':'41','demand-register':'08','receipts-payments':'16','income-expense':'15','profit-loss':'15A','balance-sheet':'10','trial-balance':'11','monthly-summary':'12','cashbook':'13','receipts':'14','payments':'15','largest-payments-anomalies':'34','bank-recon':'16','expense-analysis':'17','missing-docs':'18','statutory':'19','rectification':'20','party-ledger-summary':'21','party-ledger-monthly':'22','party-ledger-detail':'23','account-ledger-summary':'24','account-ledger-monthly':'25','account-ledger-detail':'26','category-ledger-summary':'27','category-ledger-monthly':'28','category-ledger-detail':'29','receipt-allocation-review':'30','opening-balance-review':'31','adjustments-contra':'32','mapping-exceptions':'33','unidentified-parties':'35','unidentified-accounts':'36','unidentified-categories':'37','payment-mode-quality':'38','transaction-type-quality':'39'};
  const normalizedReportSearch=reportSearch.trim().toLowerCase();
  const filteredReportCatalog=reportCatalog.filter(r=>!normalizedReportSearch||[r.name,r.description,r.category,`RPT-${reportNumbers[r.id]||''}`,r.id].some(v=>String(v||'').toLowerCase().includes(normalizedReportSearch)));
  const visibleReportCategories=reportCategories.slice(1).filter(cat=>!normalizedReportSearch||filteredReportCatalog.some(r=>r.category===cat));
@@ -191,7 +191,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
  const exportTxt=()=>{const x=selectedReportExport();const txt=x.rows.map(row=>row.map(v=>csvValue(v)).join('\t')).join('\r\n');const url=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='society-'+selectedReport+'.txt';a.click();URL.revokeObjectURL(url)};
  const exportPdf=()=>{
   if(screen==='reports'){
-   const source=document.querySelector('#rpt15-print-content') as HTMLElement|null;
+   const source=document.querySelector(selectedReport==='income-expense'?'#rpt15-print-content':'#selected-report-content') as HTMLElement|null;
    if(!source)return;
    const clone=source.cloneNode(true) as HTMLElement;
    clone.querySelectorAll('button,input,select,textarea,[class*="print:hidden"]').forEach(el=>el.remove());
@@ -666,15 +666,14 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const paymentTotal=paymentsByHead.reduce((sum,x)=>sum+x.amount,0);
     const closingTotal=openingTotal+receiptTotal-paymentTotal;
     const contraTotal=filtered.filter(t=>t.transactionClass==='Contra').reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);
-    const count=Math.max(receiptsByHead.length,paymentsByHead.length,openingRows.length,1);
+    const leftRows:any[][]=[...(openingAvailable?openingRows.map(x=>['Opening Balance · '+x.account,currencyCell(x.amount)]):[['Opening Cash & Bank Balance','Not available']]),...receiptsByHead.map(x=>[x.group+' · '+x.name,currencyCell(x.amount)])];
+    const rightRows:any[][]=[...paymentsByHead.map(x=>[x.group+' · '+x.name,currencyCell(x.amount)]),['Closing Cash & Bank Balance',openingAvailable?currencyCell(closingTotal):'Not available']];
+    const count=Math.max(leftRows.length,rightRows.length,1);
     const rows:any[][]=[];
-    for(let i=0;i<count;i++){
-     const r=receiptsByHead[i],p=paymentsByHead[i],o=openingRows[i];
-     rows.push([r?r.group+' · '+r.name:'',r?currencyCell(r.amount):'',p?p.group+' · '+p.name:'',p?currencyCell(p.amount):'']);
-    }
-    rows.push(['TOTAL RECEIPTS',currencyCell(receiptTotal),'TOTAL PAYMENTS',currencyCell(paymentTotal)]);
-    rows.push(['Opening cash & bank balance',openingAvailable?currencyCell(openingTotal):'Not available','Closing cash & bank balance',openingAvailable?currencyCell(closingTotal):'Not available']);
-    rows.push(['Opening balance availability',openingAvailable?num(openingRows.length)+' account balance records':'No verified opening balance records','Contra transfers excluded',currencyCell(contraTotal)]);
+    for(let i=0;i<count;i++){const l=leftRows[i],p=rightRows[i];rows.push([l?.[0]||'',l?.[1]||'',p?.[0]||'',p?.[1]||'']);}
+    rows.push(['TOTAL RECEIPTS INCLUDING OPENING',openingAvailable?currencyCell(openingTotal+receiptTotal):currencyCell(receiptTotal),'TOTAL PAYMENTS INCLUDING CLOSING',openingAvailable?currencyCell(paymentTotal+closingTotal):'Not available']);
+    rows.push(['Recorded transaction receipts',currencyCell(receiptTotal),'Recorded transaction payments',currencyCell(paymentTotal)]);
+    rows.push(['Contra transfers excluded',currencyCell(contraTotal),'Transaction count',num(movement.length)]);
     const accountRows=openingRows.map(x=>[x.account,currencyCell(x.amount)]);
     return {title:'RPT-16 · Receipts & Payments Account',note:'Cash and bank movement statement generated from connected transactions. Receipt and payment heads are grouped by Category Group → Category Name. Contra transfers are excluded from consolidated cash movement to avoid double counting. Opening balances are shown only where Account Master opening records are available. Closing balance is a calculated provisional movement, not a bank-reconciled balance. Debtors, investments and unpaid liabilities are not treated as cash receipts or payments unless represented by actual cash/bank transactions.',headers:['RECEIPTS — Particulars','Amount (₹)','PAYMENTS — Particulars','Amount (₹)'],rows,openingAccounts:accountRows,summary:{openingAvailable,openingTotal,receiptTotal,paymentTotal,closingTotal,contraTotal,transactionCount:movement.length}};
    }
