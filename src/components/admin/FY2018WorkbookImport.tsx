@@ -329,6 +329,17 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
     try {
       const data = await buildPayload(chosen);
       setPayload(data);
+      const importTx = data.transactions || [];
+      const qualityCounts = {
+        missingDate: importTx.filter((x:any) => !x.transaction_date).length,
+        missingDescription: importTx.filter((x:any) => !x.description).length,
+        unmappedDemand: importTx.filter((x:any) => !x.demand_id).length,
+        signReview: importTx.filter((x:any) => (x.transaction_type === 'Payment' && Number(x.amount) > 0) || (x.transaction_type === 'Receipt' && Number(x.amount) < 0)).length,
+      };
+      const qualityTotal = Object.values(qualityCounts).reduce((sum,n)=>sum+n,0);
+      setPreflightMessage(qualityTotal
+        ? `Quality preflight: ${qualityCounts.missingDate} missing dates, ${qualityCounts.missingDescription} missing descriptions, ${qualityCounts.unmappedDemand} unmapped Demand IDs, ${qualityCounts.signReview} sign reviews. These are warnings; verify before import.`
+        : 'Quality preflight passed: no missing dates, descriptions, Demand IDs or sign-review flags found.');
       const nextPlan: ImportPlanRow[] = [
         { table: 'source_register', count: data.source_register.length, note: 'Source files and review status' },
         { table: 'member_opening_balances', count: data.member_opening_balances.length, note: 'Opening balances by party and financial year' },
@@ -364,6 +375,16 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       const { data: authData, error: authError } = await supabaseClient.auth.getSession();
       if (authError) throw authError;
       if (!authData.session) throw new Error('Sign in with Google through Supabase before importing.');
+
+      // Quality preflight: preserve historical gaps, but require explicit review before import.
+      const importTx = selectedTables.includes('transactions') ? (payload.transactions || []) : [];
+      const issues = importTx.filter((x:any) => !x.transaction_date || !x.description || !x.demand_id ||
+        (x.transaction_type === 'Payment' && Number(x.amount) > 0) ||
+        (x.transaction_type === 'Receipt' && Number(x.amount) < 0));
+      if (issues.length) {
+        const proceedQuality = window.confirm(`Transaction quality preflight found ${issues.length} rows with missing dates/descriptions/Demand IDs or sign-review flags. No values will be auto-corrected. Continue importing these rows as supplied?`);
+        if (!proceedQuality) { setPreflightMessage('Import paused after quality preflight. Correct the workbook or explicitly review the warnings before retrying.'); return; }
+      }
 
       // Preflight: reject overlapping imports and inspect existing destination counts.
       const { data: status, error: statusError } = await supabaseClient.functions.invoke('import-fy2018-workbook', { body: { action: 'status' } });
@@ -425,6 +446,24 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       if (finishError) throw new Error(finishError.message || 'Records were written but final audit verification failed.');
       if (finished?.error || finished?.success !== true) throw new Error(finished?.error || 'Server did not confirm all selected table counts.');
       setResults(ordered.map(row => ({ table: row.table, attempted: row.count, succeeded: row.count })));
+      if (selectedTables.includes('transactions') && (payload.transactions || []).length) {
+        const importedFindings:any[] = [];
+        (payload.transactions || []).forEach((x:any) => {
+          const add=(code:string,severity:string,finding:string,action:string)=>importedFindings.push({
+            exception_key:'transactions:'+x.transaction_id+':'+code, entity_name:'transactions', record_id:x.transaction_id,
+            rule_code:code, severity, finding, suggested_action:action, metadata:{source:'FY2018 workbook import',source_sheet:x.source_sheet,source_row:x.source_row}
+          });
+          if(!x.transaction_date)add('MISSING_DATE','High','Transaction date is missing in imported workbook row.','Verify against the source register.');
+          if(!x.description)add('MISSING_DESCRIPTION','Low','Transaction description is missing in imported workbook row.','Review source voucher or register.');
+          if(!x.demand_id)add('UNMAPPED_DEMAND','Medium','Imported transaction has no Demand ID.','Map only with reliable supporting evidence.');
+          if(x.transaction_type==='Payment'&&Number(x.amount)>0)add('PAYMENT_SIGN_REVIEW','Medium','Payment has a positive signed amount.','Review source sign; do not auto-flip.');
+          if(x.transaction_type==='Receipt'&&Number(x.amount)<0)add('RECEIPT_SIGN_REVIEW','Medium','Receipt has a negative signed amount.','Review source sign; do not auto-flip.');
+        });
+        if(importedFindings.length) {
+          const {error:qualityError}=await supabaseClient.from('data_quality_exceptions').upsert(importedFindings,{onConflict:'exception_key'});
+          if(qualityError) throw new Error('Import completed but quality exception registration failed: '+qualityError.message);
+        }
+      }
       setComplete(true);
       setSelectedTables([]);
       setPreflightMessage('Import completed and verified. The workbook remains loaded; select the next table to continue.');
