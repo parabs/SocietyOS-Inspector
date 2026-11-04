@@ -536,6 +536,8 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       const cat=String(d.category_id||'');
       const row=parties.get(id);
       if(previousDueCategories.has(cat))return; // brought forward in opening balance, not current-period demand
+      const category=categoryMaster.find((x:any)=>String(x.category_id||'')===cat);
+      if(String(category?.category_group||'').trim()!=='Member Income & Recoveries')return; // expense, transfer and non-receivable categories are not member demands
       if(maintenanceCategories.has(cat))row.maintenance+=amount;
       else if(parkingCategories.has(cat))row.parking+=amount;
       else if(nocCategories.has(cat))row.noc+=amount;
@@ -543,7 +545,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       else row.other+=amount;
     });
     const rows=Array.from(parties.values()).map(p=>{
-      const ids=new Set(reportDemands.filter((d:any)=>String(d.party_id||'')===p.id&&(period==='All months'||monthKey(d.month||d.demand_month)===monthKey(period))&&!previousDueCategories.has(String(d.category_id||''))).map((d:any)=>String(d.demand_id||d.id||'')));
+      const ids=new Set(reportDemands.filter((d:any)=>{const cat=String(d.category_id||'');const category=categoryMaster.find((x:any)=>String(x.category_id||'')===cat);return String(d.party_id||'')===p.id&&(period==='All months'||monthKey(d.month||d.demand_month)===monthKey(period))&&!previousDueCategories.has(cat)&&String(category?.category_group||'').trim()==='Member Income & Recoveries';}).map((d:any)=>String(d.demand_id||d.id||'')));
       p.adjustments=demandAdjustments.filter((a:any)=>a.is_approved===true&&ids.has(String(a.demand_id||''))).reduce((v:number,a:any)=>v+Number(a.amount??a.adjustment_amount??0),0);
       p.total=p.opening+p.maintenance+p.parking+p.noc+p.delay+p.other;
       return p;
@@ -552,7 +554,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       .sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
     const totals={opening:0,maintenance:0,parking:0,noc:0,delay:0,other:0,total:0,adjustments:0};
     rows.forEach(x=>Object.keys(totals).forEach(k=>(totals as any)[k]+=Number(x[k])||0));
-    return {title:'Demand Summary by Party',note:'Demand categories are separated using the Society category master: Maintenance (CAT-0001 and Ad-hoc Maintenance CAT-0025), Parking (CAT-0021), Non-Occupancy Charges (CAT-0023), Delay Charges (CAT-0003), and remaining current demand categories under Other Demands. Previous Dues categories CAT-0002, CAT-0022 and CAT-0024 are excluded from current-period demand to avoid duplicating brought-forward opening balances. Total Demands = Opening Balance + current-period Maintenance + Parking + NOC + Delay Charges + Other Demands. Approved adjustments are displayed separately.',headers:['Party Type','Party Name','Opening Balance','Maintenance Charges','Parking Charges','Non-Occupancy Charges','Delay Charges','Other Demands','Total Demands','Approved Adjustments'],rows:[...rows.map(x=>[x.type,x.name,currencyCell(x.opening),currencyCell(x.maintenance),currencyCell(x.parking),currencyCell(x.noc),currencyCell(x.delay),currencyCell(x.other),currencyCell(x.total),currencyCell(x.adjustments)]),['TOTAL','',currencyCell(totals.opening),currencyCell(totals.maintenance),currencyCell(totals.parking),currencyCell(totals.noc),currencyCell(totals.delay),currencyCell(totals.other),currencyCell(totals.total),currencyCell(totals.adjustments)]]};
+    return {title:'Demand Summary by Party',note:'Demand categories are separated using the Society category master: Maintenance (CAT-0001 and Ad-hoc Maintenance CAT-0025), Parking (CAT-0021), Non-Occupancy Charges (CAT-0023), Delay Charges (CAT-0003), and remaining Member Income & Recoveries categories under Other Demands. Expense, transfer and other non-receivable categories are excluded. Previous Dues categories CAT-0002, CAT-0022 and CAT-0024 are excluded from current-period demand to avoid duplicating brought-forward opening balances. Total Demands = Opening Balance + current-period Maintenance + Parking + NOC + Delay Charges + Other Demands. Approved adjustments are displayed separately.',headers:['Party Type','Party Name','Opening Balance','Maintenance Charges','Parking Charges','Non-Occupancy Charges','Delay Charges','Other Demands','Total Demands','Approved Adjustments'],rows:[...rows.map(x=>[x.type,x.name,currencyCell(x.opening),currencyCell(x.maintenance),currencyCell(x.parking),currencyCell(x.noc),currencyCell(x.delay),currencyCell(x.other),currencyCell(x.total),currencyCell(x.adjustments)]),['TOTAL','',currencyCell(totals.opening),currencyCell(totals.maintenance),currencyCell(totals.parking),currencyCell(totals.noc),currencyCell(totals.delay),currencyCell(totals.other),currencyCell(totals.total),currencyCell(totals.adjustments)]]};
    }
    case 'monthly-demands': {
     const parties=new Map<string,any>();
