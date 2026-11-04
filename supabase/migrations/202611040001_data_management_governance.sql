@@ -106,3 +106,8 @@ values
  ('document_status','Pending','Pending',1),('document_status','Available','Available',2),('document_status','Missing','Missing',3),
  ('exception_status','Open','Open',1),('exception_status','Under Review','Under Review',2),('exception_status','Resolved','Resolved',3),('exception_status','Accepted Exception','Accepted Exception',4)
 on conflict(option_group, option_value) do nothing;
+
+drop trigger if exists trg_dm_log_quality_exceptions on public.data_quality_exceptions;
+create trigger trg_dm_log_quality_exceptions after insert or update or delete on public.data_quality_exceptions for each row execute function public.log_data_management_change();
+drop trigger if exists trg_dm_log_options on public.data_management_options;
+create trigger trg_dm_log_options after insert or update or delete on public.data_management_options for each row execute function public.log_data_management_change();
