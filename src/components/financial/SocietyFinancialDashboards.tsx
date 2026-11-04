@@ -198,7 +198,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
  const reportDemands=demandRegister.filter((d:any)=>!d.financial_year||String(d.financial_year).includes('2018-19'));
  const demandNetAmount=(d:any)=>{
   const note=String(d.notes||'');
-  const match=note.match(/net\\s+demand\\s*[:=]\\s*(-?[0-9,]+(?:\\.[0-9]+)?)/i);
+  const match=note.match(/net\s+demand\s*[:=]\s*(-?[0-9,]+(?:\.[0-9]+)?)/i);
   const parsed=match?Number(match[1].replace(/,/g,'')):NaN;
   return Number.isFinite(parsed)?parsed:Number(d.net_demand??d.demand_amount??d.total_demand??0)||0;
  };
