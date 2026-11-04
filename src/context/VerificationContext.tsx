@@ -681,7 +681,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             total_adjustments:row.total_adjustments==null?undefined:Number(row.total_adjustments),
             net_outstanding:Number(row.net_outstanding??row.cumulative_outstanding??row.total_outstanding)||0,
             opening_balance_verification_status:row.opening_balance_verification_status||'Pending',
-            status:(Number(row.net_outstanding??row.cumulative_outstanding??row.total_outstanding)||0)>0?'Outstanding':(Number(row.net_outstanding??row.cumulative_outstanding??row.total_outstanding)||0)<0?'Credit balance':'Cleared'};
+            status:(Number(row.net_outstanding??row.cumulative_outstanding??row.total_outstanding)||0)<0?'Outstanding':(Number(row.net_outstanding??row.cumulative_outstanding??row.total_outstanding)||0)>0?'Credit balance':'Cleared'};
         });
         setCumulativeOutstanding(normalized as DbMemberCumulativeOutstanding[]);
       }
