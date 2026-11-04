@@ -800,6 +800,43 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      const openingComplete=rows.length>0&&rows.every(x=>x.opening!==null);
      return {title:'Cash & Bank Balances',note:'Calculated book position from source account opening balances, pre-FY cutoff transactions, and current FY signed movements including Contra. Contra in/out is disclosed separately. No account_monthly_balance statement-reconciliation records are currently loaded, so these are not bank-confirmed closing balances.',headers:['Account / Cash or Bank','Source Opening Balance','Pre-FY Cut-off Movement','FY Opening Balance','Receipts','Payments','Contra In','Contra Out','Net Contra','Calculated Closing Book Balance','Transaction Count','Verification Status'],rows:[...rows.map(x=>[x.name,currencyCell(x.sourceOpening),currencyCell(x.preFYMovement),x.opening===null?'Not available':currencyCell(x.opening),currencyCell(x.receipts),currencyCell(x.payments),currencyCell(x.contraIn),currencyCell(x.contraOut),currencyCell(x.contraSigned),x.closing===null?'Not available':currencyCell(x.closing),num(x.txCount),x.verification]),['TOTAL',currencyCell(totals.sourceOpening),currencyCell(totals.preFYMovement),openingComplete?currencyCell(totals.opening):'Incomplete',currencyCell(totals.receipts),currencyCell(totals.payments),currencyCell(totals.contraIn),currencyCell(totals.contraOut),currencyCell(totals.contraSigned),openingComplete?currencyCell(totals.closing):'Incomplete',num(rows.reduce((v,x)=>v+x.txCount,0)),openingComplete?'Provisional book total':'One or more opening balances missing']],summary:{rows,totals,openingComplete}};
     }
+    case 'demand-register': {
+      const rows=reportDemands
+       .filter((d:any)=>!d.party_type||String(d.party_type).toLowerCase()==='member')
+       .filter((d:any)=>!query||[d.demand_id,d.flat_no,d.member_name,d.party_name,d.category_name,d.demand_month].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase())))
+       .sort((a:any,b:any)=>String(a.demand_date||'').localeCompare(String(b.demand_date||''))||String(a.demand_id||'').localeCompare(String(b.demand_id||'')))
+       .map((d:any)=>{
+        const signed=Number(d.signed_demand_balance);
+        const due=Number.isFinite(signed)?Math.max(0,-signed):Math.max(0,Number(d.total_demand||d.demand_amount||0)-Number(d.net_collection_amount||0)-Number(d.approved_adjustment_amount||0));
+        const excess=Number.isFinite(signed)?Math.max(0,signed):0;
+        const category=categoryMaster.find((x:any)=>String(x.category_id||'')===String(d.category_id||''))||{};
+        const status=due>0?'Outstanding':excess>0?'Excess receipt':'Settled';
+        return [d.demand_id||'—',d.financial_year||'—',d.demand_month||'—',d.demand_date||'—',d.due_date||'—',d.flat_no||d.member_name||d.party_name||'Unmapped',d.demand_group||category.demand_group||'Unmapped',category.category_group||'Unmapped',d.category_name||category.category_name||'Unclassified',currencyCell(Number(d.demand_amount??d.total_demand)||0),currencyCell(Number(d.net_collection_amount)||0),currencyCell(Number(d.approved_adjustment_amount)||0),currencyCell(due),currencyCell(excess),status];
+       });
+      return {title:'Member Demand Register',note:'Member demand rows with linked net collections, approved adjustments, outstanding balances and excess receipts. Excess receipts are displayed separately and are not reallocated to other demands.',headers:['Demand ID','Financial Year','Demand Month','Demand Date','Due Date','Member / Flat','Demand Group','Category Group','Category','Demand Amount','Net Collections','Approved Adjustments','Outstanding','Excess Receipt','Status'],rows};
+    }
+    case 'monthly-summary': {
+      const months=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
+      const monthKey=(value:any)=>{const raw=String(value||'').trim();const iso=raw.match(/^(\\d{4})-(\\d{2})/);if(iso)return iso[1]+'-'+iso[2];const named=raw.match(/^([A-Za-z]{3})[- ](\\d{4})$/);if(named){const n=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(named[1].toLowerCase());return n<0?'':named[2]+'-'+String(n+1).padStart(2,'0');}return '';};
+      const accountNames=new Set<string>([...openingBalances.map((a:any)=>String(a.accountName||a.accountId||'Unmapped account')),...transactions.map(t=>String(t.accountName||t.accountId||'Unmapped account'))]);
+      const rows:any[]=[];
+      Array.from(accountNames).sort().forEach(name=>{
+       if(accountFilter!=='ALL'&&!name.toUpperCase().includes(accountFilter)&&!openingBalances.some((a:any)=>(String(a.accountName||'')===name||String(a.accountId||'')===name)&&String(a.accountId||'')===accountFilter))return;
+       const acc=openingBalances.find((a:any)=>String(a.accountName||'')===name||String(a.accountId||'')===name);
+       let running=acc?.calculatedOpeningBalance==null?null:Number(acc.calculatedOpeningBalance);
+       months.forEach(label=>{
+        const key=monthKey(label);
+        const ts=transactions.filter(t=>(String(t.accountName||t.accountId||'Unmapped account')===name)&&monthKey(t.month||t.reportingMonth||t.date)===key);
+        const receipts=ts.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
+        const payments=ts.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
+        const contra=ts.filter(t=>t.transactionClass==='Contra').reduce((s,t)=>s+Number(t.amount||0),0);
+        const opening=running;
+        if(running!==null)running+=receipts-payments+contra;
+        rows.push([name,label,opening===null?'Not available':currencyCell(opening),currencyCell(receipts),currencyCell(payments),currencyCell(contra),running===null?'Not available':currencyCell(running),num(ts.length),acc?.openingBalanceRecorded===false?'Opening pending':'Provisional — statement reconciliation required']);
+       });
+      });
+      return {title:'Monthly Financial Control Summary',note:'Account-wise monthly movement from the Transaction Register. Contra is shown separately and included with its signed value. Opening and closing book balances remain provisional until bank/cash statement reconciliation is completed.',headers:['Account','Month','Opening Book Balance','Receipts','Payments','Net Contra','Closing Book Balance','Transaction Count','Status'],rows};
+    }
     case 'demand': {
     const memberRows=memberFinancialBalances.filter((b:any)=>String(b.financial_year||'')==='FY 2018-19');
     return {title:'Member Demand vs Collections & Balance',note:'Demand is grouped by the demand financial year. Linked receipts are grouped by transaction financial year, so receipts against brought-forward demands are included in cash received. Unapplied receipts are shown separately and are not allocated to demand.',headers:['Flat No','Member','Demand Records','FY Demand','Linked Receipts During FY','Demand Receivable','Unapplied Receipts','Net Party Balance'],rows:memberRows.map((b:any)=>{const ds=reportDemands.filter((d:any)=>String(d.party_id||'')===String(b.party_id||''));const signed=Number(b.total_outstanding??b.closing_balance)||0;return [b.flat_no||'—',b.member_name||b.name||'Unmapped',num(ds.length),currencyCell(Number(b.current_fy_demand??b.billed_amount)||0),currencyCell(Number(b.current_fy_receipts??b.received_amount)||0),currencyCell(Math.max(0,-signed)),currencyCell(Number(b.unallocated_receipts)||0),currencyCell(Number(b.total_party_balance)||signed)];})};
