@@ -519,22 +519,36 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     return {title:'Monthly Flat Owner Collection Report',note:'This is a collection report: each month shows actual non-contra receipts by transaction date, grouped by matched party. Receipts that cannot be matched to a Party Master record remain visible under Unmapped / Review using the original payer label; they are not assigned to a guessed member.',headers:['Party Type','Party Name','Flat / Shop No.',...monthLabels,'Total FY Collections','Receipt Count','Last Receipt Date'],rows:[...rows.map(x=>[x.type,x.name,x.flat,...x.monthly.map(currencyCell),currencyCell(x.monthly.reduce((a:number,b:number)=>a+b,0)),x.count,x.last]),['TOTAL — ALL RECORDED RECEIPTS','','',...totalByMonth.map(currencyCell),currencyCell(totalByMonth.reduce((a:number,b:number)=>a+b,0)),rows.reduce((sum:number,x:any)=>sum+x.count,0),'']]};
    }
    case 'demand-summary': {
-    // Members-only receivables report; non-member payees are excluded.
+    // Members-only receivables report. All member demand categories (maintenance,
+    // parking, NOC and other member charges) are consolidated into one period column.
     const isMember=(party:any)=>/^members?$/i.test(String(party?.party_type||party?.party_type_name||'').trim());
     const memberDemands=reportDemands.filter((d:any)=>{const p=partyMaster.find((x:any)=>String(x.party_id)===String(d.party_id||''));return Boolean(p&&isMember(p));});
-    const categoryById=new Map(categoryMaster.map((c:any)=>[String(c.category_id||c.id||''),c]));
-    const getCategory=(d:any)=>{const c:any=categoryById.get(String(d.category_id||''))||{};return {group:String(c.demand_group||'Unclassified Demand Group').trim()||'Unclassified Demand Group',categoryGroup:String(c.category_group||'Unclassified Category Group').trim()||'Unclassified Category Group',category:String(c.category_name||d.category_name||'Unclassified Category').trim()||'Unclassified Category'};};
-    const demandColumns=Array.from(new Map(memberDemands.map((d:any)=>{const c=getCategory(d);const key=[c.group,c.categoryGroup,c.category].join('|||');return [key,{key,...c,label:[c.group,c.categoryGroup,c.category].join(' / ')}] as const;})).values()).sort((a:any,b:any)=>a.group.localeCompare(b.group)||a.categoryGroup.localeCompare(b.categoryGroup)||a.category.localeCompare(b.category));
     const parties=new Map<string,any>();
-    memberDemands.forEach((d:any)=>{const id=String(d.party_id||'');if(!id)return;const p=partyMaster.find((x:any)=>String(x.party_id)===id);if(!parties.has(id)){const opening=Number(memberFinancialBalances.find((b:any)=>String(b.party_id||'')===id)?.opening_balance)||0;parties.set(id,{id,name:p?.party_name||d.member_name||id,type:p?.party_type||'Member',opening,amounts:{},adjustments:0});}const m=monthKey(d.month||d.demand_month);if(period!=='All months'&&m!==monthKey(period))return;const c=getCategory(d);const key=[c.group,c.categoryGroup,c.category].join('|||');parties.get(id).amounts[key]=(parties.get(id).amounts[key]||0)+Number(d.total_demand??d.demand_amount)||0;});
-    const rows=Array.from(parties.values()).map(p=>{const ids=new Set(memberDemands.filter((d:any)=>String(d.party_id||'')===p.id&&(period==='All months'||monthKey(d.month||d.demand_month)===monthKey(period))).map((d:any)=>String(d.demand_id||d.id||'')));p.adjustments=demandAdjustments.filter((a:any)=>a.is_approved===true&&ids.has(String(a.demand_id||''))).reduce((v:number,a:any)=>v+Number(a.amount??a.adjustment_amount??0),0);p.total=demandColumns.reduce((sum:number,col:any)=>sum+Number(p.amounts[col.key]||0),0);return p;})
-      .filter(x=>!query||[x.name,x.type].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim())))
-      .filter(x=>partyTypeFilter==='All party types'||x.type===partyTypeFilter)
-      .sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
-    const headers=['Party Type','Party Name','Opening Balance',...demandColumns.map((c:any)=>c.label),'Total Current Period Demand','Total Demands','Approved Adjustments'];
-    const tableRows=rows.map(p=>[p.type,p.name,currencyCell(p.opening),...demandColumns.map((c:any)=>currencyCell(p.amounts[c.key]||0)),currencyCell(p.total),currencyCell(p.opening+p.total),currencyCell(p.adjustments)]);
-    const totals=['TOTAL — MEMBERS','',currencyCell(rows.reduce((v:number,p:any)=>v+p.opening,0)),...demandColumns.map((c:any)=>currencyCell(rows.reduce((v:number,p:any)=>v+Number(p.amounts[c.key]||0),0))),currencyCell(rows.reduce((v:number,p:any)=>v+p.total,0)),currencyCell(rows.reduce((v:number,p:any)=>v+p.opening+p.total,0)),currencyCell(rows.reduce((v:number,p:any)=>v+p.adjustments,0))];
-    return {title:'Demand Summary — Members Only',note:'Members only. Non-member parties (vendors, utilities and other payees) are excluded. Demand categories are mapped dynamically from Category Master and displayed in Demand Group → Category Group → Category Name order. Current-period demand retains the sign stored in Demand Register; no source values are reversed or converted to absolute values. Opening balance is shown separately. Ad-hoc transactions are not included; approved adjustments linked to these member demands are shown separately.',headers,rows:[...tableRows,totals]};
+    memberDemands.forEach((d:any)=>{
+     const id=String(d.party_id||'');if(!id)return;
+     const p=partyMaster.find((x:any)=>String(x.party_id)===id);
+     if(!parties.has(id)){
+      const opening=Number(memberFinancialBalances.find((b:any)=>String(b.party_id||'')===id)?.opening_balance)||0;
+      parties.set(id,{id,name:p?.party_name||d.member_name||id,type:p?.party_type||'Member',opening,periodDemand:0,adjustments:0});
+     }
+     const demandMonth=monthKey(d.month||d.demand_month);
+     if(period==='All months'||demandMonth===monthKey(period)){
+      parties.get(id).periodDemand+=Number(d.total_demand??d.demand_amount)||0;
+     }
+    });
+    const rows=Array.from(parties.values()).map(p=>{
+     const ids=new Set(memberDemands.filter((d:any)=>String(d.party_id||'')===p.id&&(period==='All months'||monthKey(d.month||d.demand_month)===monthKey(period))).map((d:any)=>String(d.demand_id||d.id||'')));
+     p.adjustments=demandAdjustments.filter((a:any)=>a.is_approved===true&&ids.has(String(a.demand_id||''))).reduce((v:number,a:any)=>v+Number(a.amount??a.adjustment_amount??0),0);
+     p.total=p.periodDemand;
+     return p;
+    })
+     .filter(x=>!query||[x.name,x.type].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim())))
+     .filter(x=>partyTypeFilter==='All party types'||x.type===partyTypeFilter)
+     .sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
+    const headers=['Party Type','Party Name','Opening Balance','Maintenance for Selected Period','Total Demands','Approved Adjustments'];
+    const tableRows=rows.map(p=>[p.type,p.name,currencyCell(p.opening),currencyCell(p.periodDemand),currencyCell(p.opening+p.periodDemand),currencyCell(p.adjustments)]);
+    const totals=['TOTAL — MEMBERS','',currencyCell(rows.reduce((v:number,p:any)=>v+p.opening,0)),currencyCell(rows.reduce((v:number,p:any)=>v+p.periodDemand,0)),currencyCell(rows.reduce((v:number,p:any)=>v+p.opening+p.periodDemand,0)),currencyCell(rows.reduce((v:number,p:any)=>v+p.adjustments,0))];
+    return {title:'Demand Summary — Members Only',note:'Members only. Maintenance, Parking, NOC and other member demand categories are consolidated into the single column “Maintenance for Selected Period”. The selected period filter applies to all included demand categories. Opening balance and approved adjustments are shown separately. Non-member parties and ad-hoc transactions are excluded.',headers,rows:[...tableRows,totals]};
    }
    case 'monthly-demands': {
     const parties=new Map<string,any>();
