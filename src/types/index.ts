@@ -83,6 +83,16 @@ export interface OpeningBalanceRecord {
   remarks: string;
   verifiedBy?: string;
   verifiedOn?: string;
+  openingBalanceRecorded?: boolean;
+  currentFYReceipts?: number;
+  currentFYPayments?: number;
+  currentFYContraIn?: number;
+  currentFYContraOut?: number;
+  currentFYContraSigned?: number;
+  netMovement?: number;
+  calculatedClosingBalance?: number | null;
+  transactionCount?: number;
+  accountVerificationStatus?: string;
 }
 
 export type ReconciliationStatus = 'Pending' | 'Matched' | 'Mismatch' | 'Mismatch Accepted' | 'Reconciled' | 'Difference'; // legacy stored values remain readable
