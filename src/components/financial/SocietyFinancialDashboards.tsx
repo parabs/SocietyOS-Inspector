@@ -932,10 +932,18 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const demandAmount=(d:any)=>Number(d.total_demand??d.demand_amount??d.amount??0)||0;
     const demandCategory=(d:any)=>{const linked=categoryMaster.find((c:any)=>String(c.category_id??c.id??'')===String(d.category_id??d.categoryId??''));return String(d.category_name??d.categoryName??linked?.category_name??d.demand_type??d.charge_type??d.description??'Unmapped demand category')};
     const monthKey=(v:any)=>{const raw=String(v??'').trim().replace(/-/g,' ').replace(/\//g,' ');const m=raw.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(20\d{2})/i);return m?m[1].slice(0,3).toLowerCase()+' '+m[2]:''};
-    const fyDemand=reportDemands.reduce((s:number,d:any)=>s+demandAmount(d),0);
-    const receiptRows=filtered.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra');
+    // This dashboard measures member receivables only; vendor and utility parties belong in Payments & Expenses.
+    const isMemberParty=(record:any)=>{
+     const id=String(record.party_id??record.partyId??record.member_id??'');
+     const name=String(record.party_name??record.partyName??record.member_name??record.memberName??record.party??record.flat_owner_name??'').trim().toLowerCase();
+     const party=partyMaster.find((p:any)=>(id&&String(p.party_id??p.id??'')===id)||(name&&String(p.party_name??p.name??'').trim().toLowerCase()===name));
+     return !!party&&/^members?$/i.test(String(party.party_type??party.party_type_name??party.type??'').trim());
+    };
+    const memberDemands=reportDemands.filter((d:any)=>isMemberParty(d));
+    const fyDemand=memberDemands.reduce((s:number,d:any)=>s+demandAmount(d),0);
+    const receiptRows=filtered.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&isMemberParty(t));
     const fyReceipts=receiptRows.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
-    const dueRows=cumulativeOutstanding.filter((r:any)=>Number(r.net_outstanding||0)>0).sort((a:any,b:any)=>Number(b.net_outstanding||0)-Number(a.net_outstanding||0));
+    const dueRows=cumulativeOutstanding.filter((r:any)=>isMemberParty(r)&&Number(r.net_outstanding||0)>0).sort((a:any,b:any)=>Number(b.net_outstanding||0)-Number(a.net_outstanding||0));
     const groupKey=(d:any)=>{const n=demandCategory(d).toLowerCase();return /maintenance/.test(n)&&!/previous|opening|arrears|brought forward/.test(n)?'Maintenance Charges':/parking/.test(n)&&!/previous|opening|arrears|brought forward/.test(n)?'Parking Charges':/previous dues|opening balance|arrears|brought forward/.test(n)?'Previous-year dues':/cheque.?bounce|bounce charge/.test(n)?'Cheque Bounce Charges':/additional fund|special fund|capital contribution|special levy/.test(n)?'Additional Funds / Special Levies':/non.?occup/.test(n)?'Non-Occupancy Charges':'Other Charges'};
     const groups:Record<string,{amount:number;count:number}>={};
     reportDemands.forEach((d:any)=>{const k=groupKey(d);groups[k]??={amount:0,count:0};groups[k].amount+=demandAmount(d);groups[k].count++;});
