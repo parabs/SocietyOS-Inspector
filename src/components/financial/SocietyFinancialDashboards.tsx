@@ -736,12 +736,12 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     };
     memberDemands.forEach((d:any)=>{
      const partyId=String(d.party_id||'');if(!partyId)return;
+     const kind=demandKind(d);if(kind==='other')return;
      const row=ensureParty(partyId,d);
      const id=String(d.demand_id||d.id||'');
      const amount=demandNetAmount(d);
      const linked=(receiptsByDemand.get(id)||[]).slice().sort((x:any,y:any)=>transactionDate(x).localeCompare(transactionDate(y)));
      const paid=linked.reduce((sum:number,t:any)=>sum+Math.abs(Number(t.amount)||0),0);
-     const kind=demandKind(d);
      if(kind==='maintenance'){
       let applied=0,onTime=0,late=0,excess=0;
       const due=String(d.due_date||'').slice(0,10);
