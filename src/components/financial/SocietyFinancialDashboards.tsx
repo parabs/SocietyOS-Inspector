@@ -490,66 +490,54 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    }
    case 'monthly-flat-balance': {
     const months=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
-    const keys=new Set<string>();flatOwnerMaster.forEach((x:any)=>keys.add(String(x.flat_no||x.owner_name||'')));memberFinancialBalances.forEach((x:any)=>keys.add(String(x.flat_no||x.member_name||'')));
-    const rows=Array.from(keys).filter(Boolean).map(key=>{const owner=flatOwnerMaster.find((x:any)=>String(x.flat_no||'')===key||String(x.owner_name||'')===key),bal=memberFinancialBalances.find((x:any)=>String(x.flat_no||'')===key||String(x.member_name||'')===key),name=owner?.owner_name||bal?.member_name||key,ds=reportDemands.filter((d:any)=>String(d.flat_no||d.member_id||d.member_name||'')===key||String(d.member_name||'')===name),ts=transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&(String(t.party||'').trim().toLowerCase()===name.toLowerCase()||String(t.party||'').trim().toLowerCase()===key.toLowerCase())),monthly=months.map(m=>{const demand=ds.filter((d:any)=>String(d.month||'').trim().toLowerCase().startsWith(m.slice(0,3).toLowerCase())).reduce((s,d)=>s+Number(d.total_demand||0),0),paid=ts.filter(t=>String(t.reportingMonth||t.month||'').replace(/\\n/g,' ').trim().toLowerCase()===m.toLowerCase()).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);return {demand,paid,due:Math.max(0,demand-paid)}});return {key,name,monthly};}).filter(x=>!query||[x.key,x.name].some(v=>v.toLowerCase().includes(query.toLowerCase())));
-    return {title:'Monthly Flat Owner Balance Report',note:'Shows demand, recorded receipts and provisional unpaid amount per month. If receipts are not allocated to a demand month, month-specific dues are indicative only and do not automatically carry prior arrears.',headers:['Flat / Shop No.','Party Name',...months.flatMap(m=>[m+' Demand',m+' Paid',m+' Due'])],rows:rows.map(x=>[x.key,x.name,...x.monthly.flatMap(m=>[currencyCell(m.demand),currencyCell(m.paid),currencyCell(m.due)])])};
+    const byDemand=new Map<string,number>();
+    transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&String(t.demandId||'').trim()).forEach(t=>{const id=String(t.demandId).trim();byDemand.set(id,(byDemand.get(id)||0)+Math.abs(Number(t.amount)||0));});
+    const parties=new Map<string,any>();
+    reportDemands.forEach((d:any)=>{const id=String(d.party_id||d.member_id||d.flat_no||'');if(!id)return;if(!parties.has(id))parties.set(id,{id,name:d.member_name||d.party_name||id,flat:d.flat_no||'',demands:[]});parties.get(id).demands.push(d);});
+    const rows=Array.from(parties.values()).map(p=>{
+      const monthly=months.map(m=>{const ds=p.demands.filter((d:any)=>String(d.month||d.demand_month||'').trim().toLowerCase()===m.toLowerCase());const demand=ds.reduce((v:number,d:any)=>v+Number(d.total_demand??d.demand_amount??0),0);const paid=ds.reduce((v:number,d:any)=>v+(byDemand.get(String(d.demand_id||d.id||''))||0),0);return {demand,paid,closing:demand-paid};});
+      return {...p,monthly};
+    }).filter(x=>!query||[x.id,x.name,x.flat].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim()))).sort((a,b)=>String(a.flat||a.name).localeCompare(String(b.flat||b.name)));
+    const totals=months.map((_,i)=>rows.reduce((v:number,r:any)=>v+r.monthly[i].closing,0));
+    return {title:'Monthly Flat Owner Balance Report',note:'Demand is grouped by demand month. Receipts are credited to the exact Demand ID recorded on the transaction, regardless of the receipt date. This prevents a May receipt against an April demand from being treated as May demand settlement. Transactions without Demand IDs are excluded from demand-level allocation and remain in the unmapped-receipts review.',headers:['Flat / Shop No.','Party Name',...months.flatMap(m=>[m+' Demand',m+' Allocated Receipt',m+' Balance'])],rows:[...rows.map((x:any)=>[x.flat||'—',x.name,...x.monthly.flatMap((m:any)=>[currencyCell(m.demand),currencyCell(m.paid),currencyCell(m.closing)])]),['TOTAL','',...months.flatMap((_,i)=>[currencyCell(rows.reduce((v:number,r:any)=>v+r.monthly[i].demand,0)),currencyCell(rows.reduce((v:number,r:any)=>v+r.monthly[i].paid,0)),currencyCell(totals[i])])]]};
    }
    case 'demand-summary': {
-    const keys=new Set<string>();flatOwnerMaster.forEach(x=>keys.add(String(x.flat_no||x.owner_name||'')));memberFinancialBalances.forEach(x=>keys.add(String(x.flat_no||'')));cumulativeOutstanding.forEach(x=>keys.add(String(x.flat_no||'')));reportDemands.forEach(x=>keys.add(String(x.flat_no||x.member_id||'')));
+    const receiptsByDemand=new Map<string,number>();
+    transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&String(t.demandId||'').trim()).forEach(t=>{const id=String(t.demandId).trim();receiptsByDemand.set(id,(receiptsByDemand.get(id)||0)+Math.abs(Number(t.amount)||0));});
+    const keys=new Set<string>();reportDemands.forEach((d:any)=>keys.add(String(d.party_id||d.member_id||d.flat_no||'')));
     const rows=Array.from(keys).filter(Boolean).map(key=>{
-      const owner=flatOwnerMaster.find(x=>String(x.flat_no||'')===key),bal=memberFinancialBalances.find(x=>String(x.flat_no||'')===key),cum=cumulativeOutstanding.find(x=>String(x.flat_no||'')===key);
-      const p=partyMaster.find((p:any)=>String(p.flat_no||'')===key||String(p.party_id||'')===key);
-      const name=owner?.owner_name||bal?.member_name||cum?.member_name||p?.party_name||'Unmapped party';
-      const ds=reportDemands.filter(d=>String(d.flat_no||d.member_id||'')===key||String(d.member_name||'')===name);
-      const periodDs=ds.filter(d=>period==='All months'||String(d.month||'').trim().toLowerCase()===period.toLowerCase()||String(d.month||'').trim().toLowerCase().startsWith(period.slice(0,3).toLowerCase()));
-      const tx=transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&(String(t.party||'').trim().toLowerCase()===name.toLowerCase()||String(t.party||'').trim().toLowerCase()===key.toLowerCase())&&(period==='All months'||String(t.reportingMonth||t.month||'').replace(/\\n/g,' ').trim().toLowerCase()===period.toLowerCase()));
-      const demand=periodDs.reduce((s,d)=>s+Number(d.total_demand||0),0),paid=tx.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
-      const adjustments=demandAdjustments.filter(a=>(String(a.flat_no||a.member_id||'')===key||String(a.member_name||'')===name)&&a.is_approved===true&&(period==='All months'||String(a.month||'').trim().toLowerCase()===period.toLowerCase())).reduce((s,a)=>s+Number(a.amount||0),0);
-      const opening=Number(bal?.opening_balance)||0,closing=Number(cum?.net_outstanding??bal?.closing_balance)||0;
-      return {key,name,type:p?.party_type||'Member / Owner',flat:owner?.flat_no||bal?.flat_no||p?.flat_no||'Not recorded',opening,demand,paid,adjustments,uncollected:Math.max(0,demand-paid-adjustments),collection:demand>0?Math.min(100,paid/demand*100):0,closing};
-    }).filter(x=>(partyTypeFilter==='All party types'||x.type===partyTypeFilter)&&(!query||[x.name,x.flat].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase())))).sort((a,b)=>b.uncollected-a.uncollected);
-    return {title:'Demand Summary by Party',note:'Period-oriented collection control report, distinct from the all-party debtor position. Demand and receipts use the selected month (or full FY when All months is selected); closing outstanding comes from the available cumulative balance register and must be reconciled.',headers:['Party Type','Party Name','Flat / Shop No.','Opening FY Balance','Selected Period Demand','Receipts in Period','Uncollected Period Demand','Collection %','Adjustments','Closing Outstanding'],rows:rows.map(x=>[x.type,x.name,x.flat,currencyCell(x.opening),currencyCell(x.demand),currencyCell(x.paid),currencyCell(x.uncollected),x.demand?pct(x.paid,x.demand)+'%':'—',currencyCell(x.adjustments),currencyCell(x.closing)])};
+      const ds=reportDemands.filter((d:any)=>String(d.party_id||d.member_id||d.flat_no||'')===key);
+      const periodDs=ds.filter((d:any)=>period==='All months'||String(d.month||d.demand_month||'').trim().toLowerCase()===period.toLowerCase());
+      const party=partyMaster.find((p:any)=>String(p.party_id||'')===String(periodDs[0]?.party_id||ds[0]?.party_id||''));
+      const name=periodDs[0]?.member_name||periodDs[0]?.party_name||party?.party_name||key;
+      const type=party?.party_type||'Unclassified';
+      const flat=periodDs[0]?.flat_no||ds[0]?.flat_no||'—';
+      const demand=periodDs.reduce((v:number,d:any)=>v+Number(d.total_demand??d.demand_amount??0),0);
+      const paid=periodDs.reduce((v:number,d:any)=>v+(receiptsByDemand.get(String(d.demand_id||d.id||''))||0),0);
+      const adjustments=demandAdjustments.filter((a:any)=>a.is_approved===true&&periodDs.some((d:any)=>String(d.demand_id||d.id||'')===String(a.demand_id||''))).reduce((v:number,a:any)=>v+Number(a.amount??a.adjustment_amount??0),0);
+      const opening=Number(memberFinancialBalances.find((b:any)=>String(b.flat_no||'')===String(flat)||String(b.member_name||'').trim().toLowerCase()===String(name).trim().toLowerCase())?.opening_balance)||0;
+      const closing=opening+ds.reduce((v:number,d:any)=>v+Number(d.total_demand??d.demand_amount??0),0)-ds.reduce((v:number,d:any)=>v+(receiptsByDemand.get(String(d.demand_id||d.id||''))||0),0)-demandAdjustments.filter((a:any)=>a.is_approved===true&&ds.some((d:any)=>String(d.demand_id||d.id||'')===String(a.demand_id||''))).reduce((v:number,a:any)=>v+Number(a.amount??a.adjustment_amount??0),0);
+      return {key,name,type,flat,opening,demand,paid,adjustments,uncollected:demand-paid-adjustments,closing};
+    }).filter(x=>(partyTypeFilter==='All party types'||x.type===partyTypeFilter)&&(!query||[x.name,x.flat].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim())))).sort((a,b)=>b.uncollected-a.uncollected);
+    return {title:'Demand Summary by Party',note:'Demand and collection are grouped by the demand month. Collections are counted only where a receipt transaction carries the matching Demand ID; receipt date may be in a later month. Approved adjustments are applied only to their linked demands. Opening and closing balances are FY-level values; period collection is not presented as formal allocation-table data because demand_payment_allocations is currently empty.',headers:['Party Type','Party Name','Flat / Shop No.','Opening FY Balance','Selected Period Demand','Receipts Mapped to Period Demands','Uncollected Period Demand','Collection %','Approved Adjustments','FY Closing Position'],rows:rows.map(x=>[x.type,x.name,x.flat,currencyCell(x.opening),currencyCell(x.demand),currencyCell(x.paid),currencyCell(x.uncollected),x.demand?pct(x.paid,x.demand)+'%':'—',currencyCell(x.adjustments),currencyCell(x.closing)])};
    }
    case 'monthly-demands': {
-    const monthLabels=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
-    const keys=new Set<string>();
-    flatOwnerMaster.forEach(x=>keys.add(String(x.flat_no||x.owner_name||'')));
-    memberFinancialBalances.forEach(x=>keys.add(String(x.flat_no||'')));
-    reportDemands.forEach(x=>keys.add(String(x.flat_no||x.member_id||'')));
-    const rows=Array.from(keys).filter(Boolean).map(key=>{
-      const owner=flatOwnerMaster.find(x=>String(x.flat_no||'')===key);
-      const bal=memberFinancialBalances.find(x=>String(x.flat_no||'')===key);
-      const ds=reportDemands.filter(d=>String(d.flat_no||d.member_id||'')===key);
-      const monthValues=monthLabels.map(m=>ds.filter(d=>String(d.month||'').trim().toLowerCase()===m.toLowerCase()||String(d.month||'').trim().toLowerCase().startsWith(m.slice(0,3).toLowerCase())).reduce((s,d)=>s+Number(d.total_demand||0),0));
-      const opening=Number(bal?.opening_balance)||0;
-      const total=monthValues.reduce((s,n)=>s+n,0);
-      const name=owner?.owner_name||bal?.member_name||partyMaster.find(p=>p.flat_no===key)?.party_name||key;
-      return {key,name,opening,monthValues,total,closing:opening+total};
-    }).filter(x=>!query||[x.key,x.name].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).sort((a,b)=>a.name.localeCompare(b.name));
-    const totalRow=['TOTAL','',currencyCell(rows.reduce((s,x)=>s+x.opening,0)),...monthLabels.map((_,i)=>currencyCell(rows.reduce((s,x)=>s+x.monthValues[i],0))),currencyCell(rows.reduce((s,x)=>s+x.total,0)),currencyCell(rows.reduce((s,x)=>s+x.closing,0))];
-    return {title:'Monthly Demand Matrix — Party-wise',note:'Shows opening balance and demands raised in each month. This is a demand-only matrix; it intentionally excludes a pre-payment balance column. Monthly totals are based on available demand register rows.',headers:['Flat / Shop No.','Party Name','Opening Balance',...monthLabels,'Total Demand'],rows:[...rows.map(x=>[x.key,x.name,currencyCell(x.opening),...x.monthValues.map(currencyCell),currencyCell(x.total)]),['TOTAL','',currencyCell(rows.reduce((s,x)=>s+x.opening,0)),...monthLabels.map((_,i)=>currencyCell(rows.reduce((s,x)=>s+x.monthValues[i],0))),currencyCell(rows.reduce((s,x)=>s+x.total,0))]]};
+    const months=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
+    const parties=new Map<string,any>();
+    reportDemands.forEach((d:any)=>{const id=String(d.party_id||d.member_id||d.flat_no||'');if(!id)return;if(!parties.has(id))parties.set(id,{id,name:d.member_name||d.party_name||id,flat:d.flat_no||'',demands:[]});parties.get(id).demands.push(d);});
+    const rows=Array.from(parties.values()).map(p=>{const monthly=months.map(m=>p.demands.filter((d:any)=>String(d.month||d.demand_month||'').trim().toLowerCase()===m.toLowerCase()).reduce((v:number,d:any)=>v+Number(d.total_demand??d.demand_amount??0),0));return {...p,monthly,total:monthly.reduce((v:number,n:number)=>v+n,0)};})
+     .filter(x=>!query||[x.id,x.name,x.flat].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim()))).sort((a,b)=>String(a.flat||a.name).localeCompare(String(b.flat||b.name)));
+    return {title:'Monthly Demand Matrix — Party-wise',note:'Demand-only matrix for FY 2018–19. Opening balance is shown separately from current-year demand. Values are taken from demand_register; no demand is generated or inferred by this report.',headers:['Flat / Shop No.','Party Name','Opening Balance',...months,'Total Demand'],rows:[...rows.map((x:any)=>{const opening=Number(memberFinancialBalances.find((b:any)=>String(b.flat_no||'')===String(x.flat)||String(b.member_name||'').trim().toLowerCase()===String(x.name).trim().toLowerCase())?.opening_balance)||0;return [x.flat||'—',x.name,currencyCell(opening),...x.monthly.map(currencyCell),currencyCell(x.total)];}),['TOTAL','',currencyCell(rows.reduce((v:number,x:any)=>v+(Number(memberFinancialBalances.find((b:any)=>String(b.flat_no||'')===String(x.flat)||String(b.member_name||'').trim().toLowerCase()===String(x.name).trim().toLowerCase())?.opening_balance)||0),0)),...months.map((_,i)=>currencyCell(rows.reduce((v:number,x:any)=>v+x.monthly[i],0))),currencyCell(rows.reduce((v:number,x:any)=>v+x.total,0))]]};
    }
    case 'monthly-payments': {
-    const monthLabels=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
-    const keys=new Set<string>();
-    flatOwnerMaster.forEach(x=>keys.add(String(x.flat_no||x.owner_name||'')));
-    memberFinancialBalances.forEach(x=>keys.add(String(x.flat_no||'')));
-    cumulativeOutstanding.forEach(x=>keys.add(String(x.flat_no||'')));
-    const rows=Array.from(keys).filter(Boolean).map(key=>{
-      const owner=flatOwnerMaster.find(x=>String(x.flat_no||'')===key);
-      const bal=memberFinancialBalances.find(x=>String(x.flat_no||'')===key);
-      const cum=cumulativeOutstanding.find(x=>String(x.flat_no||'')===key);
-      const name=owner?.owner_name||bal?.member_name||cum?.member_name||partyMaster.find(p=>p.flat_no===key)?.party_name||key;
-      const matches=(t:any)=>String(t.party||'').trim().toLowerCase()===String(name||'').trim().toLowerCase()||String(t.party||'').trim().toLowerCase()===key.toLowerCase();
-      const monthly=monthLabels.map(m=>transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&matches(t)&&String(t.reportingMonth||t.month||'').replace(/\\n/g,' ').trim().toLowerCase()===m.toLowerCase()).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0));
-      const opening=Number(bal?.opening_balance)||0;
-      const total=monthly.reduce((s,n)=>s+n,0);
-      const billed=Number(cum?.total_billed??bal?.billed_amount)||reportDemands.filter(d=>String(d.flat_no||'')===key).reduce((s,d)=>s+Number(d.total_demand||0),0);
-      const adjustments=Number(cum?.total_adjustments??bal?.adjusted_amount)||0;
-      return {key,name,opening,monthly,total,closing:opening+billed-total-adjustments};
-    }).filter(x=>!query||[x.key,x.name].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase()))).sort((a,b)=>a.name.localeCompare(b.name));
-    const totalRow=['TOTAL','',...monthLabels.map((_,i)=>currencyCell(rows.reduce((s,x)=>s+x.monthly[i],0))),currencyCell(rows.reduce((s,x)=>s+x.total,0))];
-    return {title:'Monthly Payment / Collection Matrix — Party-wise',note:'Shows society receipts collected from members by month, excluding contra transfers. The report intentionally has no opening balance. Match party labels and reconcile unallocated receipts before relying on monthly totals.',headers:['Flat / Shop No.','Party Name',...monthLabels,'Total Payments'],rows:[...rows.map(x=>[x.key,x.name,...x.monthly.map(currencyCell),currencyCell(x.total)]),totalRow]};
+    const months=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
+    const parties=new Map<string,any>();
+    reportDemands.forEach((d:any)=>{const id=String(d.party_id||d.member_id||d.flat_no||'');if(!id)return;if(!parties.has(id))parties.set(id,{id,name:d.member_name||d.party_name||id,flat:d.flat_no||''});});
+    const partyByName=new Map<string,string>();parties.forEach((p:any,id:string)=>[p.name,p.flat].filter(Boolean).forEach((v:any)=>partyByName.set(String(v).trim().toLowerCase(),id)));
+    const rows=Array.from(parties.values()).map(p=>{const monthly=months.map(m=>transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&String(t.reportingMonth||t.month||'').replace(/\\n/g,' ').trim().toLowerCase()===m.toLowerCase()&&partyByName.get(String(t.party||'').trim().toLowerCase())===p.id).reduce((v:number,t:any)=>v+Math.abs(Number(t.amount)||0),0));return {...p,monthly,total:monthly.reduce((v:number,n:number)=>v+n,0)};})
+     .filter(x=>!query||[x.id,x.name,x.flat].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim()))).sort((a,b)=>String(a.flat||a.name).localeCompare(String(b.flat||b.name)));
+    const unmatched=transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&!String(t.demandId||'').trim());
+    return {title:'Monthly Payment / Collection Matrix — Party-wise',note:'Collections are grouped by actual receipt reporting month, not by demand month. Party attribution uses the demand register party master names; receipt transactions with no matching party label or no Demand ID are excluded from the party matrix and remain visible in the unmatched receipt review. This report does not represent demand allocation by month.',headers:['Flat / Shop No.','Party Name',...months,'Total Receipts'],rows:[...rows.map((x:any)=>[x.flat||'—',x.name,...x.monthly.map(currencyCell),currencyCell(x.total)]),['TOTAL','',...months.map((_,i)=>currencyCell(rows.reduce((v:number,x:any)=>v+x.monthly[i],0))),currencyCell(rows.reduce((v:number,x:any)=>v+x.total,0))],['Unmapped receipt transactions','',...months.map(m=>currencyCell(unmatched.filter(t=>String(t.reportingMonth||t.month||'').replace(/\\n/g,' ').trim().toLowerCase()===m.toLowerCase()).reduce((v:number,t:any)=>v+Math.abs(Number(t.amount)||0),0))),currencyCell(unmatched.reduce((v:number,t:any)=>v+Math.abs(Number(t.amount)||0),0))]]};
    }
    case 'receipts-payments': {
     const auditorReceipts=[['Opening Balance',166440.30,'opening'],['  Bank Accounts',138462.30,'opening-bank'],['  Cash-in-Hand',27978,'opening-cash'],['Current Assets — Sundry Debtors',993765,'debtors'],['Indirect Incomes — Bank Interest',6618,'Bank Interest'],['Indirect Incomes — Car Parking Charges',2700,'CAR PARKING CHARGES'],['Indirect Incomes — Cheque Charges',600,'Cheque Charges'],['Indirect Incomes — Delay Charges',30,'Delay Charges'],['Indirect Incomes — Other Charges',1869,'Other Charges'],['Indirect Incomes — Penal Interest',4060,'Penal Interest']];
