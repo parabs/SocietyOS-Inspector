@@ -943,36 +943,45 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const fyDemand=memberDemands.reduce((s:number,d:any)=>s+demandAmount(d),0);
     const receiptRows=filtered.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&isMemberParty(t));
     const fyReceipts=receiptRows.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
-    const dueRows=cumulativeOutstanding.filter((r:any)=>isMemberParty(r)&&Number(r.net_outstanding||0)>0).sort((a:any,b:any)=>Number(b.net_outstanding||0)-Number(a.net_outstanding||0));
-    const groupKey=(d:any)=>{const n=demandCategory(d).toLowerCase();return /maintenance/.test(n)&&!/previous|opening|arrears|brought forward/.test(n)?'Maintenance Charges':/parking/.test(n)&&!/previous|opening|arrears|brought forward/.test(n)?'Parking Charges':/previous dues|opening balance|arrears|brought forward/.test(n)?'Previous-year dues':/cheque.?bounce|bounce charge/.test(n)?'Cheque Bounce Charges':/additional fund|special fund|capital contribution|special levy/.test(n)?'Additional Funds / Special Levies':/non.?occup/.test(n)?'Non-Occupancy Charges':'Other Charges'};
-    const groups:Record<string,{amount:number;count:number}>={};
-    reportDemands.forEach((d:any)=>{const k=groupKey(d);groups[k]??={amount:0,count:0};groups[k].amount+=demandAmount(d);groups[k].count++;});
-    const chargeData=Object.entries(groups).sort((a,b)=>b[1].amount-a[1].amount).slice(0,6).map(([name,v],i)=>({name,amount:v.amount,count:v.count,fill:COLORS[i%COLORS.length]}));
-    const sumGroup=(re:RegExp)=>reportDemands.filter((d:any)=>re.test(demandCategory(d))).reduce((s:number,d:any)=>s+demandAmount(d),0);
-    const currentMaintenance=reportDemands.filter((d:any)=>/maintenance/i.test(demandCategory(d))&&!/previous|opening|arrears|brought forward/i.test(demandCategory(d))).reduce((s:number,d:any)=>s+demandAmount(d),0);
+    const dueRows=cumulativeOutstanding.filter((r:any)=>isMemberParty(r)&&Number(r.net_outstanding||0)<0).sort((a:any,b:any)=>Number(b.net_outstanding||0)-Number(a.net_outstanding||0));
+    const demandGroupName=(d:any)=>{
+     const category=categoryMaster.find((c:any)=>String(c.category_id??c.id??'')===String(d.category_id??d.categoryId??'')||String(c.category_name??'')===demandCategory(d));
+     return String(category?.demand_group??'').trim()||'Unmapped Demand Group';
+    };
+    const groups:Record<string,{amount:number;count:number;categories:Set<string>}>={};
+    memberDemands.forEach((d:any)=>{const k=demandGroupName(d);groups[k]??={amount:0,count:0,categories:new Set<string>()};groups[k].amount+=demandAmount(d);groups[k].count++;groups[k].categories.add(demandCategory(d));});
+    const chargeData=Object.entries(groups).sort((a,b)=>b[1].amount-a[1].amount).map(([name,v],i)=>({name,amount:v.amount,count:v.count,categories:Array.from(v.categories).sort(),share:fyDemand?v.amount/fyDemand*100:0,fill:COLORS[i%COLORS.length]}));
+    const sumGroup=(re:RegExp)=>memberDemands.filter((d:any)=>re.test(demandCategory(d))).reduce((s:number,d:any)=>s+demandAmount(d),0);
+    const currentMaintenance=memberDemands.filter((d:any)=>/maintenance/i.test(demandCategory(d))&&!/previous|opening|arrears|brought forward/i.test(demandCategory(d))).reduce((s:number,d:any)=>s+demandAmount(d),0);
     const previousDues=sumGroup(/previous dues|opening balance|arrears|brought forward/i);
     const chequeBounce=sumGroup(/cheque.?bounce|bounce charge/i);
     const additionalFunds=sumGroup(/additional fund|special fund|capital contribution|special levy/i);
     const monthLabels=['Apr 2018','May 2018','Jun 2018','Jul 2018','Aug 2018','Sep 2018','Oct 2018','Nov 2018','Dec 2018','Jan 2019','Feb 2019','Mar 2019'];
-    const monthlyDemand=monthLabels.map(m=>({month:m.split(' ')[0],demand:reportDemands.filter((d:any)=>monthKey(d.demand_month??d.month??d.reporting_month??d.demand_date??d.created_at)===m.toLowerCase()).reduce((s:number,d:any)=>s+demandAmount(d),0),receipts:receiptRows.filter(t=>monthKey(t.reportingMonth??t.month??t.date)===m.toLowerCase()).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0)}));
+    const monthlyDemand=monthLabels.map(m=>{
+     const row:any={month:m.split(' ')[0],receipts:receiptRows.filter(t=>monthKey(t.reportingMonth??t.month??t.date)===m.toLowerCase()).reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0)};
+     chargeData.forEach(g=>{row[g.name]=memberDemands.filter((d:any)=>demandGroupName(d)===g.name&&monthKey(d.demand_month??d.month??d.reporting_month??d.demand_date??d.created_at)===m.toLowerCase()).reduce((sum:number,d:any)=>sum+demandAmount(d),0);});
+     row.demand=chargeData.reduce((sum,g)=>sum+Number(row[g.name]||0),0);
+     return row;
+    });
     const monthlyDemandAvailable=monthlyDemand.some(x=>x.demand>0);
-    const top=dueRows.slice(0,5).map((r:any)=>({party:String(r.flat_no||r.member_name||'Unidentified'),amount:Number(r.net_outstanding)||0}));
-    const outstanding=cumulativeOutstanding.reduce((s:number,r:any)=>s+Number(r.net_outstanding||0),0);
+    const top=dueRows.slice(0,5).map((r:any)=>({party:String(r.flat_no||r.member_name||'Unidentified'),amount:Math.abs(Number(r.net_outstanding)||0)}));
+    // Register convention: negative balance = member owes Society; positive = member credit.
+    const outstanding=cumulativeOutstanding.filter((r:any)=>isMemberParty(r)&&Number(r.net_outstanding||0)<0).reduce((sum:number,r:any)=>sum+Math.abs(Number(r.net_outstanding)||0),0);
     const rate=fyDemand?fyReceipts/fyDemand*100:0;
     const allocated=Array.isArray(demandAllocations)?demandAllocations.length:0;
     return <>
      <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
-      <Card label="Members / Flat Owners" value={num(flatOwnerMaster.length)} detail={num(dueRows.length)+' register rows with dues'} icon={Users}/>
+      <Card label="Members / Flat Owners" value={num(flatOwnerMaster.length)} detail={num(dueRows.length)+' member accounts with dues'} icon={Users}/>
       <Card label="Total Demand Raised" value={fmt(fyDemand)} detail={num(reportDemands.length)+' demand records'} icon={FileText}/>
       <Card label="Receipts Collected" value={fmt(fyReceipts)} detail={num(receiptRows.length)+' receipt transactions'} icon={Banknote} tone="green"/>
-      <Card label="Outstanding (Register)" value={fmt(outstanding)} detail="Cumulative; not reconciled" icon={AlertTriangle} tone="red"/>
-      <Card label="Receipts vs Demand" value={fyDemand?rate.toFixed(1)+'%':'Not available'} detail="Simple total comparison; not allocation-based" icon={ArrowUpRight} tone="violet"/>
+      <Card label="Member Dues Outstanding" value={fmt(outstanding)} detail="Sum of member debit balances; credits excluded" icon={AlertTriangle} tone="red"/>
+      <Card label="Receipts / Demand (FY)" value={fyDemand?rate.toFixed(1)+'%':'Not available'} detail="Not a collection rate; receipts may include earlier dues" icon={ArrowUpRight} tone="violet"/>
       <Card label="Unallocated Receipts" value={num(allocated===0?receiptRows.length:Math.max(0,receiptRows.length-allocated))} detail={allocated===0?'No allocations recorded':'Review allocation coverage'} icon={AlertTriangle} tone="amber"/>
      </div>
      <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
       <div className="xl:col-span-7"><Panel title="Monthly Demand vs Collections" action={<ReportLink id="monthly-demands" category="Demands & Payments" label="View Month-wise Matrix"/>}>
-       <div className="h-[225px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthlyDemand}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Legend wrapperStyle={{fontSize:10}}/><Bar dataKey="demand" name="Demand raised (period available)" fill="#3976f6" radius={[3,3,0,0]}/><Bar dataKey="receipts" name="Receipts recorded" fill="#43b581" radius={[3,3,0,0]}/></ComposedChart></ResponsiveContainer></div>
-       <p className="mt-1 text-[10px] text-slate-500">{monthlyDemandAvailable?'Monthly demand is shown where demand-period keys match.':'Demand period keys are missing or inconsistent; monthly demand is not fabricated.'} Receipts are not allocated to specific demand records.</p>
+       <div className="h-[245px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthlyDemand}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Legend wrapperStyle={{fontSize:10}}/>{chargeData.map((g:any)=><Bar key={g.name} dataKey={g.name} name={'Demand · '+g.name} stackId="demand" fill={g.fill}/ >)}<Line type="monotone" dataKey="receipts" name="Member receipts (unallocated)" stroke="#111827" strokeWidth={2} dot={{r:2}}/></ComposedChart></ResponsiveContainer></div>
+       <p className="mt-1 text-[10px] text-slate-500">{monthlyDemandAvailable?'Demand bars are stacked by the Demand Group from Category Master.':'Demand period keys are missing or inconsistent; monthly demand is not fabricated.'} The dark line is all member receipts by receipt month; it cannot be split by Demand Group until receipts are allocated to individual demands.</p>
       </Panel></div>
       <div className="xl:col-span-5"><Panel title="Outstanding — Top 5 Members / Flats" action={<ReportLink id="party-balances" category="Debtors & Parties" label="View All-Party Debtors"/>}>
        <div className="h-[225px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={top} layout="vertical" margin={{left:4,right:12}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><YAxis type="category" dataKey="party" width={82} tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="amount" name="Register outstanding" fill="#e45a5a" radius={[0,4,4,0]}/></BarChart></ResponsiveContainer></div>
@@ -980,13 +989,10 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       </Panel></div>
      </div>
      <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
-      <div className="xl:col-span-5"><Panel title="Demand by Charge Category" action={<ReportLink id="demand-summary" category="Demands & Payments" label="View Demand Summary"/>}>
-       <div className="space-y-3">{chargeData.map((x:any)=><div key={x.name}><div className="mb-1 flex items-center justify-between gap-2 text-[11px]"><span>{x.name}</span><strong>{fmt(x.amount)}</strong></div><div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full" style={{width:(fyDemand?Math.max(1,x.amount/fyDemand*100):0)+'%',background:x.fill}}/></div></div>)}</div>
-       <p className="mt-3 text-[10px] text-slate-500">Category labels are grouped for insight. Collection-by-charge is not calculated because receipt allocations are absent.</p>
-      </Panel></div>
-      <div className="xl:col-span-4"><Panel title="Demand Profile" action={<ReportLink id="mapping-exceptions" category="Audit & Governance" label="Review Charge Mapping"/>}>
-       <div className="h-[185px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={chargeData} dataKey="amount" nameKey="name" innerRadius={48} outerRadius={72} paddingAngle={2}>{chargeData.map((x:any)=><Cell key={x.name} fill={x.fill}/>)}</Pie><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Legend verticalAlign="bottom" height={34} wrapperStyle={{fontSize:9}}/></PieChart></ResponsiveContainer></div>
-       <div className="rounded-lg bg-blue-50 p-2 text-[10px] text-blue-900">Recorded demand composition only—not collection efficiency by charge type.</div>
+      <div className="xl:col-span-9"><Panel title="Demand Profile — What Makes Up Member Demand?" action={<ReportLink id="demand-summary" category="Receivables & Demand" label="Open Demand Summary"/>}>
+       <p className="mb-3 text-[11px] text-slate-600">This is the composition of member demand by the Demand Group maintained in Category Master. Amount is demand raised in FY 2018–19; share is each group’s portion of total member demand.</p>
+       <Table headers={['Demand Group','Included Categories','Demand Amount','Share','Records']} rows={chargeData.map((g:any)=>[g.name,g.categories.join(', ')||'—',currencyCell(g.amount),g.share.toFixed(1)+'%',num(g.count)])}/>
+       <p className="mt-2 text-[10px] text-slate-500">Unmapped Demand Group means the linked category has no Demand Group assigned in Category Master. Receipt amounts are not attributed to groups without demand allocations.</p>
       </Panel></div>
       <div className="xl:col-span-3"><Panel title="Key Insights & Actions">
        <div className="space-y-2 text-[11px]">
