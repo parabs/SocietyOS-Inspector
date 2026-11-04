@@ -46,7 +46,10 @@ const MainContent: React.FC = () => {
       return <SocietyFinancialDashboards screen="reports" />;
 
     case 'data-management':
-      return <DataManagementHub />;
+      return <DataManagementHub initialSection="masters" />;
+
+    case 'import-wizard':
+      return <DataManagementHub initialSection="import" />;
 
     case 'transactions':
       return <DataManagement />;
