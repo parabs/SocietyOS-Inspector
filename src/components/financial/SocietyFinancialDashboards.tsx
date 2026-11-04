@@ -47,7 +47,6 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const [globalPaymentModeFilter,setGlobalPaymentModeFilter]=useState('All modes');
  const [demandSummaryCategoryFilter,setDemandSummaryCategoryFilter]=useState('All categories');
  const [demandSummaryCategoryGroupFilter,setDemandSummaryCategoryGroupFilter]=useState('All category groups');
- const [categoryFilter,setCategoryFilter]=useState('All categories');
  const [categoryGroupFilter,setCategoryGroupFilter]=useState('All category groups');
  const [expenseDemandGroupFilter,setExpenseDemandGroupFilter]=useState('All demand groups');
  const [partyTypeFilter,setPartyTypeFilter]=useState('All party types');
@@ -589,7 +588,9 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     };
     const memberDemands=reportDemands.filter((d:any)=>{
      const p=partyMaster.find((x:any)=>String(x.party_id)===String(d.party_id||''));
-     return Boolean(p&&isMember(p));
+     const category:any=categoryById.get(String(d.category_id||''))||{};
+     const group=String(category.demand_group||'Unmapped Demand Group');
+     return Boolean(p&&isMember(p))&&(globalDemandGroupFilter==='All demand groups'||group===globalDemandGroupFilter);
     });
     const parties=new Map<string,any>();
     memberDemands.forEach((d:any)=>{
