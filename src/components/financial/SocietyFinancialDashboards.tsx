@@ -756,7 +756,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      const contraOut=tx.filter(t=>t.transactionClass==='Contra'&&Number(t.amount)<0).reduce((v,t)=>v+Math.abs(Number(t.amount)||0),0);
      const contra=tx.filter(t=>t.transactionClass==='Contra').reduce((v,t)=>v+Math.abs(Number(t.amount)||0),0);
      const closing=opening===null?null:opening+receipts-payments;
-     return {name,accountId:acc?.accountId||tx[0]?.accountId||'',opening,receipts,payments,contraIn,contraOut,contra,closing,txCount:tx.length,verification:opening===null?'Opening balance missing':acc?.verificationStatus||acc?.status||'Opening balance not independently verified'};
+     return {name,accountId:acc?.accountId||tx[0]?.accountId||'',opening,receipts,payments,contraIn,contraOut,contra,closing,txCount:tx.length,verification:opening===null?'Opening balance missing':'Opening balance recorded — independent verification pending'};
     });
     const totals=rows.reduce((a,x)=>({opening:a.opening+(x.opening??0),receipts:a.receipts+x.receipts,payments:a.payments+x.payments,closing:a.closing+(x.closing??0),contra:a.contra+x.contra}),{opening:0,receipts:0,payments:0,closing:0,contra:0});
     const openingComplete=rows.length>0&&rows.every(x=>x.opening!==null);
