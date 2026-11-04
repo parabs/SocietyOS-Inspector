@@ -111,6 +111,8 @@ export interface DbPartyFinancialYearBalance {
   adjustments?: number;
   current_fy_contra_signed?: number;
   total_outstanding?: number;
+  unallocated_receipts?: number;
+  total_party_balance?: number;
   opening_balance_verification_status?: string;
   opening_balance_notes?: string;
 }
@@ -121,6 +123,8 @@ export interface DbMemberFinancialYearBalance {
   financial_year: string;
   opening_balance?: number;
   opening_balance_recorded?: boolean;
+  unallocated_receipts?: number;
+  total_party_balance?: number;
   billed_amount?: number;
   received_amount?: number;
   adjusted_amount?: number;
