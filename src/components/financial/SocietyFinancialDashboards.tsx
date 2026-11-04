@@ -421,6 +421,18 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         const particulars=categoryName+(demandMonth?' for '+demandMonth:'');
         return {date:String(d.demand_date||d.created_at||d.month||''),particulars,voucher:String(d.demand_id||d.id||'Demand Register'),category:categoryName,movement:partyType==='Member'?-Math.abs(Number(d.total_demand||d.demand_amount||0)):-Number(d.total_demand||d.demand_amount||0),kind:'Demand'};
       }):[];
+      const unmatchedTankDemandEvents=isParty&&!isVendor&&partyType==='Member'
+        ? groupTransactions.filter((t:any)=>{
+            if(String(t.type||'').toLowerCase()!=='receipt'||!/(tank)/i.test(String(t.description||'')+' '+String(t.categoryName||'')))return false;
+            const linkedDemandId=transactionDemandId(t);
+            const hasDemand=Boolean(linkedDemandId&&reportDemands.some((d:any)=>String(d.demand_id||d.id||'')===linkedDemandId));
+            return !hasDemand;
+          }).map((t:any)=>({
+            date:String(t.date||''),particulars:'Tank payment — reporting-only demand (source demand unavailable)',
+            voucher:String(t.receiptNo||t.voucherNo||t.id||'—'),category:'Tank Payment (reporting only)',
+            movement:-Math.abs(Number(t.amount)||0),kind:'Reporting-only demand'
+          }))
+        :[];
       const events:any[]=[
         ...groupTransactions.map(t=>{
           const rawAmount=Number(t.amount)||0;
@@ -438,8 +450,9 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
             movement,kind:txKind||'transaction'
           };
         }),
-        ...memberDemands
-      ].sort((a,b)=>a.date.localeCompare(b.date));
+        ...memberDemands,
+        ...unmatchedTankDemandEvents
+      ].sort((a,b)=>a.date.localeCompare(b.date)||a.movement-b.movement);
       const groupOpeningKnown=isParty
         ? partyFinancialBalances.some((x:any)=>String(x.financial_year||'')==='FY 2018-19'&&String(x.type||'')===partyType&&String(x.name||'')===groupLabel&&x.opening_balance_recorded===true)
         : isAccount
@@ -517,7 +530,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       detailRows.push(isParty?['','','','','','']:['','','','','','','']);
     });
 
-    return {title:isVendor?'Vendor / Payee Ledger — Detailed':selectedReport==='member-ledger'?'Member / Flat Owner Ledger — Detailed':(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Detailed',note:'Each party, account or category group is shown separately with its opening balance (where a verified source exists), dated transaction details and closing balance. Member demand entries reduce the signed balance and receipts increase it; negative closing means the member owes Society. Unallocated receipts remain visible as unapplied credits. Staff and utility bills increase payables and payments reduce them.',headers:isParty?['Date','Particulars','Voucher / Receipt No.','Debit / Payment','Credit / Receipt','Balance']:['Date','Particulars','Voucher / Receipt No.','Category','Debit / Payment','Credit / Receipt','Balance'],rows:detailRows};
+    return {title:isVendor?'Vendor / Payee Ledger — Detailed':selectedReport==='member-ledger'?'Member / Flat Owner Ledger — Detailed':(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Detailed',note:'Each party, account or category group is shown separately with its opening balance (where a verified source exists), dated transaction details and closing balance. Member demand entries reduce the signed balance and receipts increase it; negative closing means the member owes Society. Tank receipts without a matching demand are paired with a reporting-only demand debit for the same amount, so the receipt is not treated as an advance credit. This is a presentation adjustment only; no demand or transaction record is created in the database. Staff and utility bills increase payables and payments reduce them.',headers:isParty?['Date','Particulars','Voucher / Receipt No.','Debit / Payment','Credit / Receipt','Balance']:['Date','Particulars','Voucher / Receipt No.','Category','Debit / Payment','Credit / Receipt','Balance'],rows:detailRows};
    }
    case 'member-opening-balance-register': return {title:'Member Opening Balance Register — FY 2018–19',note:'Opening-position register only. Recorded opening amounts remain Pending until supported by prior-year closing records; five member parties have no opening row. This register does not include current-year demands or receipts. Debtors — All Parties is the current-year position report, calculated from opening balance plus recorded demands less actual receipts and approved adjustments.',headers:[],rows:[]};
    case 'receipt-allocation-review': {
