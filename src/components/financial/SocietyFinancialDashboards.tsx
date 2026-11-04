@@ -191,12 +191,19 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
  const exportTxt=()=>{const x=selectedReportExport();const txt=x.rows.map(row=>row.map(v=>csvValue(v)).join('\t')).join('\r\n');const url=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='society-'+selectedReport+'.txt';a.click();URL.revokeObjectURL(url)};
  const exportPdf=()=>{
   if(screen==='reports'){
-   const source=document.querySelector(selectedReport==='income-expense'?'#rpt15-print-content':'#selected-report-content') as HTMLElement|null;
+   const dedicatedId=selectedReport==='income-expense'?'#rpt15-print-content':selectedReport==='receipts-payments'?'#rpt16-print-content':null;
+   const source=(dedicatedId?document.querySelector(dedicatedId):document.querySelector('#selected-report-content')) as HTMLElement|null;
    if(!source)return;
    const clone=source.cloneNode(true) as HTMLElement;
-   if(selectedReport!=='income-expense'){
-    clone.querySelector(':scope > div:first-child')?.remove();
-    clone.querySelector(':scope > div:first-child')?.remove();
+   if(!dedicatedId){
+    // Remove the application toolbar and filter/control strips, but retain report body.
+    const direct=Array.from(clone.children) as HTMLElement[];
+    direct.forEach(el=>{
+     const txt=(el.innerText||'').toLowerCase();
+     const hasToolbar=['refresh','print','csv','txt','pdf'].filter(v=>txt.includes(v)).length>=3;
+     const isFilterStrip=txt.includes('report filters')||((txt.includes('period')||txt.includes('all months'))&&el.querySelector('select,input,button'));
+     if(hasToolbar||isFilterStrip)el.remove();
+    });
    }
    clone.querySelectorAll('button,input,select,textarea,[class*="print:hidden"]').forEach(el=>el.remove());
    const w=window.open('','_blank','width=1100,height=800');if(!w)return;
@@ -204,6 +211,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    const esc=(v:string)=>v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>'+
     '@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font:9pt Arial,sans-serif;color:#111;margin:0}h1,h2,h3{break-after:avoid;color:#111}h2{font-size:15pt}h3{font-size:11pt;margin:12pt 0 5pt}p{font-size:9pt;line-height:1.45}table{width:100%;table-layout:fixed;border-collapse:collapse;margin:6pt 0 10pt;font-size:8pt;break-inside:auto}thead{display:table-header-group}tr{break-inside:avoid;break-after:auto}th,td{border:1px solid #888;padding:5px;text-align:left;vertical-align:top;white-space:normal;overflow-wrap:anywhere;word-break:normal}th{background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact}section{break-inside:auto;margin:0 0 10pt}.rounded,.border{box-shadow:none!important}header{text-align:center;margin-bottom:10pt}footer{margin-top:10pt;border-top:1px solid #aaa;padding-top:6pt}#rpt15-print-content>header{display:block}#rpt15-print-content>div:first-of-type{display:none}'+
+    '.rpt16-summary{break-inside:avoid;border:2px solid #555!important;padding:12px;margin:12px 0}.rpt16-summary h4{font-size:11pt;font-weight:800}.rpt16-summary .text-xl,.rpt16-summary .text-2xl{font-weight:800}'+
     '</style></head><body>'+clone.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');
    w.document.close();return;
   }
@@ -1397,7 +1405,19 @@ return <Panel title="RPT-08 · Demand Register">
      <div id="rpt16-print-content" className="mx-auto max-w-5xl space-y-6 bg-white text-slate-800">
       <header className="border-b-2 border-slate-800 pb-4 text-center"><h2 className="text-base font-bold uppercase tracking-wide">Pearl Meadows 'C' Type 'C' Wing Chs Ltd</h2><p className="mt-1 text-xs font-semibold">Regd. No. TNA/KLN/HSG(TC) 27051/2014-15/YEAR 2014</p><h3 className="mt-4 text-lg font-bold uppercase">Receipts & Payments · Financial Movement & Control Report</h3><p className="mt-1 text-xs text-slate-600">FY 2018–19 · RPT-16 · Period: {periodName}</p><p className="mt-2 text-[10px] text-slate-500">Prepared from connected SocietyOS transactions · Generated {new Date().toLocaleDateString('en-IN')}</p></header>
       <section><h3 className="mb-2 text-sm font-bold">1. Executive Cash Movement Assessment</h3><p className="text-xs leading-6">For {periodName}, the connected records show {x.openingAvailable?'an opening cash and bank balance of '+fmtAmount(x.openingTotal):'no verified opening cash and bank balance'}, receipts of <strong>{fmtAmount(x.receiptTotal)}</strong> and payments of <strong>{fmtAmount(x.paymentTotal)}</strong>. {x.openingAvailable?'The calculated closing book position is ':'A closing cash and bank position cannot be established without opening balances. '}{x.openingAvailable?<strong>{fmtAmount(x.closingTotal)}</strong>:''}. This is a book-movement calculation; it is not a bank-confirmed or physically verified balance.</p>
-       <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">{[['Opening balance',x.openingAvailable?fmtAmount(x.openingTotal):'Not available'],['Recorded receipts',fmtAmount(x.receiptTotal)],['Recorded payments',fmtAmount(x.paymentTotal)],['Calculated closing',x.openingAvailable?fmtAmount(x.closingTotal):'Not available']].map(([label,value])=><div className="rounded border p-3"><div className="text-[10px] text-slate-500">{label}</div><div className="mt-1 text-lg font-bold">{value}</div></div>)}</div>
+       <div className="mt-4 rounded-lg border-2 border-slate-400 p-4 rpt16-summary">
+        <h4 className="mb-3 border-b border-slate-300 pb-2 text-sm font-extrabold uppercase tracking-wide">Cash Movement Summary</h4>
+        <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+         <div><div className="text-[11px] font-semibold uppercase text-slate-500">Opening cash & bank balance</div><div className="mt-1 text-xl font-extrabold">{x.openingAvailable?fmtAmount(x.openingTotal):'Not available'}</div></div>
+         <div><div className="text-[11px] font-semibold uppercase text-slate-500">Total recorded receipts</div><div className="mt-1 text-xl font-extrabold">{fmtAmount(x.receiptTotal)}</div></div>
+         <div><div className="text-[11px] font-semibold uppercase text-slate-500">Total recorded payments</div><div className="mt-1 text-xl font-extrabold">{fmtAmount(x.paymentTotal)}</div></div>
+         <div className="border-t border-slate-300 pt-2"><div className="text-[11px] font-semibold uppercase text-slate-700">Calculated closing cash & bank balance</div><div className="mt-1 text-2xl font-black">{x.openingAvailable?fmtAmount(x.closingTotal):'Not available'}</div></div>
+        </div>
+        <div className="mt-4 border-t-2 border-double border-slate-500 pt-3 text-center text-sm font-bold">
+         {x.openingAvailable?fmtAmount(x.openingTotal)+'  +  '+fmtAmount(x.receiptTotal)+'  −  '+fmtAmount(x.paymentTotal)+'  =  '+fmtAmount(x.closingTotal):'Opening balance unavailable — closing balance cannot be calculated'}
+        </div>
+        <p className="mt-2 text-[10px] italic text-slate-600">Closing balance is a calculated book position and remains subject to bank reconciliation and physical cash verification.</p>
+       </div>
       </section>
       <section><h3 className="mb-2 text-sm font-bold">2. Receipts & Payments Account</h3><p className="mb-2 text-xs text-slate-600">Opening balance is presented on the receipts side and calculated closing balance on the payments side. Transaction heads are grouped by Category Group → Category Name. Contra transfers are excluded from receipts and payments totals.</p><Table headers={['RECEIPTS — Particulars','Amount (₹)','PAYMENTS — Particulars','Amount (₹)']} rows={d.rows||[]}/></section>
       <section><h3 className="mb-2 text-sm font-bold">3. Receipt Composition & Funding Sources</h3><Table headers={['Receipt head','Recorded amount','Share of receipts','Committee interpretation']} rows={receipts.map((h:any)=>[h.group+' · '+h.name,currencyCell(h.amount),x.receiptTotal?Math.round(h.amount/x.receiptTotal*100)+'%':'0%',/maintenance|parking/i.test(h.name)?'Member collection / recovery; reconcile to demand and receipt allocation':'Verify source, payer, bank credit and supporting receipt'])}/><p className="mt-2 text-xs leading-5">{topReceipt?'Largest recorded receipt head is '+topReceipt.name+' at '+fmtAmount(topReceipt.amount)+'. ':'No receipt transactions are recorded for this period. '}Receipt totals indicate money recorded in the books; they do not independently establish demand collection efficiency or completeness.</p></section>
