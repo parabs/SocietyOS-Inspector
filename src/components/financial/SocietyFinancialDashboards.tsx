@@ -1055,6 +1055,18 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const lateRate=qualityClassified?qualityLate/qualityClassified*100:0;
     const monthlyQuality=monthLabels.map(m=>{const q=qualityByMonth[m.toLowerCase()]||{onTime:0,late:0};return {month:m.split(' ')[0],onTime:q.onTime,late:q.late};});
     const qualityCoverage=allocatedCollectionTotal?qualityClassified/allocatedCollectionTotal*100:0;
+    // Level-2 view: compare each demand group's allocated recovery against its own demand.
+    const groupPerformance:Record<string,{demand:number;collected:number;outstanding:number;efficiency:number;count:number;fill:string}>={};
+    memberDemands.forEach((d:any)=>{
+     const group=demandGroupName(d),id=String(d.demand_id||d.id||'');
+     const demand=Math.max(0,demandNetAmount(d)),collected=Math.min(demand,Number(demandPaid[id]||0));
+     groupPerformance[group]??={demand:0,collected:0,outstanding:0,efficiency:0,count:0,fill:COLORS[Object.keys(groupPerformance).length%COLORS.length]};
+     groupPerformance[group].demand+=demand;
+     groupPerformance[group].collected+=collected;
+     groupPerformance[group].outstanding+=Math.max(0,demand-collected);
+     groupPerformance[group].count++;
+    });
+    const collectionEfficiencyData=Object.entries(groupPerformance).map(([name,g])=>({...g,name,efficiency:g.demand?g.collected/g.demand*100:0})).sort((a,b)=>a.efficiency-b.efficiency);
     const top=dueRows.slice(0,5).map((r:any)=>({party:String(r.flat_no||r.member_name||'Unidentified'),amount:Math.abs(Number(r.net_outstanding)||0)}));
     // Register convention: negative balance = member owes Society; positive = member credit.
     const outstanding=cumulativeOutstanding.filter((r:any)=>isMemberParty(r)&&Number(r.net_outstanding||0)<0).reduce((sum:number,r:any)=>sum+Math.abs(Number(r.net_outstanding)||0),0);
@@ -1070,9 +1082,10 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       <Card label="Unallocated Receipts" value={num(allocated===0?receiptRows.length:Math.max(0,receiptRows.length-allocated))} detail={allocated===0?'No allocations recorded':'Review allocation coverage'} icon={AlertTriangle} tone="amber"/>
      </div>
      <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
-      <div className="xl:col-span-7"><Panel title="Monthly Demand vs Collections" action={<ReportLink id="monthly-demands" category="Demands & Payments" label="View Month-wise Matrix"/>}>
-       <div className="h-[245px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthlyDemand}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Legend wrapperStyle={{fontSize:10}}/>{chargeData.map((g:any)=><Bar key={g.name} dataKey={g.name} name={'Demand · '+g.name} stackId="demand" fill={g.fill}/ >)}<Line type="monotone" dataKey="receipts" name="Member receipts (unallocated)" stroke="#111827" strokeWidth={2} dot={{r:2}}/></ComposedChart></ResponsiveContainer></div>
-       <p className="mt-1 text-[10px] text-slate-500">{monthlyDemandAvailable?'Demand bars are stacked by the Demand Group from Category Master.':'Demand period keys are missing or inconsistent; monthly demand is not fabricated.'} The dark line is all member receipts by receipt month; it cannot be split by Demand Group until receipts are allocated to individual demands.</p>
+      <div className="xl:col-span-7"><Panel title="Collection Efficiency by Demand Group" action={<ReportLink id="demand-summary" category="Receivables & Demand" label="View Demand Summary"/>}>
+       <p className="mb-3 text-[11px] text-slate-600">Each group's collection percentage is calculated against its own member demand, using only receipts allocated or directly linked to those demands. This removes the distortion caused by Maintenance's larger rupee value.</p>
+       {collectionEfficiencyData.length>0?<><div className="h-[210px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={collectionEfficiencyData} layout="vertical" margin={{left:12,right:24,top:4,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" domain={[0,100]} tickFormatter={(v:any)=>v+'%'} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" width={145} tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>Number(v).toFixed(1)+'%'}/><Bar dataKey="efficiency" name="Collection efficiency" radius={[0,4,4,0]}>{collectionEfficiencyData.map((g:any)=><Cell key={g.name} fill={g.efficiency<50?'#d05e5e':g.efficiency<75?'#d69e36':'#4f9d62'}/>)}</Bar></BarChart></ResponsiveContainer></div><div className="mt-3"><Table headers={['Demand Group','Demand','Collected','Outstanding','Efficiency']} rows={collectionEfficiencyData.map((g:any)=>[g.name,currencyCell(g.demand),currencyCell(g.collected),currencyCell(g.outstanding),g.efficiency.toFixed(1)+'%'])}/></div></>:<div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No member demand groups are available for comparison.</div>}
+       <p className="mt-2 text-[10px] text-slate-500">This is a demand-linked recovery measure, not a receipt-month comparison. Unallocated receipts are excluded. Groups with incomplete allocations may show lower apparent recovery; review allocation coverage before drawing conclusions.</p>
       </Panel></div>
       <div className="xl:col-span-5"><Panel title="Outstanding — Top 5 Members / Flats" action={<ReportLink id="party-balances" category="Debtors & Parties" label="View All-Party Debtors"/>}>
        <div className="h-[225px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={top} layout="vertical" margin={{left:4,right:12}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><YAxis type="category" dataKey="party" width={82} tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="amount" name="Register outstanding" fill="#e45a5a" radius={[0,4,4,0]}/></BarChart></ResponsiveContainer></div>
