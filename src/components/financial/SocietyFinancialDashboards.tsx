@@ -707,21 +707,68 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    case 'missing-docs': return {title:'Missing Document / Evidence Register',note:'Transactions with incomplete evidence, missing bills or missing voucher/receipt references.',headers:['Date','Transaction ID','Party','Category','Amount','Voucher / receipt','Bill status','Evidence status'],rows:filtered.filter(t=>t.evidenceStatus!=='Complete'||t.billStatus==='Missing'||t.voucherReceiptStatus==='Missing').map(t=>[t.date||'—',t.id||'—',t.party||'Unmapped',t.categoryName||'Unclassified',currencyCell(Math.abs(Number(t.amount)||0)),t.voucherNo||t.receiptNo||'Missing',statusPill(t.billStatus||'Not assessed'),statusPill(t.evidenceStatus||'Pending')])};
    case 'bank-recon': return {title:'Bank Reconciliation Register',note:'Displays saved reconciliation records only. Confirm book and statement balances are populated before relying on differences.',headers:['Account','Month','Status','Adjustments','Remarks'],rows:totalRecon.map(x=>[String((x as any).accountId||'—'),String((x as any).monthId||'—'),statusPill(String((x as any).status||'Pending')),currencyCell(Number((x as any).adjustments)||0),String((x as any).remarks||'—')])};
    case 'maintenance-performance': {
-    const maintenance=reportDemands.filter((d:any)=>String(d.category_id)==='CAT-0001'&&(period==='All months'||monthKey(d.month||d.demand_month)===monthKey(period)));
-    const partyGroups=new Map<string,any>();
-    let totalDemand=0,totalOnTime=0,totalLate=0,totalUndetermined=0,totalOutstanding=0,totalExcess=0,totalDelayDemand=0,totalDelayCollected=0,totalDelayOutstanding=0;
-    maintenance.forEach((d:any)=>{const id=String(d.demand_id||d.id||''),partyId=String(d.party_id||'');const due=String(d.due_date||'').slice(0,10);const amount=Number(d.total_demand??d.demand_amount)||0;const linked=receiptRows.filter(t=>transactionDemandId(t)===id).sort((a,b)=>transactionDate(a).localeCompare(transactionDate(b)));let applied=0,onTime=0,late=0,undetermined=0,excess=0;
-      linked.forEach(t=>{const receipt=Math.abs(Number(t.amount)||0),available=Math.max(0,amount-applied),used=Math.min(receipt,available);if(!due||!transactionDate(t))undetermined+=used;else if(transactionDate(t)<=due)onTime+=used;else late+=used;applied+=used;excess+=receipt-used;});
-      const outstanding=Math.max(0,amount-applied);totalDemand+=amount;totalOnTime+=onTime;totalLate+=late;totalUndetermined+=undetermined;totalOutstanding+=outstanding;totalExcess+=excess;
-      const p=partyMaster.find((x:any)=>String(x.party_id)===partyId);if(!partyGroups.has(partyId))partyGroups.set(partyId,{type:p?.party_type||'Unclassified',name:p?.party_name||d.member_name||partyId,demand:0,onTime:0,late:0,undetermined:0,outstanding:0,excess:0});const row=partyGroups.get(partyId);row.demand+=amount;row.onTime+=onTime;row.late+=late;row.undetermined+=undetermined;row.outstanding+=outstanding;row.excess+=excess;
+    const isMember=(party:any)=>/^members?$/i.test(String(party?.party_type||'').trim());
+    const categoryById=new Map(categoryMaster.map((c:any)=>[String(c.category_id||c.id||''),c]));
+    const demandKind=(d:any)=>{
+     const c:any=categoryById.get(String(d.category_id||''))||{};
+     const group=String(c.demand_group||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+     const category=String(c.category_name||d.category_name||d.description||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+     const id=String(d.category_id||'').toUpperCase();
+     if(/non occupancy|nonoccupancy|\bnoc\b/.test(group+' '+category)||id==='CAT-0023')return 'noc';
+     if(/delay|late payment|penalty/.test(group+' '+category)||id==='CAT-0003')return 'delay';
+     if(/maintenance|parking/.test(group+' '+category)||id==='CAT-0001'||id==='CAT-0021')return 'maintenance';
+     return 'other';
+    };
+    const memberDemands=reportDemands.filter((d:any)=>{
+     const p=partyMaster.find((x:any)=>String(x.party_id)===String(d.party_id||''));
+     return Boolean(p&&isMember(p))&&(period==='All months'||monthKey(d.month||d.demand_month)===monthKey(period));
     });
-    const delayDemands=reportDemands.filter((d:any)=>String(d.category_id)==='CAT-0003'&&(period==='All months'||monthKey(d.month||d.demand_month)===monthKey(period)));
-    const delayByParty=new Map<string,{demand:number;collected:number;outstanding:number}>();
-    delayDemands.forEach((d:any)=>{const amount=Number(d.total_demand??d.demand_amount)||0;const paid=receiptRows.filter(t=>transactionDemandId(t)===String(d.demand_id||d.id||'')).reduce((v:number,t:any)=>v+Math.abs(Number(t.amount)||0),0);const collected=Math.min(amount,paid);totalDelayDemand+=amount;totalDelayCollected+=collected;totalDelayOutstanding+=Math.max(0,amount-paid);const id=String(d.party_id||'');const current=delayByParty.get(id)||{demand:0,collected:0,outstanding:0};current.demand+=amount;current.collected+=collected;current.outstanding+=Math.max(0,amount-paid);delayByParty.set(id,current);if(!partyGroups.has(id)){const p=partyMaster.find((x:any)=>String(x.party_id)===id);partyGroups.set(id,{type:p?.party_type||'Unclassified',name:p?.party_name||d.member_name||id,demand:0,onTime:0,late:0,undetermined:0,outstanding:0,excess:0});}});
-    const rows=Array.from(partyGroups.entries()).sort((a,b)=>a[1].type.localeCompare(b[1].type)||a[1].name.localeCompare(b[1].name));
-    return {title:'Maintenance Collection & Delay Analysis',note:'On-time and late amounts are split using actual receipt transaction dates against each demand due_date. Partial receipts are split by receipt date and capped at the demand amount; excess receipts are separately disclosed. Maintenance is category CAT-0001; delay-charge demands are category CAT-0003. Only exact Demand ID-linked receipts are attributed. If a due date or transaction date is missing, the linked amount is shown separately as undetermined and must be reviewed.',headers:['Party Type','Party Name','Maintenance Demanded','Collected On Time','Collected Late','Date / Due Date Unverified','Outstanding Maintenance','Excess Receipts','Delay Charges Demanded','Delay Charges Collected','Delay Charges Outstanding'],rows:[...rows.map(([pid,x]:any)=>{const delay=delayByParty.get(pid)||{demand:0,collected:0,outstanding:0};return [x.type,x.name,currencyCell(x.demand),currencyCell(x.onTime),currencyCell(x.late),currencyCell(x.undetermined),currencyCell(x.outstanding),currencyCell(x.excess),currencyCell(delay.demand),currencyCell(delay.collected),currencyCell(delay.outstanding)];}),['SOCIETY TOTAL','',currencyCell(totalDemand),currencyCell(totalOnTime),currencyCell(totalLate),currencyCell(totalUndetermined),currencyCell(totalOutstanding),currencyCell(totalExcess),currencyCell(totalDelayDemand),currencyCell(totalDelayCollected),currencyCell(totalDelayOutstanding)]]};
+    const partyGroups=new Map<string,any>();
+    const totals={maintenanceDemand:0,onTime:0,late:0,maintenanceOutstanding:0,excess:0,delayDemand:0,delayCollected:0,delayOutstanding:0,nocDemand:0,nocCollected:0,nocOutstanding:0};
+    const receiptsByDemand=new Map<string,any[]>();
+    receiptRows.forEach((t:any)=>{const id=transactionDemandId(t);if(!id)return;if(!receiptsByDemand.has(id))receiptsByDemand.set(id,[]);receiptsByDemand.get(id)!.push(t);});
+    const ensureParty=(partyId:string,d:any)=>{
+     if(!partyGroups.has(partyId)){
+      const p=partyMaster.find((x:any)=>String(x.party_id)===partyId);
+      partyGroups.set(partyId,{type:p?.party_type||'Member',name:p?.party_name||d.member_name||partyId,maintenanceDemand:0,onTime:0,late:0,maintenanceOutstanding:0,excess:0,delayDemand:0,delayCollected:0,delayOutstanding:0,nocDemand:0,nocCollected:0,nocOutstanding:0});
+     }
+     return partyGroups.get(partyId);
+    };
+    memberDemands.forEach((d:any)=>{
+     const partyId=String(d.party_id||'');if(!partyId)return;
+     const row=ensureParty(partyId,d);
+     const id=String(d.demand_id||d.id||'');
+     const amount=demandNetAmount(d);
+     const linked=(receiptsByDemand.get(id)||[]).slice().sort((x:any,y:any)=>transactionDate(x).localeCompare(transactionDate(y)));
+     const paid=linked.reduce((sum:number,t:any)=>sum+Math.abs(Number(t.amount)||0),0);
+     const kind=demandKind(d);
+     if(kind==='maintenance'){
+      let applied=0,onTime=0,late=0,excess=0;
+      const due=String(d.due_date||'').slice(0,10);
+      linked.forEach((t:any)=>{
+       const receipt=Math.abs(Number(t.amount)||0),used=Math.min(receipt,Math.max(0,amount-applied));
+       if(due&&transactionDate(t)){if(transactionDate(t)<=due)onTime+=used;else late+=used;}
+       applied+=used;excess+=receipt-used;
+      });
+      const outstanding=Math.max(0,amount-paid);
+      row.maintenanceDemand+=amount;row.onTime+=onTime;row.late+=late;row.maintenanceOutstanding+=outstanding;row.excess+=excess;
+      totals.maintenanceDemand+=amount;totals.onTime+=onTime;totals.late+=late;totals.maintenanceOutstanding+=outstanding;totals.excess+=excess;
+     }else if(kind==='delay'){
+      const collected=Math.min(Math.max(0,amount),paid),outstanding=Math.max(0,amount-paid);
+      row.delayDemand+=amount;row.delayCollected+=collected;row.delayOutstanding+=outstanding;
+      totals.delayDemand+=amount;totals.delayCollected+=collected;totals.delayOutstanding+=outstanding;
+     }else if(kind==='noc'){
+      const collected=Math.min(Math.max(0,amount),paid),outstanding=Math.max(0,amount-paid);
+      row.nocDemand+=amount;row.nocCollected+=collected;row.nocOutstanding+=outstanding;
+      totals.nocDemand+=amount;totals.nocCollected+=collected;totals.nocOutstanding+=outstanding;
+     }
+    });
+    const rows=Array.from(partyGroups.values()).sort((a:any,b:any)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
+    const headers=['Party Type','Party Name','Maintenance Demanded (incl. Parking)','Collected On Time','Collected Late','Outstanding Maintenance (incl. Parking)','Excess Receipts (incl. Parking)','Delay Charges Demanded','Delay Charges Collected','Delay Charges Outstanding','NOC Demanded','NOC Collected','NOC Outstanding'];
+    const tableRows=rows.map((x:any)=>[x.type,x.name,currencyCell(x.maintenanceDemand),currencyCell(x.onTime),currencyCell(x.late),currencyCell(x.maintenanceOutstanding),currencyCell(x.excess),currencyCell(x.delayDemand),currencyCell(x.delayCollected),currencyCell(x.delayOutstanding),currencyCell(x.nocDemand),currencyCell(x.nocCollected),currencyCell(x.nocOutstanding)]);
+    const totalRow=['SOCIETY TOTAL','',currencyCell(totals.maintenanceDemand),currencyCell(totals.onTime),currencyCell(totals.late),currencyCell(totals.maintenanceOutstanding),currencyCell(totals.excess),currencyCell(totals.delayDemand),currencyCell(totals.delayCollected),currencyCell(totals.delayOutstanding),currencyCell(totals.nocDemand),currencyCell(totals.nocCollected),currencyCell(totals.nocOutstanding)];
+    return {title:'Maintenance, Parking, Delay Charges & NOC Analysis',note:'Members only. Maintenance and Parking demand groups are combined in the Maintenance columns. Delay Charges and NOC are separately reported. Demanded amounts use Net Demand from the Demand Register; collections are matched only through Demand ID-linked non-contra receipts. On-time / late classification uses the demand due date and receipt transaction date. Where either date is missing, the receipt is not assigned to either timing bucket; it is still included when calculating outstanding and excess receipts. Period filter applies by demand month.',headers,rows:[...tableRows,totalRow]};
    }
-   
    case 'income-expense': return {title:'Income & Expenditure Analysis (Preliminary)',note:'Cash movements are grouped by category group and category. This is not an accrual-certified Income & Expenditure Account until classification, accruals and year-end adjustments are verified.',headers:['Category Group','Category','Income / Receipts','Expenditure / Payments','Net Movement'],rows:cats.map(([name])=>{const g=filtered.filter(t=>(t.categoryName||'Unclassified')===name&&t.transactionClass!=='Contra');const inc=g.filter(t=>t.type==='Receipt').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);const exp=g.filter(t=>t.type==='Payment').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);const group=categoryMaster.find((x:any)=>x.category_name===name)?.category_group||g[0]?.categoryGroup||'Unmapped';return [group,name,currencyCell(inc),currencyCell(exp),currencyCell(inc-exp)]})};
    case 'balance-sheet': {const rows=[['Cash / Bank','Account-wise reconciliations','Requires verified account-wise closing balances'],['Member Receivables','Cumulative outstanding register',currencyCell(cumulativeOutstanding.reduce((s,x)=>s+Math.max(0,Number(x.net_outstanding)||0),0))],['Vendor Payables','Vendor bills / payable allocations','Not available as a complete bill-level register'],['Deposits / Investments','Investment register','Not available in connected sources'],['Society Funds / Accumulated Balance','Approved prior-year balance sheet','Required from audited closing balances'],['Member FY balances',num(memberFinancialBalances.length)+' rows','Verify opening and closing balance mapping'],['Bank Reconciliation',num(totalRecon.length)+' account-month records',unmatched?'Unresolved differences exist':'Verify source statement balances'],['Balance Sheet equation','Assets = Liabilities + Funds','Cannot certify until all heads are mapped and verified']];return {title:'Balance Sheet Working Statement (Provisional)',note:'This report identifies available balance-sheet evidence and explicitly labels balances that cannot yet be calculated. It is not a complete Balance Sheet until assets, liabilities, funds and prior-year closing balances reconcile.',headers:['Balance Sheet Head','Source / Basis','Amount or Status'],rows}};
    case 'trial-balance': {const rows=Array.from(new Set(transactions.map(t=>String(t.accountName||'Unmapped account')))).map(name=>{const ts=filtered.filter(t=>String(t.accountName||'Unmapped account')===name&&t.transactionClass!=='Contra');const debit=ts.filter(t=>t.type==='Payment').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);const credit=ts.filter(t=>t.type==='Receipt').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);return [name,'Not mapped',currencyCell(debit),currencyCell(credit),'Unposted cash-movement view']});return {title:'Trial Balance & Posting Reconciliation (Provisional)',note:'The source transaction model records receipts/payments but does not establish complete double-entry debit and credit postings. This is a posting-readiness view, not a certified Trial Balance; it must not be forced to balance.',headers:['Account / Ledger','Account Group','Recorded Debit-side Payments','Recorded Credit-side Receipts','Posting Status'],rows:[...rows,['Unmapped transactions','—',num(filtered.filter(t=>!t.accountName||!t.categoryName).length),'—','Review mapping'],['Double-entry posting completeness','—','—','—','Missing / requires journal-posting model']]}};
