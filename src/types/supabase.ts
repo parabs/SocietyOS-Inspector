@@ -103,6 +103,7 @@ export interface DbPartyFinancialYearBalance {
   type: string;
   financial_year: string;
   opening_balance?: number;
+  opening_balance_recorded?: boolean;
   current_fy_demand?: number;
   current_fy_receipts?: number;
   current_fy_payments_signed?: number;
@@ -119,6 +120,7 @@ export interface DbMemberFinancialYearBalance {
   member_name?: string;
   financial_year: string;
   opening_balance?: number;
+  opening_balance_recorded?: boolean;
   billed_amount?: number;
   received_amount?: number;
   adjusted_amount?: number;
