@@ -1278,9 +1278,10 @@ return <Panel title="RPT-08 · Demand Register">
     const monthIndex=months.indexOf(rpt15Month);
     const monthStart=monthIndex>=0?new Date(2018,3+monthIndex,1):new Date(2018,3,1);
     const monthEnd=monthIndex>=0?new Date(2018,4+monthIndex,0):new Date(2019,2,31);
+    const localDate=(d:Date)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     const dateOf=(t:any)=>String(t.date||t.transaction_date||t.transactionDate||'').slice(0,10);
-    const startDate=rpt15PeriodMode==='FY'?fyStart:rpt15PeriodMode==='YTD'?fyStart:monthStart.toISOString().slice(0,10);
-    const endDate=rpt15PeriodMode==='FY'?fyEnd:monthEnd.toISOString().slice(0,10);
+    const startDate=rpt15PeriodMode==='FY'?fyStart:rpt15PeriodMode==='YTD'?fyStart:localDate(monthStart);
+    const endDate=rpt15PeriodMode==='FY'?fyEnd:localDate(monthEnd);
     const source=transactions.filter(t=>t.transactionClass!=='Contra'&&(t.type==='Receipt'||t.type==='Payment')&&dateOf(t)>=startDate&&dateOf(t)<=endDate);
     const names=Array.from(new Set(source.map(t=>t.categoryName||'Unclassified')));
     const detail=names.map(name=>{const g=source.filter(t=>(t.categoryName||'Unclassified')===name);const income=g.filter(t=>t.type==='Receipt').reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);const expense=g.filter(t=>t.type==='Payment').reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);const group=categoryMaster.find((x:any)=>x.category_name===name)?.category_group||g[0]?.categoryGroup||'Unmapped';return {group,name,income,expense,transactions:g};});
