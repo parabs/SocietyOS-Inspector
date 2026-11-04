@@ -94,17 +94,17 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   {id:'trial-balance',name:'Trial Balance & Posting Reconciliation',category:'Financial Statements',description:'Debit/credit movements and double-entry completeness'},
   {id:'monthly-summary',name:'Monthly Financial Control Summary',category:'Financial Statements',description:'Monthly opening, receipts, payments and closing by account'},
   {id:'cashbook',name:'Cash & Bank Balances',category:'Financial Statements',description:'Account-wise opening balances, receipts, payments, contra transfers, calculated closing balances and verification status'},
-  {id:'receipts',name:'Receipts Register',category:'Operational Operational Registers',description:'Receipt date, payer, category group, cheque/reference and balance where supported'},
-  {id:'payments',name:'Payment Register',category:'Operational Operational Registers',description:'Payee, party classification, payment mode, category, account, voucher and evidence details'},
+  {id:'receipts',name:'Receipts Register',category:'Operational Registers',description:'Receipt date, payer, category group, cheque/reference and balance where supported'},
+  {id:'payments',name:'Payment Register',category:'Operational Registers',description:'Payee, party classification, payment mode, category, account, voucher and evidence details'},
   {id:'largest-payments-anomalies',name:'Largest Payments & Potential Anomalies',category:'Audit & Governance',description:'Largest individual payments with explainable screening flags, evidence gaps and recommended review actions'},
   {id:'bank-recon',name:'Bank / UPI Reconciliation',category:'Financial Statements',description:'Account- and month-wise book-to-statement reconciliation, outstanding differences, matching status and committee action'},
-  {id:'expense-analysis',name:'Expense Analysis by Category',category:'Operational Operational Registers',description:'Category group and monthly expenditure matrix'},
+  {id:'expense-analysis',name:'Expense Analysis by Category',category:'Operational Registers',description:'Category group and monthly expenditure matrix'},
   {id:'missing-docs',name:'Missing Document / Evidence Register',category:'Audit & Governance',description:'Missing bills, vouchers and transaction evidence'},
   {id:'statutory',name:'Statutory & Governance Register',category:'Audit & Governance',description:'Applicable bylaws, meetings, approvals and statutory controls'},
   {id:'rectification',name:'Audit Observations & Rectification',category:'Audit & Governance',description:'Open observations, proposed correction and closure evidence'},
   {id:'receipt-allocation-review',name:'Receipt Allocation & Unmatched Receipts Review',category:'Member Receivables',description:'Recorded receipts versus demand allocations'},
   {id:'opening-balance-review',name:'Opening Balance Verification & Exceptions',category:'Audit & Governance',description:'Recorded, missing and unverified opening balances'},
-  {id:'adjustments-contra',name:'Adjustments Register',category:'Operational Operational Registers',description:'Demand adjustments and transaction corrections; contra transfers shown separately'},
+  {id:'adjustments-contra',name:'Adjustments Register',category:'Operational Registers',description:'Demand adjustments and transaction corrections; contra transfers shown separately'},
   {id:'mapping-exceptions',name:'Transaction Mapping Exceptions',category:'Audit & Governance',description:'Missing party, category, account or source mappings'},
   {id:'unidentified-parties',name:'Unidentified Parties Audit',category:'Audit & Governance',description:'Transactions with missing, unknown or unmapped party names'},
   {id:'unidentified-accounts',name:'Unidentified Accounts Audit',category:'Audit & Governance',description:'Transactions with missing or unmapped cash/bank account mappings'},
@@ -112,7 +112,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   {id:'payment-mode-quality',name:'Payment Mode Data Quality',category:'Audit & Governance',description:'Missing, inconsistent or unrecognized payment modes by transaction'},
   {id:'transaction-type-quality',name:'Transaction Type Data Quality',category:'Audit & Governance',description:'Missing or unexpected transaction types and counts / amounts'}
  ];
- const reportCategories=['All Reports','Member Receivables','Financial Statements','Ledgers','Operational Operational Registers','Audit & Governance'];
+ const reportCategories=['All Reports','Member Receivables','Financial Statements','Ledgers','Operational Registers','Audit & Governance'];
  const categoryGroups=Array.from(new Set([...categoryMaster.map((x:any)=>String(x.category_group||'').trim()),...transactions.map((t:any)=>String(t.categoryGroup||'').trim())].filter(Boolean))).sort();
  const partyTypes=Array.from(new Set([...[],...partyMaster.map((x:any)=>String(x.party_type||x.party_type_name||'').trim())].filter(Boolean))).sort();
  const memberPartyTypes=partyTypes.filter(v=>/^members?$/i.test(v.trim()));
@@ -1433,7 +1433,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
   </>}
    {screen==='reports'&&<div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-start">
    <aside className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm xl:sticky xl:top-4">
-    <div className="mb-3 border-b border-slate-100 pb-3"><h2 className="text-sm font-bold text-blue-950">Financial Reports & Operational Registers</h2><p className="mt-1 text-[11px] leading-4 text-slate-600">Browse the financial report library by purpose: member receivables, financial statements, ledgers, operational registers and audit controls.</p></div>
+    <div className="mb-3 border-b border-slate-100 pb-3"><h2 className="text-sm font-bold text-blue-950">Financial Reports & Registers</h2><p className="mt-1 text-[11px] leading-4 text-slate-600">Browse the financial report library by purpose: member receivables, financial statements, ledgers, operational registers and audit controls.</p></div>
     <div className="mb-3"><label className="sr-only" htmlFor="financial-report-search">Search reports</label><div className="relative"><input id="financial-report-search" type="search" value={reportSearch} onChange={e=>setReportSearch(e.target.value)} placeholder="Search reports (e.g. RPT-04, demand, bank)…" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-9 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"/>{reportSearch&&<button type="button" onClick={()=>setReportSearch('')} aria-label="Clear report search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-1.5 py-1 text-xs text-slate-500 hover:bg-slate-100">✕</button>}</div><p className="mt-1 px-1 text-[10px] text-slate-500">{normalizedReportSearch?`${filteredReportCatalog.length} matching reports`:`${reportCatalog.length} reports available`}</p></div>
     <nav className="max-h-[72vh] space-y-2 overflow-y-auto" aria-label="Reports">
      <div className="flex items-center justify-between px-2 py-1"><span className="text-xs font-extrabold uppercase tracking-wide text-slate-800">{normalizedReportSearch?'Search results':'Browse by category'}</span>{normalizedReportSearch&&<button onClick={()=>setReportSearch('')} className="text-[10px] font-semibold text-blue-700 hover:underline">Clear search</button>}</div>
