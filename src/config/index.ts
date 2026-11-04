@@ -1,5 +1,5 @@
 /**
- * Central Configuration for Varsha Nivas Society Financial Management
+ * Central Configuration for Pearl Meadows 'C' Type 'C' Wing Society Financial Management
  */
 
 export const APP_CONFIG = {
