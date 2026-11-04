@@ -638,21 +638,20 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     return {title:'Demand Summary — Members Only',note:'Members only. Demand Group values from Category Master are mapped into the fixed columns: Maintenance Charges (including Parking), Non-Occupancy Charges, Delay Charges and Other Recoveries. The selected period filter applies to all demand columns. Any member Demand Group not matching the first four classifications is included in Other Recoveries. Opening balance and approved adjustments are shown separately. Total Amount Due includes current-period demand less the signed opening balance (negative opening = brought-forward member dues; positive opening = member credit). Collections are not deducted in this demand summary. Non-member parties and ad-hoc transactions are excluded.',headers,rows:[...tableRows,totals]};
    }
    case 'monthly-demands': {
-    // Monthly drill-up of Demand Summary: members only, with one column per demand month.
+    // Monthly member demand matrix: brought-forward balance and FY demand are shown separately.
     const isMember=(party:any)=>/^members?$/i.test(String(party?.party_type||party?.party_type_name||'').trim());
     const demandMonthKey=(value:any)=>{
      const raw=String(value??'').trim();
      if(!raw)return '';
      const monthNames=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-     const monthMatch=raw.match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|october|oct|november|nov|december|dec)\b/i);
-     const yearMatch=raw.match(/\b(20\d{2}|\d{2})\b/);
+     const monthMatch=raw.match(/\\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|october|oct|november|nov|december|dec)\\b/i);
+     const yearMatch=raw.match(/\\b(20\\d{2}|\\d{2})\\b/);
      if(monthMatch&&yearMatch){
-      const monthName=monthMatch[1].slice(0,3).toLowerCase();
-      const month=monthNames.indexOf(monthName);
+      const month=monthNames.indexOf(monthMatch[1].slice(0,3).toLowerCase());
       let year=Number(yearMatch[1]);if(year<100)year+=year>=70?1900:2000;
       return month>=0?monthNames[month]+' '+year:'';
      }
-     const isoMatch=raw.match(/\b(20\d{2})[-/](0?[1-9]|1[0-2])\b/);
+     const isoMatch=raw.match(/\\b(20\\d{2})[-/](0?[1-9]|1[0-2])\\b/);
      if(isoMatch)return monthNames[Number(isoMatch[2])-1]+' '+isoMatch[1];
      return '';
     };
@@ -661,20 +660,38 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      return Boolean(p&&isMember(p));
     });
     const parties=new Map<string,any>();
+    (partyMaster as any[]).filter(isMember).forEach(p=>{
+     const id=String(p.party_id||'');if(!id)return;
+     const bal=memberFinancialBalances.find((b:any)=>String(b.financial_year||'')==='FY 2018-19'&&String(b.party_id||'')===id);
+     parties.set(id,{id,name:p.party_name||id,type:p.party_type||'Member',opening:Number(bal?.opening_balance)||0,openingRecorded:bal?.opening_balance_recorded===true,openingVerified:bal?.opening_balance_verified===true,monthly:Array(monthLabels.length).fill(0),categoryTotals:{maintenance:0,parking:0,noc:0,delay:0,other:0}});
+    });
     memberDemands.forEach((d:any)=>{
-     const id=String(d.party_id||'');if(!id)return;
-     const p=partyMaster.find((x:any)=>String(x.party_id)===id);
-     if(!parties.has(id))parties.set(id,{id,name:p?.party_name||d.member_name||id,type:p?.party_type||'Member',monthly:Array(monthLabels.length).fill(0)});
+     const id=String(d.party_id||'');if(!id||!parties.has(id))return;
+     const row=parties.get(id), category:any=categoryById.get(String(d.category_id||''))||{};
+     const group=String(category.demand_group||'').toLowerCase();
+     const name=String(category.category_name||'').toLowerCase();
+     const amount=demandNetAmount(d);
      const key=demandMonthKey(d.month||d.demand_month||d.demand_date);
      const idx=monthLabels.findIndex(m=>demandMonthKey(m)===key);
-     if(idx>=0)parties.get(id).monthly[idx]+=demandNetAmount(d);
+     if(idx>=0)row.monthly[idx]+=amount;
+     if(group.includes('maintenance'))row.categoryTotals.maintenance+=amount;
+     else if(group.includes('parking'))row.categoryTotals.parking+=amount;
+     else if(group.includes('non-occupancy')||name.includes('non-occupancy'))row.categoryTotals.noc+=amount;
+     else if(group.includes('delay'))row.categoryTotals.delay+=amount;
+     else row.categoryTotals.other+=amount;
     });
     const rows=Array.from(parties.values())
      .filter(x=>!query||[x.name,x.type].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim())))
      .filter(x=>partyTypeFilter==='All party types'||x.type===partyTypeFilter)
      .sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
     const monthTotals=monthLabels.map((_,i)=>rows.reduce((sum:number,x:any)=>sum+Number(x.monthly[i]||0),0));
-    return {title:'Monthly Demand Matrix — Members Only',note:'Monthly drill-up of Demand Summary. Includes only member demands and uses demand month (not receipt month). Maintenance and Parking remain included in member demand totals, as in Demand Summary. Opening balances are excluded; each month shows demand raised in that month. Separate Party Master records remain separate rows.',headers:['Party Type','Party Name',...monthLabels,'Total Demand'],rows:[...rows.map(x=>[x.type,x.name,...x.monthly.map(currencyCell),currencyCell(x.monthly.reduce((sum:number,v:number)=>sum+v,0))]),['TOTAL — MEMBERS','',...monthTotals.map(currencyCell),currencyCell(monthTotals.reduce((sum:number,v:number)=>sum+v,0))]]};
+    const catTotal=(key:string)=>rows.reduce((sum:number,x:any)=>sum+Number(x.categoryTotals[key]||0),0);
+    const currentFyTotal=(x:any)=>x.monthly.reduce((sum:number,v:number)=>sum+v,0);
+    const totalDue=(x:any)=>currentFyTotal(x)-x.opening;
+    const headers=['Party Type','Party Name','Opening Balance',...monthLabels,'Maintenance Total','Parking Total','NOC Total','Delay Charges Total','Other Recoveries Total','Total FY Demand','Total Amount Due incl. Opening'];
+    const tableRows=rows.map(x=>[x.type,x.name,x.openingRecorded?currencyCell(x.opening):'Not recorded',...x.monthly.map(currencyCell),currencyCell(x.categoryTotals.maintenance),currencyCell(x.categoryTotals.parking),currencyCell(x.categoryTotals.noc),currencyCell(x.categoryTotals.delay),currencyCell(x.categoryTotals.other),currencyCell(currentFyTotal(x)),currencyCell(totalDue(x))]);
+    const totals=['TOTAL — MEMBERS','',currencyCell(rows.filter(x=>x.openingRecorded).reduce((s:number,x:any)=>s+x.opening,0)),...monthTotals.map(currencyCell),currencyCell(catTotal('maintenance')),currencyCell(catTotal('parking')),currencyCell(catTotal('noc')),currencyCell(catTotal('delay')),currencyCell(catTotal('other')),currencyCell(rows.reduce((s:number,x:any)=>s+currentFyTotal(x),0)),currencyCell(rows.reduce((s:number,x:any)=>s+totalDue(x),0))];
+    return {title:'Monthly Demand Matrix — Members Only',note:'Opening Balance is brought forward separately and is not repeated in monthly demand columns. Month columns show demand raised in each month. Category totals separately disclose Maintenance, Parking, Non-Occupancy Charges, Delay Charges and Other Recoveries. Total Amount Due incl. Opening = FY Demand − signed Opening Balance; negative opening balances are brought-forward member dues. This is a demand position before collections; receipts are not deducted. Members without demand rows are retained in the report.',headers,rows:[...tableRows,totals]};
    }
    case 'monthly-payments': {
     const parties=new Map<string,any>(),demandParty=new Map<string,string>();
