@@ -510,7 +510,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       const p=partyMaster.find((x:any)=>String(x.party_id)===matchedId);
       if(!parties.has(key))parties.set(key,{id:key,name:p?.party_name||payer||'Unidentified payer',type:p?.party_type||'Unmapped / Review',flat:p?.flat_no||'—',monthly:Array(12).fill(0),count:0,last:'—'});
       const date=transactionDate(t);
-      const idx=date?monthLabels.findIndex(m=>monthKey(m)===monthKey(date.slice(0,7).replace(/^([0-9]{4})-([0-9]{2})$/,(_,y,mo)=>new Date(Number(y),Number(mo)-1,1).toLocaleString('en-US',{month:'short',year:'numeric'})))):-1;
+      const dateParts=date.match(/^\\d{4}-(\\d{2})-/); const monthNumber=dateParts?Number(dateParts[1]):0; const idx=monthNumber>=1&&monthNumber<=12?(monthNumber+8)%12:-1;
       if(idx>=0){const row=parties.get(key);row.monthly[idx]+=Math.abs(Number(t.amount)||0);row.count++;if(date>row.last)row.last=date;}
     });
     const rows=Array.from(parties.values()).filter(x=>!query||[x.name,x.type].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim()))).sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
@@ -548,7 +548,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       const p=partyMaster.find((x:any)=>String(x.party_id)===matchedId);
       if(!parties.has(key))parties.set(key,{id:key,name:p?.party_name||payer||'Unidentified payer',type:p?.party_type||'Unmapped / Review',monthly:Array(12).fill(0)});
       const date=transactionDate(t);
-      const idx=date?monthLabels.findIndex(m=>monthKey(m)===monthKey(date.slice(0,7).replace(/^([0-9]{4})-([0-9]{2})$/,(_,y,mo)=>new Date(Number(y),Number(mo)-1,1).toLocaleString('en-US',{month:'short',year:'numeric'})))):-1;
+      const dateParts=date.match(/^\\d{4}-(\\d{2})-/); const monthNumber=dateParts?Number(dateParts[1]):0; const idx=monthNumber>=1&&monthNumber<=12?(monthNumber+8)%12:-1;
       if(idx>=0)parties.get(key).monthly[idx]+=Math.abs(Number(t.amount)||0);
     });
     const rows=Array.from(parties.values()).map(x=>({...x,cumulative:x.monthly.map((_:number,i:number)=>x.monthly.slice(0,i+1).reduce((a:number,b:number)=>a+b,0))})).filter(x=>!query||[x.name,x.type].some(v=>String(v||'').toLowerCase().includes(query.toLowerCase().trim()))).sort((a,b)=>a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
@@ -587,7 +587,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
       const bal=memberFinancialBalances.find((b:any)=>String(b.party_id||'')===String(p.party_id||''))||memberFinancialBalances.find((b:any)=>String(b.flat_no||'')===flat||String(b.member_name||'')===String(p.party_name||''));
       const ds=reportDemands.filter((d:any)=>String(d.party_id||'')===String(p.party_id||'')||(flat&&String(d.flat_no||'')===flat));
       const partyLabels=new Set([p.party_name,p.contact_person,flat,owner?.owner_name].filter(Boolean).map((v:any)=>String(v).trim().toLowerCase()));
-      const receipts=transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&partyLabels.has(String(t.party||'').trim().toLowerCase()));
+      const demandParty=new Map<string,string>(); reportDemands.forEach((d:any)=>{const did=String(d.demand_id||d.id||'');if(did&&d.party_id)demandParty.set(did,String(d.party_id));}); const receipts=transactions.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra'&&(demandParty.get(transactionDemandId(t))===String(p.party_id||'')||partyLabels.has(String(t.party||'').trim().toLowerCase())));
       const paid=receipts.reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);
       const billed=ds.reduce((sum,d)=>sum+Number(d.total_demand??d.demand_amount??0),0);
       const demandIds=new Set(ds.map((d:any)=>String(d.demand_id||d.id||'')));
