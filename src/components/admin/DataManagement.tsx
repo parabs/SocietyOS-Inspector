@@ -69,9 +69,6 @@ export const DataManagement: React.FC = () => {
   if(isNew&&entity==='transactions'){
    Object.assign(payload,{bank_verified:'Pending',is_correction:false,correction_status:'Not Required',bill_status:'Pending',voucher_receipt_status:'Pending',evidence_status:'Pending',internal_audit_status:'Pending'});
   }
-  if(isNew&&entity==='account_master'){
-   Object.assign(payload,{verification_status:'Pending',supporting_records:[]});
-  }
   try{
    const key=cfg.key;
    const tableClient:any=supabaseClient.from(entity);
