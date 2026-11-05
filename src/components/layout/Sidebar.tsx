@@ -86,10 +86,9 @@ export const Sidebar: React.FC = () => {
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed lg:sticky top-[57px] left-0 bottom-0 z-40 w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 overflow-y-auto transition-transform duration-200 ease-in-out ${
+        className={`fixed top-[89px] bottom-0 lg:sticky lg:top-0 lg:h-full left-0 z-40 w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 overflow-y-auto overscroll-y-contain transition-transform duration-200 ease-in-out ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
-        style={{ height: 'calc(100vh - 57px)' }}
       >
         <div className="p-3 space-y-4">
           {/* Quick Dashboard */}

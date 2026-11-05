@@ -152,11 +152,11 @@ const AuthGate: React.FC = () => {
 
   return (
     <VerificationProvider>
-      <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
-        <Header />
-        <div className="flex-1 flex overflow-hidden">
+      <div className="h-dvh min-h-0 overflow-hidden bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
+        <div className="shrink-0"><Header /></div>
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar />
-          <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+          <main className="min-w-0 min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 sm:px-6 lg:px-8 py-6">
             <MainContent />
           </main>
         </div>
