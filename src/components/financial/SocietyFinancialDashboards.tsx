@@ -1175,6 +1175,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const ageing={notYetDue:0,days0to30:0,days31to60:0,days61to90:0,over90:0,unknown:0};
     const ageDays=(from:string,to:string)=>Math.floor((Date.parse(to+'T00:00:00Z')-Date.parse(from+'T00:00:00Z'))/86400000);
     const qualityEntries:Array<{demandId:string;receiptId:string;amount:number}>=[];
+    const sameMonthMaintenancePaid:Record<string,number>={};
     const qualityReceiptSeen=new Set<string>();
     const addQualityEntry=(demandId:string,receiptId:string,amount:number)=>{
      if(!demandById.has(demandId)||!receiptById.has(receiptId)||!(amount>0))return;
@@ -1199,8 +1200,14 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
      const applied=Math.min(amount,Math.max(0,demandLimit-alreadyPaid));
      if(applied<=0)return;
      demandPaid[demandId]=alreadyPaid+applied;
+     const demandMonth=monthKey(d.demand_month||d.month||d.reporting_month||d.demand_date||d.created_at);
+     const receiptMonth=monthKey(t.reportingMonth||t.month||t.date);
+     const dCategory=demandCategory(d);
+     if(/maintenance/i.test(dCategory)&&!/previous|opening|arrears|brought forward/i.test(dCategory)&&demandMonth===receiptMonth){
+      sameMonthMaintenancePaid[demandMonth]=(sameMonthMaintenancePaid[demandMonth]||0)+applied;
+     }
      const due=String(d.due_date||'').slice(0,10),paidOn=transactionDate(t);
-     const month=monthKey(t.reportingMonth||t.month||t.date);
+     const month=receiptMonth;
      if(!qualityByMonth[month])qualityByMonth[month]={onTime:0,late:0};
      if(due&&paidOn){
       if(paidOn<=due){qualityOnTime+=applied;qualityByMonth[month].onTime+=applied;}
@@ -1227,6 +1234,29 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const onTimeRate=qualityClassified?qualityOnTime/qualityClassified*100:0;
     const lateRate=qualityClassified?qualityLate/qualityClassified*100:0;
     const monthlyQuality=monthLabels.map(m=>{const q=qualityByMonth[m.toLowerCase()]||{onTime:0,late:0};return {month:m.split(' ')[0],onTime:q.onTime,late:q.late};});
+    const monthlyMaintenanceQuality=monthLabels.map(m=>{
+     const key=m.toLowerCase();
+     const demand=memberDemands.filter((d:any)=>/maintenance/i.test(demandCategory(d))&&!/previous|opening|arrears|brought forward/i.test(demandCategory(d))&&monthKey(d.demand_month??d.month??d.reporting_month??d.demand_date??d.created_at)===key).reduce((sum:number,d:any)=>sum+Math.max(0,demandNetAmount(d)),0);
+     const paid=Math.min(demand,Math.max(0,sameMonthMaintenancePaid[key]||0));
+     return {month:m.split(' ')[0],demand,paid,percentage:demand?paid/demand*100:0};
+    });
+    const maintenanceAgeBuckets=Array.from({length:13},(_,i)=>({bucket:i===12?'>12 months':String(i+1)+' month'+(i===0?'':'s'),amount:0,count:0}));
+    let maintenanceAgeUnknown=0;
+    memberDemands.forEach((d:any)=>{
+     const category=demandCategory(d);
+     if(!/maintenance/i.test(category)||/previous|opening|arrears|brought forward/i.test(category))return;
+     const id=String(d.demand_id||d.id||'');
+     const signed=Number(d.signed_demand_balance);
+     const balance=Math.max(0,Number.isFinite(signed)?-signed:Math.max(0,demandNetAmount(d)-(Number(d.net_collection_amount)||Number(demandPaid[id]||0))-(Number(d.approved_adjustment_amount)||0)));
+     if(!balance)return;
+     const due=String(d.due_date||'').slice(0,10);
+     if(!due){maintenanceAgeUnknown+=balance;return;}
+     const overdueDays=ageDays(due,fyEnd);
+     if(overdueDays<=0)return;
+     const bucketIndex=Math.min(12,Math.max(0,Math.ceil(overdueDays/30)-1));
+     maintenanceAgeBuckets[bucketIndex].amount+=balance;
+     maintenanceAgeBuckets[bucketIndex].count++;
+    });
     const qualityCoverage=allocatedCollectionTotal?qualityClassified/allocatedCollectionTotal*100:0;
     // Level-2 view: compare each demand group's allocated recovery against its own demand.
     const groupPerformance:Record<string,{demand:number;collected:number;outstanding:number;efficiency:number;count:number;fill:string}>={};
@@ -1264,7 +1294,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
        <p className="mt-2 text-[10px] text-slate-500">This is a demand-linked recovery measure, not a receipt-month comparison. Unallocated receipts are excluded. Groups with incomplete allocations may show lower apparent recovery; review allocation coverage before drawing conclusions.</p>
       </Panel></div>
       <div className="xl:col-span-5"><Panel title="Outstanding — Top 5 Members / Flats" action={<ReportLink id="party-balances" category="Ledgers" label="View All-Party Debtors"/>}>
-       <div className="h-[225px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={top} layout="vertical" margin={{left:4,right:12}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><YAxis type="category" dataKey="party" width={82} tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="amount" name="Register outstanding" fill="#e45a5a" radius={[0,4,4,0]}/></BarChart></ResponsiveContainer></div>
+       <div className="h-[145px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={top} layout="vertical" margin={{left:4,right:12}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><YAxis type="category" dataKey="party" width={82} tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="amount" name="Register outstanding" fill="#e45a5a" radius={[0,4,4,0]}/></BarChart></ResponsiveContainer></div>
        <p className="text-[10px] text-slate-500">Uses the central FY member balance register and demand-linked collections. Verify imported opening balances against approved prior-year schedules before audit certification.</p><div className="mt-2"><ReportLink id="member-ledger" category="Ledgers" label="Open Detailed Member Ledger"/></div>
       </Panel></div>
      </div>
