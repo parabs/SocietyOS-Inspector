@@ -1119,7 +1119,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     groupMap[group]=(groupMap[group]||0)+Number(d.demand_amount||d.total_demand||0);
    });
    const demandGroups=Object.entries(groupMap).map(([name,amount],i)=>({name,amount,fill:COLORS[i%COLORS.length]})).sort((a,b)=>b.amount-a.amount);
-   const expenseGroups=categoryData.slice(0,6).map((x:any,i:number)=>({...x,fill:COLORS[(i+1)%COLORS.length]}));
+   const expenseMap:Record<string,number>={};filtered.filter(t=>t.type==='Payment'&&t.transactionClass!=='Contra').forEach(t=>{const name=String(t.categoryName||'Unclassified');expenseMap[name]=(expenseMap[name]||0)+Math.abs(Number(t.amount)||0);});const expenseGroups=Object.entries(expenseMap).map(([name,amount],i)=>({name,amount,fill:COLORS[(i+1)%COLORS.length]})).sort((a,b)=>b.amount-a.amount).slice(0,6);
    const topOutstanding=cumulativeOutstanding.filter((r:any)=>Number(r.net_outstanding||0)<0).sort((a:any,b:any)=>Number(a.net_outstanding||0)-Number(b.net_outstanding||0)).slice(0,5);
    const receiptRatio=demandTotal?receipts/demandTotal*100:0;
    const outstandingRatio=demandTotal?outstanding/demandTotal*100:0;
