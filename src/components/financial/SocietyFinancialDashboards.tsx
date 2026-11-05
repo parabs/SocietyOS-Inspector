@@ -379,7 +379,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
             .reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);
           const contra=ts.filter(t=>t.transactionClass==='Contra')
             .reduce((sum,t)=>sum+(Number(t.amount)||0),0);
-          const dem=isParty?reportDemands.filter((d:any)=>{
+          const recordedDemand=isParty?reportDemands.filter((d:any)=>{
             const demandParty=String(
               d.member_name||d.party_name||d.flat_no||
               partyMaster.find((p:any)=>String(p.party_id||'')===String(d.party_id||''))?.party_name||
@@ -388,6 +388,12 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
             return demandParty===partyName.trim().toLowerCase()&&
               normalizeMonth(d.demand_month||d.month||d.reporting_month||d.demand_date||d.bill_date)===monthKey;
           }).reduce((sum,d)=>sum+Number(d.total_demand??d.demand_amount??0),0):0;
+          const unmatchedTankReceipts=isParty&&partyType==='Member'?ts.filter((t:any)=>{
+            if(String(t.type||'').toLowerCase()!=='receipt'||t.transactionClass==='Contra'||!/(tank)/i.test(String(t.description||'')+' '+String(t.categoryName||'')))return false;
+            const linkedDemandId=transactionDemandId(t);
+            return !(linkedDemandId&&reportDemands.some((d:any)=>String(d.demand_id||d.id||'')===linkedDemandId));
+          }).reduce((sum:number,t:any)=>sum+Math.abs(Number(t.amount)||0),0):0;
+          const dem=recordedDemand+unmatchedTankReceipts;
           const bounceReversal=ts.filter(t=>t.transactionClass==='Contra'&&/bounce/i.test(String(t.description||''))&&!/bank charge/i.test(String(t.description||''))).reduce((sum,t)=>sum+(Number(t.amount)||0),0);
           const memberMovement=partyType==='Member'?-dem+rec+bounceReversal:-dem-pay+rec;
           const accountMovement=rec-pay+contra;
@@ -400,7 +406,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
             ? [key,currencyCell(opening),...vals.flatMap(v=>[currencyCell(v.rec),currencyCell(v.pay),currencyCell(v.closing)]),currencyCell(running)]
             : [...key.split('¦'),...vals.map(v=>currencyCell(v.net)),currencyCell(vals.reduce((sum,v)=>sum+v.net,0))];
       });
-      return {title:(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Month-wise',note:isParty?'Monthly party balances use signed demand and transaction movements. Member receipts and cheque-bounce reversals are applied; staff and utility payments reduce recorded bills. Unallocated member receipts remain unapplied.':isAccount?'Balances roll forward from the earliest available reconciliation opening balance.':'Category figures show monthly movements; income and expense categories do not normally carry opening balances.',headers:isParty?['Party Type','Party Name','Opening',...months.flatMap(m=>[m+' Demand',m+' Paid',m+' Closing']),'Year-end Closing']:isAccount?['Account Name','Opening',...months.flatMap(m=>[m+' Receipts',m+' Payments',m+' Closing']),'Year-end Closing']:['Demand Group','Category Group','Category Name',...months,'Annual Net Movement'],rows};
+      return {title:(isParty?'Party-wise':isAccount?'Account-wise':'Demand Group-wise')+' Ledger — Month-wise',note:isParty?'Monthly party balances use signed demand and transaction movements. Member receipts and cheque-bounce reversals are applied. Tank receipts without a matching demand are paired with a reporting-only demand charge in the receipt month, preventing them from appearing as advance credits or reducing member dues. Other unapplied member receipts remain unapplied. Staff and utility payments reduce recorded bills.':isAccount?'Balances roll forward from the earliest available reconciliation opening balance.':'Category figures show monthly movements; income and expense categories do not normally carry opening balances.',headers:isParty?['Party Type','Party Name','Opening',...months.flatMap(m=>[m+' Demand',m+' Paid',m+' Closing']),'Year-end Closing']:isAccount?['Account Name','Opening',...months.flatMap(m=>[m+' Receipts',m+' Payments',m+' Closing']),'Year-end Closing']:['Demand Group','Category Group','Category Name',...months,'Annual Net Movement'],rows};
     }
     const detailRows:any[][]=[];
     const moneyText=(value:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(Number(value)||0);
