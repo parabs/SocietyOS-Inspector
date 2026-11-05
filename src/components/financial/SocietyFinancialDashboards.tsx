@@ -445,17 +445,6 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
         const particulars=categoryName+(demandMonth?' for '+demandMonth:'');
         return {date:String(d.demand_date||d.created_at||d.month||''),particulars,voucher:String(d.demand_id||d.id||'Demand Register'),category:categoryName,movement:partyType==='Member'?-Math.abs(Number(d.total_demand||d.demand_amount||0)):-Number(d.total_demand||d.demand_amount||0),kind:'Demand'};
       }):[];
-      const detailedTankDemandEvents=isParty&&!isVendor&&partyType==='Member'
-        ? groupTransactions.filter((t:any)=>{
-            if(String(t.type||'').toLowerCase()!=='receipt'||t.transactionClass==='Contra'||!/(tank)/i.test(String(t.description||'')+' '+String(t.categoryName||'')))return false;
-            const linkedDemandId=transactionDemandId(t);
-            return !(linkedDemandId&&reportDemands.some((d:any)=>String(d.demand_id||d.id||'')===linkedDemandId));
-          }).map((t:any)=>({
-            date:String(t.date||''),particulars:'Tank payment — reporting-only demand (source demand unavailable)',
-            voucher:String(t.receiptNo||t.voucherNo||t.id||'—'),category:'Tank Payment (reporting only)',
-            movement:-Math.abs(Number(t.amount)||0),kind:'Reporting-only demand'
-          }))
-        :[];
       const unmatchedTankDemandEvents=isParty&&!isVendor&&partyType==='Member'
         ? groupTransactions.filter((t:any)=>{
             if(String(t.type||'').toLowerCase()!=='receipt'||!/(tank)/i.test(String(t.description||'')+' '+String(t.categoryName||'')))return false;
@@ -486,8 +475,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
           };
         }),
         ...memberDemands,
-        ...unmatchedTankDemandEvents,
-        ...detailedTankDemandEvents
+        ...unmatchedTankDemandEvents
       ].sort((a,b)=>a.date.localeCompare(b.date)||a.movement-b.movement);
       const groupOpeningKnown=isParty
         ? partyFinancialBalances.some((x:any)=>String(x.financial_year||'')==='FY 2018-19'&&String(x.type||'')===partyType&&String(x.name||'')===groupLabel&&x.opening_balance_recorded===true)
