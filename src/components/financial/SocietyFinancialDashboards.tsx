@@ -308,8 +308,10 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const sourceTx=transactions.filter(t=>{
       if(isVendor){
         if(t.type!=='Payment')return false;
-        const payee=partyMaster.find((p:any)=>(t.partyId||t.party_id)&&String(p.party_id||'')===String(t.partyId||t.party_id||''))||partyMaster.find((p:any)=>String(p.party_name||'').trim().toLowerCase()===String(t.party||'').trim().toLowerCase());
-        const payeeType=String(payee?.party_type||payee?.party_type_name||'').trim();
+        // EnrichedTransaction exposes the resolved party name (not party_id).
+        // Resolve classification through the party master using that name.
+        const payee=partyMaster.find(p=>String(p.party_name||'').trim().toLowerCase()===String(t.party||'').trim().toLowerCase());
+        const payeeType=String(payee?.party_type||'').trim();
         // Vendor / Payee Ledger is strictly for classified non-member payees.
         // Member payments (refunds/reimbursements) remain in the Member Ledger.
         if(!payeeType||/^members?$/i.test(payeeType))return false;
