@@ -373,7 +373,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
               : getKey(t)===key;
             // The context normalises the reporting month into t.month (e.g. "Jun 2018").
             // Prefer that value; reportingMonth is the raw imported label (e.g. "Jun-2018").
-            return sameLedger&&normalizeMonth(t.month||t.reportingMonth||t.date)===monthKey;
+            return sameLedger&&normalizeMonth(t.reportingMonth||t.month||t.date)===monthKey;
           });
           const rec=ts.filter(t=>t.type==='Receipt'&&t.transactionClass!=='Contra')
             .reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0);
