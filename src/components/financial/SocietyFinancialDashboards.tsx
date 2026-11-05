@@ -1280,71 +1280,36 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     const allocated=receiptRows.filter((t:any)=>allocatedReceiptIds.has(String(t.id||''))).length;
     return <>
      <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
-      <Card label="Members / Flat Owners" value={num(flatOwnerMaster.length)} detail={num(dueRows.length)+' member accounts with dues'} icon={Users}/>
-      <Card label="Total Demand Raised" value={fmt(fyDemand)} detail={num(memberDemands.length)+' member demand records'} icon={FileText}/>
-      <Card label="Receipts Collected" value={fmt(fyReceipts)} detail={num(receiptRows.length)+' receipt transactions'} icon={Banknote} tone="green"/>
-      <Card label="Member Dues Outstanding" value={fmt(outstanding)} detail="Sum of member debit balances; credits excluded" icon={AlertTriangle} tone="red"/>
-      <Card label="Receipts / Demand (FY)" value={fyDemand?rate.toFixed(1)+'%':'Not available'} detail="Not a collection rate; receipts may include earlier dues" icon={ArrowUpRight} tone="violet"/>
-      <Card label="Unallocated Receipts" value={num(Math.max(0,receiptRows.length-allocated))} detail={num(allocated)+' receipts linked to demands'} icon={AlertTriangle} tone="amber"/>
+      <Card label="Members / Flat Owners" value={num(flatOwnerMaster.length)} detail={num(dueRows.length)+' with dues'} icon={Users}/>
+      <Card label="Total Demand Raised" value={fmt(fyDemand)} detail={num(memberDemands.length)+' demands'} icon={FileText}/>
+      <Card label="Receipts Collected" value={fmt(fyReceipts)} detail={num(receiptRows.length)+' receipts'} icon={Banknote} tone="green"/>
+      <Card label="Member Dues Outstanding" value={fmt(outstanding)} detail="Debit balances only" icon={AlertTriangle} tone="red"/>
+      <Card label="Receipts / Demand (FY)" value={fyDemand?rate.toFixed(1)+'%':'Not available'} detail="Receipts may include arrears" icon={ArrowUpRight} tone="violet"/>
+      <Card label="Unallocated Receipts" value={num(Math.max(0,receiptRows.length-allocated))} detail={num(allocated)+' linked to demands'} icon={AlertTriangle} tone="amber"/>
      </div>
-     <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
-      <div className="xl:col-span-7"><Panel title="Collection Efficiency by Demand Group" action={<ReportLink id="demand-summary" category="Member Receivables" label="View Demand Summary"/>}>
-       <p className="mb-3 text-[11px] text-slate-600">Each group's collection percentage is calculated against its own member demand, using only receipts allocated or directly linked to those demands. This removes the distortion caused by Maintenance's larger rupee value.</p>
-       {collectionEfficiencyData.length>0?<><div className="h-[210px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={collectionEfficiencyData} layout="vertical" margin={{left:12,right:24,top:4,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" domain={[0,100]} tickFormatter={(v:any)=>v+'%'} tick={{fontSize:10}}/><YAxis type="category" dataKey="name" width={145} tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>Number(v).toFixed(1)+'%'}/><Bar dataKey="efficiency" name="Collection efficiency" radius={[0,4,4,0]}>{collectionEfficiencyData.map((g:any)=><Cell key={g.name} fill={g.efficiency<50?'#d05e5e':g.efficiency<75?'#d69e36':'#4f9d62'}/>)}</Bar></BarChart></ResponsiveContainer></div><div className="mt-3"><Table headers={['Demand Group','Demand','Collected','Outstanding','Efficiency']} rows={collectionEfficiencyData.map((g:any)=>[g.name,currencyCell(g.demand),currencyCell(g.collected),currencyCell(g.outstanding),g.efficiency.toFixed(1)+'%'])}/></div></>:<div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No member demand groups are available for comparison.</div>}
-       <p className="mt-2 text-[10px] text-slate-500">This is a demand-linked recovery measure, not a receipt-month comparison. Unallocated receipts are excluded. Groups with incomplete allocations may show lower apparent recovery; review allocation coverage before drawing conclusions.</p>
-      </Panel></div>
-      <div className="xl:col-span-5"><Panel title="Outstanding — Top 5 Members / Flats" action={<ReportLink id="party-balances" category="Ledgers" label="View All-Party Debtors"/>}>
-       <div className="h-[145px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={top} layout="vertical" margin={{left:4,right:12}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><YAxis type="category" dataKey="party" width={82} tick={{fontSize:10}}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="amount" name="Register outstanding" fill="#e45a5a" radius={[0,4,4,0]}/></BarChart></ResponsiveContainer></div>
-       <p className="text-[10px] text-slate-500">Uses the central FY member balance register and demand-linked collections. Verify imported opening balances against approved prior-year schedules before audit certification.</p><div className="mt-2"><ReportLink id="member-ledger" category="Ledgers" label="Open Detailed Member Ledger"/></div>
-      </Panel></div>
+     <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+      <Panel title="Collection Efficiency by Demand Group" action={<ReportLink id="demand-summary" category="Member Receivables" label="Demand Summary"/>}>
+       {collectionEfficiencyData.length>0?<div className="h-[170px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={collectionEfficiencyData} layout="vertical" margin={{left:8,right:18,top:2,bottom:2}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" domain={[0,100]} tickFormatter={(v:any)=>v+'%'} tick={{fontSize:9}}/><YAxis type="category" dataKey="name" width={125} tick={{fontSize:9}}/><Tooltip formatter={(v:any)=>Number(v).toFixed(1)+'%'}/><Bar dataKey="efficiency" name="Collection efficiency" radius={[0,4,4,0]}>{collectionEfficiencyData.map((g:any)=><Cell key={g.name} fill={g.efficiency<50?'#d05e5e':g.efficiency<75?'#d69e36':'#4f9d62'}/>)}</Bar></BarChart></ResponsiveContainer></div>:<div className="p-3 text-sm text-slate-500">No member demand groups available.</div>}
+       <p className="mt-1 text-[10px] text-slate-500">Demand-linked receipts only; unallocated receipts excluded.</p>
+      </Panel>
+      <Panel title="Maintenance — Same-month Collection Trend" action={<ReportLink id="maintenance-performance" category="Member Receivables" label="Detailed Analysis"/>}>
+       <div className="h-[170px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthlyMaintenanceQuality} margin={{top:4,right:4,bottom:0,left:0}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:9}}/><YAxis yAxisId="pct" domain={[0,100]} tick={{fontSize:9}} tickFormatter={(v:any)=>v+'%'}/><YAxis yAxisId="amt" orientation="right" tick={{fontSize:8}} tickFormatter={(v:any)=>'₹'+num(Number(v)/1000)+'k'}/><Tooltip formatter={(v:any,n:any)=>n==='Same-month %'?Number(v).toFixed(1)+'%':fmt(Number(v))}/><Legend wrapperStyle={{fontSize:9}}/><Bar yAxisId="amt" dataKey="demand" name="Demand" fill="#94a3b8"/><Bar yAxisId="amt" dataKey="paid" name="Paid same month" fill="#269b63"/><Line yAxisId="pct" type="monotone" dataKey="percentage" name="Same-month %" stroke="#2563eb" strokeWidth={2} dot={{r:2}}/></ComposedChart></ResponsiveContainer></div>
+       <p className="mt-1 text-[10px] text-slate-500">Same-month maintenance receipts ÷ that month's recurring maintenance demand.</p>
+      </Panel>
      </div>
-     <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
-      <div className="xl:col-span-9"><Panel title="Collection Quality — On-time vs Delayed" action={<ReportLink id="maintenance-performance" category="Member Receivables" label="Open Collection & Delay Analysis"/>}>
-       <p className="mb-2 text-[11px] text-slate-600">Monthly percentage of recurring maintenance demand collected within the same demand month. Only receipts linked or allocated to that month's maintenance demands count; arrears, other charges and unallocated receipts are excluded.</p>
-       {monthlyMaintenanceQuality.some(x=>x.demand>0)?<><div className="h-[205px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthlyMaintenanceQuality} margin={{top:8,right:12,bottom:0,left:0}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis yAxisId="left" domain={[0,100]} tick={{fontSize:9}} tickFormatter={(v:any)=>v+'%'}/><YAxis yAxisId="right" orientation="right" tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><Tooltip formatter={(v:any,name:any)=>name==='Same-month payment %'?Number(v).toFixed(1)+'%':fmt(Number(v))}/><Legend wrapperStyle={{fontSize:10}}/><Bar yAxisId="right" dataKey="demand" name="Maintenance demand" fill="#94a3b8" radius={[3,3,0,0]}/><Bar yAxisId="right" dataKey="paid" name="Paid in same month" fill="#269b63" radius={[3,3,0,0]}/><Line yAxisId="left" type="monotone" dataKey="percentage" name="Same-month payment %" stroke="#2563eb" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer></div><div className="mt-2"><Table headers={['Month','Maintenance Demand','Paid Same Month','Same-month %']} rows={monthlyMaintenanceQuality.map(x=>[x.month,currencyCell(x.demand),currencyCell(x.paid),x.percentage.toFixed(1)+'%'])}/></div></>:<div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Monthly maintenance demand is not available for this financial year.</div>}
-       <div className="grid grid-cols-3 gap-2 mb-3"><div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3"><div className="text-[10px] text-slate-600">Collected on time</div><div className="text-xl font-bold text-emerald-800">{onTimeRate.toFixed(1)}%</div><div className="text-[10px]">{fmt(qualityOnTime)}</div></div><div className="rounded-lg border border-amber-100 bg-amber-50 p-3"><div className="text-[10px] text-slate-600">Collected late</div><div className="text-xl font-bold text-amber-800">{lateRate.toFixed(1)}%</div><div className="text-[10px]">{fmt(qualityLate)}</div></div><div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><div className="text-[10px] text-slate-600">No timing evidence</div><div className="text-xl font-bold">{fmt(qualityUndated)}</div><div className="text-[10px]">Excluded from rate</div></div></div>
-       {qualityClassified>0?<><div className="h-[210px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlyQuality}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Legend wrapperStyle={{fontSize:10}}/><Bar dataKey="onTime" name="Paid on time" stackId="collection" fill="#269b63"/><Bar dataKey="late" name="Paid late" stackId="collection" fill="#e6a23c"/></BarChart></ResponsiveContainer></div></>:<div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Collection quality cannot be calculated: there are no usable receipt-to-demand links with due dates and receipt dates.</div>}
-       <div className="mt-2 text-[10px] text-slate-500">Timing classification coverage: {qualityCoverage.toFixed(1)}% of attributed collections. This is a receipt-value-weighted measure, not a member-count percentage.</div>
-      </Panel></div>
-      <div className="xl:col-span-3"><Panel title="Collection Risks & Actions">
-       <div className="space-y-2 text-[11px]">
-        <div className="rounded-lg bg-emerald-50 p-2"><strong className="block">{onTimeRate.toFixed(1)}% of classified collections were on time</strong><span className="text-slate-600">{fmt(qualityOnTime)} received by due date; {fmt(qualityLate)} received late.</span></div>
-        <div className="rounded-lg bg-red-50 p-2"><strong className="block">{fmt(qualityOutstanding)} demand remains unpaid</strong><span className="text-slate-600">Based on direct Demand IDs and approved allocation fallback, including cheque-bounce reversals.</span></div>
-        <div className="rounded-lg bg-amber-50 p-2"><strong className="block">{fmt(ageing.over90)} is over 90 days overdue</strong><span className="text-slate-600">{fmt(ageing.days61to90)} is 61–90 days overdue. Prioritise recovery calls and written reminders.</span></div>
-        <div className="rounded-lg bg-blue-50 p-2"><strong className="block">{fmt(unallocatedCollectionTotal)} receipts remain unallocated</strong><span className="text-slate-600">Resolve receipt-to-demand mapping before publishing collection efficiency.</span></div>
-       </div>
-      </Panel></div>
-     </div>
-     <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
-      <div className="xl:col-span-12"><Panel title="Delay Charging Aging Analysis — Outstanding Maintenance">
-       <p className="mb-3 text-[11px] text-slate-600">Outstanding recurring maintenance demand grouped by overdue age as at 31-Mar-2019. This shows unpaid maintenance that may attract delay charges; it does not calculate the delay-charge amount.</p>
-       <div className="h-[235px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={maintenanceAgeBuckets} margin={{left:8,right:16,top:4,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="bucket" tick={{fontSize:9}} interval={0} angle={-35} textAnchor="end" height={55}/><YAxis tick={{fontSize:9}} tickFormatter={(v:any)=>'₹'+num(Number(v))}/><Tooltip formatter={(v:any)=>fmt(Number(v))}/><Bar dataKey="amount" name="Outstanding maintenance" fill="#d69e36" radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div>
-       <div className="mt-2"><Table headers={['Overdue Age','Outstanding Maintenance','Demand Count']} rows={[...maintenanceAgeBuckets.map(x=>[x.bucket,currencyCell(x.amount),String(x.count)]),['Due date unavailable',currencyCell(maintenanceAgeUnknown),'—']]}/></div>
-      </Panel></div>
-     </div>
-     <div className="grid grid-cols-2 gap-2 xl:grid-cols-5">
-      <Card label="Outstanding — Not Yet Due" value={fmt(ageing.notYetDue)} detail="Due date falls after 31 Mar 2019" icon={CalendarDays}/>
-      <Card label="Outstanding — 0–30 days" value={fmt(ageing.days0to30)} detail="Early overdue follow-up" icon={Clock} tone="amber"/>
-      <Card label="Outstanding — 31–60 days" value={fmt(ageing.days31to60)} detail="Escalate member follow-up" icon={AlertTriangle} tone="amber"/>
-      <Card label="Outstanding — 61–90 days" value={fmt(ageing.days61to90)} detail="Priority recovery cases" icon={AlertTriangle} tone="red"/>
-      <Card label="Outstanding — Over 90 days" value={fmt(ageing.over90)} detail="Priority recovery cases" icon={AlertTriangle}/>
-     </div>
-     <Panel title="Explore Supporting Reports" subtitle="Open the detailed registers and analysis behind this dashboard.">
+     <Panel title="Detailed Reports & Registers" subtitle="Open these for member-level balances, overdue aging, receipt allocation and monthly breakdowns.">
       <div className="flex flex-wrap gap-2">
-       <ReportLink id="demand-register" category="Member Receivables" label="Demand Register"/>
        <ReportLink id="demand-summary" category="Member Receivables" label="Demand Summary"/>
        <ReportLink id="monthly-demands" category="Member Receivables" label="Monthly Demand Matrix"/>
        <ReportLink id="monthly-payments" category="Member Receivables" label="Monthly Collection Matrix"/>
-       <ReportLink id="monthly-flat-balance" category="Member Receivables" label="Monthly Flat Owner Balance"/>
+       <ReportLink id="monthly-flat-balance" category="Member Receivables" label="Flat Owner Collection"/>
        <ReportLink id="maintenance-performance" category="Member Receivables" label="Maintenance & Delay Analysis"/>
-       <ReportLink id="party-balances" category="Member Receivables" label="Debtors — All Parties"/>
+       <ReportLink id="party-balances" category="Member Receivables" label="All-Party Debtors"/>
        <ReportLink id="member-ledger" category="Ledgers" label="Detailed Member Ledger"/>
-       <ReportLink id="receipt-allocation-review" category="Member Receivables" label="Unmatched Receipt Review"/>
-       <ReportLink id="opening-balance-review" category="Audit & Governance" label="Opening Balance Verification"/>
-       <ReportLink id="receipts" category="Operational Registers" label="Receipt Register"/>
+       <ReportLink id="receipt-allocation-review" category="Member Receivables" label="Unmatched Receipts"/>
       </div>
      </Panel>
-    </>;
+    </>;;
    })()}
   </>}
   {screen==='payments-expenses'&&<>
