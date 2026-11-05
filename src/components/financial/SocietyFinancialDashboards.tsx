@@ -387,8 +387,20 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
               partyMaster.find((p:any)=>String(p.party_id||'')===String(d.party_id||''))?.party_name||
               d.member_id||''
             ).trim().toLowerCase();
-            return demandParty===partyName.trim().toLowerCase()&&
-              normalizeMonth(d.demand_month||d.month||d.reporting_month||d.demand_date||d.bill_date)===monthKey;
+            const demandMonth=normalizeMonth(d.demand_month||d.month||d.reporting_month||d.demand_date||d.bill_date);
+            const demandDateMonth=normalizeMonth(d.demand_date||d.bill_date);
+            const fyStart=normalizeMonth(months[0]);
+            const fyEnd=normalizeMonth(months[months.length-1]);
+            // Keep normal demands in their labelled demand month. If a demand is
+            // labelled outside the displayed FY but was actually raised during
+            // this FY (e.g. a delayed-charge demand labelled Mar-2018 but dated
+            // Jul-2018), place it in its issue month so it is not omitted.
+            const ledgerDemandMonth=demandMonth>=fyStart&&demandMonth<=fyEnd
+              ? demandMonth
+              : demandDateMonth>=fyStart&&demandDateMonth<=fyEnd
+                ? demandDateMonth
+                : demandMonth;
+            return demandParty===partyName.trim().toLowerCase()&&ledgerDemandMonth===monthKey;
           }).reduce((sum,d)=>sum+Number(d.total_demand??d.demand_amount??0),0):0;
           const unmatchedTankReceipts=isParty&&partyType==='Member'?ts.filter((t:any)=>{
             if(String(t.type||'').toLowerCase()!=='receipt'||t.transactionClass==='Contra'||!/(tank)/i.test(String(t.description||'')+' '+String(t.categoryName||'')))return false;
