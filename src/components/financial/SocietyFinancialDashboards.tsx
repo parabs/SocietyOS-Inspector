@@ -69,13 +69,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const reportCatalog=[
   {id:'member-opening-balance-register',name:'Member Opening Balance Register',category:'Ledgers',description:'Approved imported opening balances, FY demand, receipts, adjustments and closing outstanding from the validated Supabase view'},
   {id:'party-balances',name:'Debtors — All Parties',category:'Member Receivables',description:'Party type, contact, opening, demand, receipts and closing receivable'},
-  {id:'member-ledger',name:'Member / Flat Owner Ledger — Detailed',category:'Ledgers',description:'Opening balance, chronological deman   const utilityPartyRows=utilityTypes.map(u=>{const rows=allPaymentRows.filter(t=>u.pattern.test(String(t.party||'')+' '+String(t.description||'')+' '+String(t.categoryName||'')));return {name:u.name,total:rows.reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0),count:rows.length,gaps:rows.filter(t=>t.evidenceStatus!=='Complete').length,lastDate:[...rows].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0]?.date||''};}).sort((a,b)=>b.total-a.total);
-   const adHocPartyRows=allPaymentRows.filter(t=>!utilityPattern.test(String(t.categoryName||'')+' '+String(t.party||'')+' '+String(t.description||''))).reduce((acc:Record<string,{total:number;count:number;gaps:number}>,t)=>{const name=String(t.party||'Unmapped payee');acc[name]??={total:0,count:0,gaps:0};acc[name].total+=Math.abs(Number(t.amount)||0);acc[name].count++;if(t.evidenceStatus!=='Complete')acc[name].gaps++;return acc;},{}); 
-   const adHocRows=Object.entries(adHocPartyRows).map(([name,v])=>({name,...v})).sort((a,b)=>b.total-a.total);
-   const utilityTotal=utilityPartyRows.reduce((sum,r)=>sum+r.total,0);
-   const adHocTotal=adHocRows.reduce((sum,r)=>sum+r.total,0);
-   const adHocGaps=adHocRows.reduce((sum,r)=>sum+r.gaps,0);
-ds/receipts, running and closing balance'},
+  {id:'member-ledger',name:'Member / Flat Owner Ledger — Detailed',category:'Ledgers',description:'Opening balance, chronological demands/receipts, running and closing balance'},
   {id:'vendor-ledger',name:'Vendor / Payee Ledger — Detailed',category:'Ledgers',description:'Non-member vendors, contractors and service providers only; member payments remain in the Member Ledger'},
   {id:'demand-summary',name:'Demand Summary',category:'Member Receivables',description:'Period demand, collections, adjustments and closing dues'},
   {id:'monthly-demands',name:'Monthly Demand Matrix',category:'Member Receivables',description:'Opening balance and monthly demand; no pre-payment balance'},
@@ -1438,6 +1432,12 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    const maxMember= Math.max(1,...memberRows.slice(0,5).map(r=>Math.abs(Number(r.net_outstanding)||0)));
    const maxVendor= Math.max(1,...vendorRows.slice(0,5).map(r=>r.paid));
    const memberStatus=[{name:'With dues',value:membersWithDues.length},{name:'No recorded dues',value:Math.max(0,memberRows.length-membersWithDues.length)}];
+   const utilityPartyRows=utilityTypes.map(u=>{const rows=allPaymentRows.filter(t=>u.pattern.test(String(t.party||'')+' '+String(t.description||'')+' '+String(t.categoryName||'')));return {name:u.name,total:rows.reduce((sum,t)=>sum+Math.abs(Number(t.amount)||0),0),count:rows.length,gaps:rows.filter(t=>t.evidenceStatus!=='Complete').length,lastDate:[...rows].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0]?.date||''};}).sort((a,b)=>b.total-a.total);
+   const adHocPartyMap=allPaymentRows.filter(t=>!utilityPattern.test(String(t.categoryName||'')+' '+String(t.party||'')+' '+String(t.description||''))).reduce((acc:Record<string,{total:number;count:number;gaps:number}>,t)=>{const name=String(t.party||'Unmapped payee');acc[name]??={total:0,count:0,gaps:0};acc[name].total+=Math.abs(Number(t.amount)||0);acc[name].count++;if(t.evidenceStatus!=='Complete')acc[name].gaps++;return acc;},{});
+   const adHocRows=Object.entries(adHocPartyMap).map(([name,v])=>({name,...v})).sort((a,b)=>b.total-a.total);
+   const utilityTotal=utilityPartyRows.reduce((sum,r)=>sum+r.total,0);
+   const adHocTotal=adHocRows.reduce((sum,r)=>sum+r.total,0);
+   const adHocGaps=adHocRows.reduce((sum,r)=>sum+r.gaps,0);
    const vendorEvidence=[{name:'Evidence gaps',value:vendorRows.reduce((sum,v)=>sum+v.gaps,0)},{name:'Complete evidence',value:Math.max(0,paymentRows.length-vendorRows.reduce((sum,v)=>sum+v.gaps,0))}];
    return <>
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-white px-3 py-2">
@@ -1459,7 +1459,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
        <div className="rounded-md bg-slate-50 px-2.5 py-2"><div className="text-[9px] text-slate-500">Identified utility payments</div><div className="text-lg font-bold text-slate-900">{fmt(utilityTotal)}</div></div>
        <div className="rounded-md bg-amber-50 px-2.5 py-2"><div className="text-[9px] text-amber-700">3+ month gaps</div><div className="text-lg font-bold text-amber-800">{num(utilityGapRows.filter(u=>u.missing.length>=3).length)}</div></div>
       </div>
-      <div className="space-y-2">{utilityPartyRows.map((u,i)=>{const gap=utilityGapRows.find(g=>g.name===u.name);return <div key={u.name}><div className="flex items-center justify-between gap-2 text-[11px]"><span className="font-medium text-slate-700">{u.name}</span><strong className="text-slate-900">{fmt(u.total)}</strong></div><div className="mt-0.5 flex items-center justify-between text-[9px] text-slate-500"><span>{num(u.count)} entries · {num(u.gaps)} evidence gaps</span><span>{gap?.consecutiveGap==null?'No baseline':gap.consecutiveGap+' recent gaps'}</span></div></div>})}</div>
+      <div className="space-y-2">{utilityPartyRows.map(u=>{const gap=utilityGapRows.find(g=>g.name===u.name);return <div key={u.name}><div className="flex items-center justify-between gap-2 text-[11px]"><span className="font-medium text-slate-700">{u.name}</span><strong className="text-slate-900">{fmt(u.total)}</strong></div><div className="mt-0.5 flex items-center justify-between text-[9px] text-slate-500"><span>{num(u.count)} entries · {num(u.gaps)} evidence gaps</span><span>{gap?.consecutiveGap==null?'No baseline':gap.consecutiveGap+' recent gaps'}</span></div></div>})}</div>
       <p className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[9px] leading-3 text-amber-900">A missing payment entry is a reconciliation alert, not proof of an unpaid bill. Confirm against bill statements.</p>
      </Panel>
      <Panel title="3. Ad-hoc Bills & Payments" action={<ReportLink id="vendor-ledger" category="Ledgers" label="Ad-hoc party ledger"/>}>
@@ -1468,21 +1468,13 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
        <div className="rounded-md bg-amber-50 px-2.5 py-2"><div className="text-[9px] text-amber-700">Evidence gaps</div><div className="text-lg font-bold text-amber-800">{num(adHocGaps)}</div></div>
       </div>
       <div className="space-y-2">{adHocRows.slice(0,4).map(v=><div key={v.name}><div className="flex items-center justify-between gap-2 text-[11px]"><span className="max-w-[70%] truncate font-medium text-slate-700" title={v.name}>{v.name}</span><strong className="text-slate-900">{fmt(v.total)}</strong></div><div className="mt-0.5 flex items-center justify-between text-[9px] text-slate-500"><span>{num(v.count)} transactions</span><span className={v.gaps?'text-amber-700':''}>{num(v.gaps)} evidence gaps</span></div></div>)}{!adHocRows.length&&<p className="text-xs text-slate-500">No ad-hoc payments in the selected period.</p>}</div>
-      <p className="mt-2 text-[9px] leading-3 text-slate-500">Keyword-excluded utility payments only; verify payee classification and supporting vouchers.</p>
+      <p className="mt-2 text-[9px] leading-3 text-slate-500">Utility-keyword exclusions; verify party classification and supporting vouchers.</p>
      </Panel>
     </div>
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] text-slate-600">
      <span>All three views use the selected financial year and global filters. Figures are preliminary and require voucher / register verification.</span>
      <div className="flex flex-wrap gap-2"><ReportLink id="demand-summary" category="Member Receivables" label="Demand summary"/><ReportLink id="monthly-flat-balance" category="Member Receivables" label="Monthly member balances"/><ReportLink id="largest-payments-anomalies" category="Audit & Governance" label="Payment review"/></div>
     </div>
-   </>;ansactions</strong><div className="text-slate-600">Evidence or bill/voucher status needs review.</div></div>
-        <div className="rounded-lg bg-blue-50 p-2"><strong>{num(paymentRows.filter(t=>!String(t.party||'').trim()||/unknown|unidentified|unmapped/i.test(String(t.party||''))).length)} payments</strong><div className="text-slate-600">Party identity may need confirmation.</div></div>
-        <div className="flex flex-wrap gap-2"><ReportLink id="missing-docs" category="Audit & Governance" label="Evidence register"/><ReportLink id="mapping-exceptions" category="Audit & Governance" label="Mapping exceptions"/></div>
-       </div>
-      </Panel>
-     </div>
-     <Panel title={activeTab==='Utilities'?'Utility Drill-Down':'Ad-hoc Party Drill-Down'}><div className="flex flex-wrap gap-2"><ReportLink id="vendor-ledger" category="Ledgers" label="Detailed vendor ledger"/><ReportLink id="payments" category="Operational Registers" label="Payments register"/><ReportLink id="largest-payments-anomalies" category="Audit & Governance" label="Largest payments & potential anomalies"/><ReportLink id="missing-docs" category="Audit & Governance" label="Missing bill / voucher evidence"/></div></Panel>
-    </>}
    </>;
   })()}
   {screen==='audit-evidence'&&<>
