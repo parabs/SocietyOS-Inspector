@@ -5,6 +5,7 @@ import {
   Plus, RefreshCw, ShieldCheck, Upload, XCircle
 } from 'lucide-react';
 import { supabaseClient } from '../../services/supabaseClient';
+import { APP_CONFIG } from '../../config';
 
 type Screen = 'annual-financial-review' | 'year-end-closure' | 'internal-audit' | 'statutory-audit-handover' | 'final-approval-freeze';
 type Row = Record<string, any>;
@@ -267,7 +268,7 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
     try{
       const version=(packages.reduce((m,p)=>Math.max(m,Number(p.package_version)||0),0))+1;
       const manifest={
-        society:'Pearl Meadows C-Wing CHS Ltd.',financial_year:fy,period:fyDates,
+        society:APP_CONFIG.societyName,registration_no:APP_CONFIG.registrationNo,financial_year:fy,period:fyDates,
         generated_at:new Date().toISOString(),
         source_data:{transaction_count:totals.transactions,receipt_total:totals.receipts,payment_total:totals.payments,demand_count:totals.demands,demand_total:totals.demand,bank_month_rows:bankBalances.length},
         audit_status:{internal_audit_signed:internalSigned,open_observations:openObs.length,critical_or_high_open:criticalObs.length,open_statutory_queries:openQueries.length,unposted_adjustment_proposals:adjustments.filter(a=>a.management_decision==='Accepted'&&!a.posted_journal_reference).length},
