@@ -127,8 +127,8 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
         db.from('audit_handover_packages').select('*').eq('financial_year',fy).order('package_version',{ascending:false}),
         db.from('closure_approvals').select('*').eq('financial_year',fy).order('signed_at',{ascending:false}),
         db.from('financial_year_snapshots').select('*').eq('financial_year',fy).order('snapshot_version',{ascending:false}),
-        db.from('transactions').select('id,transaction_id,date,financial_year,type,amount,party_name,account_id,category_name,source_file,source_sheet,source_row').eq('financial_year',fy).limit(10000),
-        db.from('demand_register').select('id,demand_id,financial_year,demand_amount,total_demand,party_name,party_id,demand_month,category_name').eq('financial_year',fy).limit(10000),
+        db.from('transactions').select('*').eq('financial_year',fy).limit(10000),
+        db.from('demand_register').select('*').eq('financial_year',fy).limit(10000),
         db.from('account_monthly_balance').select('*').eq('financial_year',fy).order('month_index'),
       ]);
       const labels=['review','checklist','observations','queries','adjustments','packages','approvals','snapshots','transactions','demands','bank'];
@@ -320,7 +320,7 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
     }catch(e:any){setError(e.message||'Unable to freeze financial year.');}finally{setBusy(false);}
   };
   const packageExport = (p:Row) => {
-    const data={package:p,documents:documents.filter(d=>d.handover_id===p.handover_id),internal_audit_observations:observations,observation_updates:updates,auditor_queries:queries,adjustment_proposals:adjustments,approvals,financial_year_summary:totals};
+    const data={package:p,documents:documents.filter(d=>d.handover_id===p.handover_id),source_registers:{transactions,demand_register:demands,account_monthly_balance:bankBalances},internal_audit_observations:observations,observation_updates:updates,auditor_queries:queries,adjustment_proposals:adjustments,approvals,financial_year_summary:totals,disclosure:{open_observations:openObs,open_queries:openQueries,critical_or_high_open:criticalObs}};
     exportJson(`Statutory_Audit_Handover_${fy.replace(/\s/g,'_')}_v${p.package_version}.json`,data);
   };
 
