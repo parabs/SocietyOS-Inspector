@@ -136,7 +136,7 @@ export const ComplianceCommandCentre:React.FC=()=>{
      });
     });
    });
-   const r=await (supabaseClient as any).from('financial_year_checklist').upsert(rows,{onConflict:'financial_year,task_code',ignoreDuplicates:true});
+   const r=await (supabaseClient as any).from('financial_year_checklist').upsert(rows,{onConflict:'financial_year,stage,work_area,task',ignoreDuplicates:true});
    if(r.error)throw r.error;
    setMessage(`AGM closure guide initialised for ${fy}. Existing task statuses and approvals were preserved.`);
    await load();
