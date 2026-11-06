@@ -283,7 +283,27 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
       setSelectedPackage(p.data.handover_id);setMessage('Handover index created. Attach or disclose each schedule before issue.');await load();
     }catch(e:any){setError(e.message||'Unable to generate handover package.');}finally{setBusy(false);}
   };
-  const uploadHandoverFile = async (d:Row,file:File) => {\n    if(file.size>25*1024*1024){setError('Maximum file size is 25 MB.');return;}\n    setBusy(true);setError('');\n    try{\n      const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');\n      const path=\`${fy.replace(/[^a-zA-Z0-9_-]/g,'_')}/${d.handover_id}/${d.document_id}_${safeName}\`;\n      const upload=await supabaseClient.storage.from('audit-evidence').upload(path,file,{upsert:true,contentType:file.type||'application/octet-stream'});\n      if(upload.error)throw upload.error;\n      const update=await (supabaseClient as any).from('audit_handover_documents').update({file_path:path,document_status:'Attached'}).eq('document_id',d.document_id);\n      if(update.error)throw update.error;\n      await log('Handover Document',d.document_id,'Evidence Uploaded',{path,file_name:file.name,size:file.size});\n      setMessage('Evidence uploaded to the private audit-evidence store.');await load();\n    }catch(e:any){setError(e.message||'Evidence upload failed.');}finally{setBusy(false);}\n  };\n  const openHandoverFile = async (d:Row) => {\n    if(!d.file_path)return;\n    const result=await supabaseClient.storage.from('audit-evidence').createSignedUrl(d.file_path,300);\n    if(result.error){setError(result.error.message);return;}\n    window.open(result.data.signedUrl,'_blank','noopener,noreferrer');\n  };\n  const updateDoc = async (d:Row,status:string,reference?:string) => {
+  const uploadHandoverFile = async (d:Row,file:File) => {
+    if(file.size>25*1024*1024){setError('Maximum file size is 25 MB.');return;}
+    setBusy(true);setError('');
+    try{
+      const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      const path=fy.replace(/[^a-zA-Z0-9_-]/g,'_')+'/'+d.handover_id+'/'+d.document_id+'_'+safeName;
+      const upload=await supabaseClient.storage.from('audit-evidence').upload(path,file,{upsert:true,contentType:file.type||'application/octet-stream'});
+      if(upload.error)throw upload.error;
+      const update=await (supabaseClient as any).from('audit_handover_documents').update({file_path:path,document_status:'Attached'}).eq('document_id',d.document_id);
+      if(update.error)throw update.error;
+      await log('Handover Document',d.document_id,'Evidence Uploaded',{path,file_name:file.name,size:file.size});
+      setMessage('Evidence uploaded to the private audit-evidence store.');await load();
+    }catch(e:any){setError(e.message||'Evidence upload failed.');}finally{setBusy(false);}
+  };
+  const openHandoverFile = async (d:Row) => {
+    if(!d.file_path)return;
+    const result=await supabaseClient.storage.from('audit-evidence').createSignedUrl(d.file_path,300);
+    if(result.error){setError(result.error.message);return;}
+    window.open(result.data.signedUrl,'_blank','noopener,noreferrer');
+  };
+  const updateDoc = async (d:Row,status:string,reference?:string) => {
     const r=await (supabaseClient as any).from('audit_handover_documents').update({document_status:status,file_path:reference??d.file_path,generated_at:status==='Generated'?new Date().toISOString():d.generated_at}).eq('document_id',d.document_id);
     if(r.error){setError(r.error.message);return;}await log('Handover Document',d.document_id,'Document Status Changed',{status,reference});await load();
   };
