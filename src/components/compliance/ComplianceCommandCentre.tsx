@@ -186,6 +186,14 @@ export const ComplianceCommandCentre:React.FC=()=>{
   finally{setBusy(false);}
  };
 
+ const taskStatusTone=(t:Task)=>{
+  if(isDone(t))return 'border-emerald-200 bg-emerald-50 text-emerald-900';
+  if(t.status==='In Progress')return 'border-blue-200 bg-blue-50 text-blue-900';
+  if(['Submitted','Awaiting Approval'].includes(t.status))return 'border-amber-200 bg-amber-50 text-amber-900';
+  if(t.status==='On Hold'||t.status==='Returned for Changes')return 'border-yellow-300 bg-yellow-50 text-yellow-900';
+  if(t.status==='Exception'||isOverdue(t))return 'border-rose-200 bg-rose-50 text-rose-900';
+  return 'border-slate-200 bg-white text-slate-800';
+ };
  const statusClass=(status:string)=>status==='Completed'?'bg-emerald-100 text-emerald-800':status==='In Progress'?'bg-blue-100 text-blue-800':status==='Submitted'?'bg-violet-100 text-violet-800':status==='Exception'?'bg-rose-100 text-rose-800':'bg-slate-100 text-slate-700';
  const cycleStart=`1 April ${cycleYear(fy)}`,cycleEnd=`30 September ${cycleYear(fy)}`;
  const todayKey=new Date().toISOString().slice(0,10);
@@ -274,8 +282,18 @@ export const ComplianceCommandCentre:React.FC=()=>{
      </article>)}{col.tasks.length>5&&<button onClick={()=>setBoardView('list')} className="w-full py-2 text-[10px] font-semibold text-blue-700">+ {col.tasks.length-5} more · View all</button>}{col.tasks.length===0&&<div className="rounded-lg border border-dashed border-slate-200 bg-white/70 p-4 text-center text-[10px] text-slate-500">No tasks in this column</div>}</div>
     </div>)}
    </div>}
-   {boardView==='list'&&<div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="border-b bg-slate-50 text-slate-500"><tr><th className="p-2">Task</th><th className="p-2">Phase</th><th className="p-2">Owner</th><th className="p-2">Due</th><th className="p-2">Status</th><th className="p-2">Update</th></tr></thead><tbody>{allStageTasks.map(t=><tr key={t.checklist_id} className="border-b"><td className="p-2"><button onClick={()=>goToTask(t)} className="text-left font-semibold hover:text-blue-700">{t.task}</button></td><td className="p-2">{t.stage}</td><td className="p-2">{t.owner_name||t.owner_role||'Unassigned'}</td><td className="p-2">{t.due_date||'—'}</td><td className="p-2">{t.status}</td><td className="p-2"><button onClick={()=>setTaskModalId(t.checklist_id)} className="rounded border px-2 py-1 text-blue-700">Update</button></td></tr>)}</tbody></table></div>}
-   {boardView==='calendar'&&<div className="mt-4 grid gap-2 md:grid-cols-3">{CYCLE_STAGES.map(s=><div key={s.code} className="rounded-lg border p-3"><div className="text-xs font-bold">{s.period} · {s.name}</div><div className="mt-2 space-y-1">{(stageTasks.get(s.code)||[]).map(t=><button key={t.checklist_id} onClick={()=>goToTask(t)} className="block w-full rounded bg-slate-50 p-2 text-left text-[11px]">{t.task} <span className="text-slate-500">· {t.status}</span></button>)}</div></div>)}</div>}
+   {boardView==='list'&&<div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="border-b bg-slate-50 text-slate-500"><tr><th className="p-2">Task</th><th className="p-2">Phase</th><th className="p-2">Owner</th><th className="p-2">Due</th><th className="p-2">Status</th><th className="p-2">Update</th></tr></thead><tbody>{filteredTasks.map(t=><tr key={t.checklist_id} className="border-b"><td className="p-2"><button onClick={()=>goToTask(t)} className="text-left font-semibold hover:text-blue-700">{t.task}</button></td><td className="p-2">{t.stage}</td><td className="p-2">{t.owner_name||t.owner_role||'Unassigned'}</td><td className="p-2">{t.due_date||'—'}</td><td className="p-2">{t.status}</td><td className="p-2"><button onClick={()=>setTaskModalId(t.checklist_id)} className="rounded border px-2 py-1 text-blue-700">Update</button></td></tr>)}</tbody></table></div>}
+   {boardView==='calendar'&&<div className="mt-4 grid gap-2 md:grid-cols-3">{[
+     {key:'pre',title:'Before annual audit',tasks:filteredTasks.filter(t=>t.task_code?.startsWith('AGM-00-')||t.task_code?.startsWith('CUSTOM-'))},
+     ...[4,5,6,7,8,9].map(month=>({key:String(month),title:new Date(2020,month-1,1).toLocaleString('en-IN',{month:'long'}),tasks:filteredTasks.filter(t=>t.due_date&&Number(t.due_date.slice(5,7))===month)}))
+    ].map(group=><div key={group.key} className="min-h-[190px] rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+     <div className="mb-3 flex items-center justify-between border-b pb-2"><h3 className="text-sm font-bold text-slate-800">{group.title}</h3><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{group.tasks.length}</span></div>
+     <div className="space-y-2">{group.tasks.map(t=><button key={t.checklist_id} onClick={()=>goToTask(t)} className={`block w-full rounded-lg border p-2.5 text-left text-xs transition hover:shadow-sm ${taskStatusTone(t)}`}>
+      <span className="block font-semibold leading-4">{t.task}</span>
+      <span className="mt-1 flex flex-wrap items-center justify-between gap-1 text-[10px] opacity-80"><span>{t.owner_name||t.owner_role||'Unassigned'}</span><span>{t.due_date?new Date(t.due_date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'No due date'}</span></span>
+      <span className="mt-1 inline-flex rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold">{isOverdue(t)?'Overdue':t.status}</span>
+     </button>)}{group.tasks.length===0&&<div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-[10px] text-slate-400">No matching tasks</div>}</div>
+    </div>)}</div>}
   </section>
   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] leading-5 text-amber-900"><AlertCircle className="mr-1 inline h-4 w-4"/>Planning windows are guidance only. Verify statutory deadlines, notice periods, prescribed forms and registered bye-laws before treating dates as mandatory.</div>
   <div className="rounded-2xl border bg-white p-4 shadow-sm">
