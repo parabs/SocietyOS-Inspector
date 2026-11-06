@@ -4,7 +4,7 @@ import {
   Settings, Database, FileCheck2, CheckSquare, BarChart3, PieChart,
   Receipt, CreditCard, Users, Files, FileText, Landmark, AlertCircle,
   ChevronDown, ChevronRight, Menu, X, Lock, CalendarCheck, FolderCheck,
-  ClipboardList, Upload, SlidersHorizontal, History, Wallet, Building2,
+  Upload, SlidersHorizontal, History, Wallet, Building2,
 } from 'lucide-react';
 import { useVerification, ScreenId } from '../../context/VerificationContext';
 
