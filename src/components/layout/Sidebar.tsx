@@ -48,7 +48,10 @@ export const Sidebar: React.FC = () => {
     if (['annual-financial-review','year-end-closure'].includes(currentScreen)) {
       setOpenGroups(prev => ({ ...prev, review: true }));
     }
-    if (currentScreen === 'compliance-command-centre') {\n      setOpenGroups(prev => ({ ...prev, compliance: true }));\n    }\n    if (['internal-audit','statutory-audit-handover','final-approval-freeze','audit-evidence','bank-reconciliation','observations-actions'].includes(currentScreen)) {
+    if (currentScreen === 'compliance-command-centre') {
+      setOpenGroups(prev => ({ ...prev, compliance: true }));
+    }
+    if (['internal-audit','statutory-audit-handover','final-approval-freeze','audit-evidence','bank-reconciliation','observations-actions'].includes(currentScreen)) {
       setOpenGroups(prev => ({ ...prev, audit: true }));
     }
     if (currentScreen === 'transactions' || currentScreen === 'data-management' || currentScreen === 'import-wizard' || currentScreen === 'data-quality' || currentScreen === 'options-config' || currentScreen === 'data-audit-trail') {
