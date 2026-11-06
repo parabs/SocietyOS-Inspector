@@ -119,6 +119,7 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
     setBusy(true); setError('');
     try {
       const db:any = supabaseClient;
+      const fyDatesForQuery = dateForFY(fy);
       const requests = await Promise.all([
         db.from('financial_year_reviews').select('*').eq('financial_year',fy).maybeSingle(),
         db.from('financial_year_checklist').select('*').eq('financial_year',fy).order('stage').order('work_area'),
@@ -128,9 +129,9 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
         db.from('audit_handover_packages').select('*').eq('financial_year',fy).order('package_version',{ascending:false}),
         db.from('closure_approvals').select('*').eq('financial_year',fy).order('signed_at',{ascending:false}),
         db.from('financial_year_snapshots').select('*').eq('financial_year',fy).order('snapshot_version',{ascending:false}),
-        db.from('transactions').select('*').eq('financial_year',fy).limit(10000),
+        db.from('transactions').select('*').gte('transaction_date',fyDatesForQuery.start).lt('transaction_date',new Date(new Date(fyDatesForQuery.end+'T00:00:00').getTime()+86400000).toISOString().slice(0,10)).limit(10000),
         db.from('demand_register').select('*').eq('financial_year',fy).limit(10000),
-        db.from('account_monthly_balance').select('*').eq('financial_year',fy).order('month_index'),
+        db.from('account_monthly_balance').select('*').eq('financial_year',fy),
       ]);
       const labels=['review','checklist','observations','queries','adjustments','packages','approvals','snapshots','transactions','demands','bank'];
       const failures=requests.map((r:any,i:number)=>r.error?{table:labels[i],message:r.error.message}:null).filter(Boolean);
@@ -157,8 +158,8 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
   useEffect(()=>{void load();},[load]);
 
   const totals = useMemo(()=>{
-    const receipts=transactions.filter(t=>String(t.type||'').toLowerCase()==='receipt').reduce((s,t)=>s+Number(t.amount||0),0);
-    const payments=transactions.filter(t=>String(t.type||'').toLowerCase()==='payment').reduce((s,t)=>s+Number(t.amount||0),0);
+    const receipts=transactions.filter(t=>String(t.transaction_type||'').toLowerCase()==='receipt').reduce((s,t)=>s+Number(t.amount||0),0);
+    const payments=transactions.filter(t=>String(t.transaction_type||'').toLowerCase()==='payment').reduce((s,t)=>s+Number(t.amount||0),0);
     const demand=demands.reduce((s,d)=>s+Number(d.demand_amount??d.total_demand??0),0);
     return {receipts,payments,demand,transactions:transactions.length,demands:demands.length};
   },[transactions,demands]);
