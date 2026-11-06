@@ -52,32 +52,45 @@ const CHECKLIST: Array<{stage:string;area:string;task:string}> = [
   {stage:'Final Approval',area:'Freeze',task:'Create immutable year-end snapshot and preserve any later restatement as a new version'}
 ];
 
-const HANDOVER_DOCS: Array<{section:string;name:string;source:string}> = [
-  {section:'01_FINANCIAL_STATEMENTS',name:'Trial Balance',source:'Trial balance / ledger reports'},
-  {section:'01_FINANCIAL_STATEMENTS',name:'Income & Expenditure Account',source:'Income & Expenditure report'},
-  {section:'01_FINANCIAL_STATEMENTS',name:'Receipts & Payments Account',source:'Receipts & Payments report'},
-  {section:'01_FINANCIAL_STATEMENTS',name:'Balance Sheet and schedules',source:'Balance sheet working statement'},
-  {section:'02_SUPPORTING_SCHEDULES',name:'Debtors / Member Outstanding Schedule',source:'Party-wise balance and member ledger'},
-  {section:'02_SUPPORTING_SCHEDULES',name:'Creditors / Vendor Payables Schedule',source:'Vendor / payee ledger'},
-  {section:'02_SUPPORTING_SCHEDULES',name:'Fixed Assets and Depreciation Schedule',source:'Asset register and depreciation workings'},
-  {section:'02_SUPPORTING_SCHEDULES',name:'Advances, Deposits and Provisions Schedule',source:'Relevant ledgers and adjustment proposals'},
-  {section:'03_ACCOUNTING_REGISTERS',name:'Cash Book and Bank Book',source:'Account-wise ledger'},
-  {section:'03_ACCOUNTING_REGISTERS',name:'Receipt and Payment Registers',source:'Transaction registers'},
-  {section:'03_ACCOUNTING_REGISTERS',name:'Demand Register and Receipt Allocation',source:'Demand register and allocation data'},
-  {section:'03_ACCOUNTING_REGISTERS',name:'Journal and Adjustment Register',source:'Approved journal references'},
-  {section:'04_INTERNAL_AUDIT',name:'Internal Audit Report and Sign-off',source:'Internal Audit sign-off'},
-  {section:'04_INTERNAL_AUDIT',name:'Internal Audit Observation Register',source:'Audit observations'},
-  {section:'04_INTERNAL_AUDIT',name:'Management Responses and Rectification Evidence',source:'Observation updates and evidence references'},
-  {section:'05_RECONCILIATIONS',name:'Bank Reconciliation Statements',source:'Bank reconciliation'},
-  {section:'05_RECONCILIATIONS',name:'Member / Party Balance Reconciliation',source:'Party balance register'},
-  {section:'05_RECONCILIATIONS',name:'Unmatched and Unallocated Transactions',source:'Data quality and allocation exceptions'},
-  {section:'06_GOVERNANCE',name:'Committee Minutes and Resolutions',source:'Governance document repository'},
-  {section:'06_GOVERNANCE',name:'Budget and Approval Records',source:'Budget and approval records'},
-  {section:'06_GOVERNANCE',name:'AGM / SGM Notice, Minutes and Adoption',source:'Meeting records'},
-  {section:'07_SUPPORTING_EVIDENCE',name:'Bank Statements, Bills, Vouchers and Receipts',source:'Evidence repository'},
-  {section:'07_SUPPORTING_EVIDENCE',name:'Contracts, Insurance and Statutory Challans',source:'Evidence repository'},
-  {section:'08_AUDIT_QUERIES',name:'Statutory Auditor Query and Response Register',source:'Audit query tracker'},
-  {section:'08_AUDIT_QUERIES',name:'Audit Adjustment and Posting Register',source:'Audit adjustment proposals'}
+const HANDOVER_DOCS: Array<{section:string;name:string;source:string;required:boolean;defaultSelected:boolean;guidance:string}> = [
+{section:'01_SOCIETY_AND_LEGAL',name:'Society Registration Certificate and amendments',source:'Society records',required:true,defaultSelected:true,guidance:'Registration certificate, registered name, registration number and amendments.'},
+{section:'01_SOCIETY_AND_LEGAL',name:'Registered Bye-laws and amendments',source:'Society records',required:true,defaultSelected:true,guidance:'Current registered bye-laws and approved amendments.'},
+{section:'01_SOCIETY_AND_LEGAL',name:'Previous year statutory audit report and rectification report',source:'Prior year audit records',required:true,defaultSelected:true,guidance:'Previous audit report, audit classification and rectification compliance submitted.'},
+{section:'01_SOCIETY_AND_LEGAL',name:'List of managing committee members and office bearers',source:'Society records',required:false,defaultSelected:false,guidance:'Committee composition and office bearer details for the audit period.'},
+{section:'02_FINANCIAL_STATEMENTS',name:'Trial Balance with account-wise balances',source:'Trial balance / ledger reports',required:true,defaultSelected:true,guidance:'Final trial balance with opening, debit, credit and closing balances.'},
+{section:'02_FINANCIAL_STATEMENTS',name:'Income & Expenditure Account',source:'Income & Expenditure report',required:true,defaultSelected:true,guidance:'Financial-year income and expenditure statement.'},
+{section:'02_FINANCIAL_STATEMENTS',name:'Receipts & Payments Account',source:'Receipts & Payments report',required:true,defaultSelected:true,guidance:'Cash and bank receipts and payments for the complete audit period.'},
+{section:'02_FINANCIAL_STATEMENTS',name:'Balance Sheet and supporting schedules',source:'Balance sheet working statement',required:true,defaultSelected:true,guidance:'Assets, liabilities, reserves and accumulated balances with schedules.'},
+{section:'02_FINANCIAL_STATEMENTS',name:'Previous year audited financial statements',source:'Prior year financial statements',required:true,defaultSelected:true,guidance:'Last audited balance sheet and income and expenditure account.'},
+{section:'03_BOOKS_AND_REGISTERS',name:'Cash Book and Bank Book',source:'Account-wise ledger',required:true,defaultSelected:true,guidance:'Cash book and each bank account book with opening and closing balances.'},
+{section:'03_BOOKS_AND_REGISTERS',name:'Receipt Register and receipt counterfoils',source:'Receipt register / receipt records',required:true,defaultSelected:true,guidance:'Receipt sequence, cancelled receipts and supporting receipt records.'},
+{section:'03_BOOKS_AND_REGISTERS',name:'Payment Register and vouchers',source:'Payment register / vouchers',required:true,defaultSelected:true,guidance:'Payment sequence, vouchers, bills, payee and approval references.'},
+{section:'03_BOOKS_AND_REGISTERS',name:'Journal and Adjustment Register',source:'Journal / adjustment records',required:false,defaultSelected:false,guidance:'Journal entries, approved adjustments and supporting approvals.'},
+{section:'03_BOOKS_AND_REGISTERS',name:'General Ledger and account-wise ledgers',source:'Account-wise ledger reports',required:true,defaultSelected:true,guidance:'Ledger extracts for all material income, expense, asset and liability accounts.'},
+{section:'04_MEMBER_AND_DEMANDS',name:'Member-wise ledger and outstanding balance schedule',source:'Party-wise ledger / member balance register',required:true,defaultSelected:true,guidance:'Member-wise opening balance, demand, receipts, adjustments and closing balance.'},
+{section:'04_MEMBER_AND_DEMANDS',name:'Demand Register and charge-wise demand summary',source:'Demand register and demand summary',required:true,defaultSelected:true,guidance:'Maintenance, parking, non-occupancy and other charge demands by member and month.'},
+{section:'04_MEMBER_AND_DEMANDS',name:'Receipt allocation and unallocated receipts report',source:'Demand payment allocations',required:true,defaultSelected:true,guidance:'Mapping of member receipts to demands, advances and unapplied receipts.'},
+{section:'04_MEMBER_AND_DEMANDS',name:'Member advances, deposits and credit balances',source:'Member ledger / balance register',required:false,defaultSelected:false,guidance:'Advance collections, refundable deposits and member credit balances.'},
+{section:'05_BANK_AND_RECONCILIATION',name:'Bank statements for all society accounts',source:'Bank statements',required:true,defaultSelected:true,guidance:'Complete bank statements for the financial year and relevant cut-off period.'},
+{section:'05_BANK_AND_RECONCILIATION',name:'Bank Reconciliation Statements',source:'Bank reconciliation reports',required:true,defaultSelected:true,guidance:'Monthly and year-end BRS with outstanding and unreconciled items.'},
+{section:'05_BANK_AND_RECONCILIATION',name:'Cash balance verification and cash count',source:'Cash book / cash verification',required:false,defaultSelected:false,guidance:'Physical cash verification evidence and explanation of differences.'},
+{section:'06_EXPENSES_AND_LIABILITIES',name:'Expense category ledger and supporting bills',source:'Expense ledgers / bills and vouchers',required:true,defaultSelected:true,guidance:'Utility bills, repairs, maintenance contracts, professional fees and material expenses.'},
+{section:'06_EXPENSES_AND_LIABILITIES',name:'Vendor / creditor balances and confirmations',source:'Party-wise ledger / confirmations',required:false,defaultSelected:false,guidance:'Payable balances, vendor statements and confirmations where obtained.'},
+{section:'06_EXPENSES_AND_LIABILITIES',name:'Statutory dues, challans and payment proofs',source:'Statutory payment records',required:false,defaultSelected:false,guidance:'Applicable statutory returns, challans and payment evidence.'},
+{section:'07_ASSETS_AND_INSURANCE',name:'Fixed Asset Register and depreciation workings',source:'Asset register',required:false,defaultSelected:false,guidance:'Asset additions, disposals, physical verification and depreciation calculations.'},
+{section:'07_ASSETS_AND_INSURANCE',name:'Investment, deposit and bank FD certificates',source:'Investment records',required:false,defaultSelected:false,guidance:'FD receipts, investment statements, interest certificates and maturity details.'},
+{section:'07_ASSETS_AND_INSURANCE',name:'Insurance policies and claims',source:'Insurance records',required:false,defaultSelected:false,guidance:'Building, equipment and public liability policies and claim correspondence.'},
+{section:'08_GOVERNANCE_AND_COMPLIANCE',name:'AGM / SGM notices, attendance, minutes and resolutions',source:'Meeting records',required:true,defaultSelected:true,guidance:'Notice and service proof, agenda, attendance, quorum, minutes and resolutions.'},
+{section:'08_GOVERNANCE_AND_COMPLIANCE',name:'Managing committee meeting minutes and approvals',source:'Committee meeting records',required:true,defaultSelected:true,guidance:'Committee minutes, expenditure approvals, contracts and financial decisions.'},
+{section:'08_GOVERNANCE_AND_COMPLIANCE',name:'Budget and budget-versus-actual statement',source:'Budget records',required:false,defaultSelected:false,guidance:'Approved budget, revisions and actual-versus-budget variances.'},
+{section:'08_GOVERNANCE_AND_COMPLIANCE',name:'Statutory returns, registers and correspondence',source:'Statutory compliance records',required:false,defaultSelected:false,guidance:'Applicable returns, statutory registers, notices and correspondence.'},
+{section:'09_INTERNAL_AUDIT_AND_EXCEPTIONS',name:'Internal Audit Report and sign-off',source:'Internal Audit sign-off',required:true,defaultSelected:true,guidance:'Internal audit conclusion, scope, procedures and sign-off.'},
+{section:'09_INTERNAL_AUDIT_AND_EXCEPTIONS',name:'Internal Audit Observation Register and rectification status',source:'Audit observations and updates',required:true,defaultSelected:true,guidance:'Findings, risk, management responses, corrective actions and unresolved items.'},
+{section:'09_INTERNAL_AUDIT_AND_EXCEPTIONS',name:'Data quality, unmatched and unreconciled exceptions',source:'Data quality and reconciliation reports',required:false,defaultSelected:false,guidance:'Unmapped transactions, unmatched receipts, data limitations and reconciliation differences.'},
+{section:'09_INTERNAL_AUDIT_AND_EXCEPTIONS',name:'Audit queries, management replies and adjustment proposals',source:'Auditor query and adjustment registers',required:false,defaultSelected:false,guidance:'Prior queries, responses, proposed adjustments and posting references.'},
+{section:'10_OTHER_SUPPORTING_EVIDENCE',name:'Contracts, quotations, tenders and work orders',source:'Contract repository',required:false,defaultSelected:false,guidance:'Major vendor contracts, quotations, comparative statements and completion certificates.'},
+{section:'10_OTHER_SUPPORTING_EVIDENCE',name:'Legal cases, claims and contingent liabilities',source:'Legal correspondence',required:false,defaultSelected:false,guidance:'Pending cases, notices, claims, guarantees and contingent liability details.'},
+{section:'10_OTHER_SUPPORTING_EVIDENCE',name:'Other auditor-requested schedules and explanations',source:'Additional supporting schedules',required:false,defaultSelected:false,guidance:'Additional information requested by the appointed statutory auditor.'}
 ];
 
 const SCREENS: Record<Screen, {title:string;description:string;tab:string}> = {
@@ -132,6 +145,8 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
   const [issueTo,setIssueTo] = useState('');
   const [selectedPackage,setSelectedPackage] = useState<string|null>(null);
   const [docRefs,setDocRefs] = useState<Record<string,string>>({});
+  const [handoverSelection,setHandoverSelection] = useState<Record<string,boolean>>(()=>Object.fromEntries(HANDOVER_DOCS.map(d=>[d.name,d.defaultSelected])));
+  const [handoverExclusionNotes,setHandoverExclusionNotes] = useState<Record<string,string>>({});
 
   const load = useCallback(async () => {
     setBusy(true); setError('');
@@ -354,12 +369,18 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
   };
   const createHandover = async () => {
     if(!internalSigned){setError('Internal Audit Sign-off is mandatory before creating the statutory auditor handover.');return;}
+    const selectedDocs=HANDOVER_DOCS.filter(d=>handoverSelection[d.name]);
+    const excludedDocs=HANDOVER_DOCS.filter(d=>!handoverSelection[d.name]);
+    if(!selectedDocs.length){setError('Select at least one information item for the statutory auditor.');return;}
+    const unexplainedRequired=excludedDocs.filter(d=>d.required&&!handoverExclusionNotes[d.name]?.trim());
+    if(unexplainedRequired.length){setError('Provide a reason for each mandatory item excluded from the handover: '+unexplainedRequired.map(d=>d.name).join('; '));return;}
     setBusy(true);setError('');
     try{
       const version=(packages.reduce((m,p)=>Math.max(m,Number(p.package_version)||0),0))+1;
       const manifest={
         society:APP_CONFIG.societyName,registration_no:APP_CONFIG.registrationNo,financial_year:fy,period:fyDates,
         generated_at:new Date().toISOString(),
+        handover_checklist:{selected:selectedDocs.map(d=>({section:d.section,name:d.name,source:d.source,required:d.required})),excluded:excludedDocs.map(d=>({section:d.section,name:d.name,required:d.required,reason:handoverExclusionNotes[d.name]?.trim()||'Not selected as applicable for this audit.'}))},
         source_data:{transaction_count:totals.transactions,receipt_total:totals.receipts,payment_total:totals.payments,demand_count:totals.demands,demand_total:totals.demand,bank_month_rows:bankBalances.length},
         audit_status:{internal_audit_signed:internalSigned,open_observations:openObs.length,critical_or_high_open:criticalObs.length,open_statutory_queries:openQueries.length,unposted_adjustment_proposals:adjustments.filter(a=>a.management_decision==='Accepted'&&!a.posted_journal_reference).length},
         approvals:approvals.map(a=>({stage:a.approval_stage,decision:a.decision,signatory:a.signatory_name,signed_at:a.signed_at,reference:a.approval_reference})),
@@ -368,7 +389,7 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
       const disclosure=openObs.map(o=>({observation_no:o.observation_no,title:o.title,risk_level:o.risk_level,status:o.status,management_response:o.management_response||null}));
       const p=await (supabaseClient as any).from('audit_handover_packages').insert({financial_year:fy,package_version:version,status:'Internal Audit Signed',prepared_by:approvalForm.name||'Treasurer',internal_auditor_name:signoff.name,internal_auditor_signed_at:approvals.find(a=>a.approval_stage==='Internal Audit Sign-off')?.signed_at||new Date().toISOString(),internal_audit_opinion:signoff.opinion,internal_audit_remarks:signoff.remarks,handover_manifest:manifest,exception_disclosure:disclosure}).select().single();
       if(p.error)throw p.error;
-      const docs=HANDOVER_DOCS.map(d=>({handover_id:p.data.handover_id,section_code:d.section,document_name:d.name,source_module:d.source,document_status:'Pending'}));
+      const docs=selectedDocs.map(d=>({handover_id:p.data.handover_id,section_code:d.section,document_name:d.name,source_module:d.source,document_status:'Pending'}));
       const d=await (supabaseClient as any).from('audit_handover_documents').insert(docs);if(d.error)throw d.error;
       await log('Handover Package',p.data.handover_id,'Handover Package Generated',{version,document_count:docs.length,open_observations:openObs.length});
       setSelectedPackage(p.data.handover_id);setMessage('Handover index created. Attach or disclose each schedule before issue.');await load();
