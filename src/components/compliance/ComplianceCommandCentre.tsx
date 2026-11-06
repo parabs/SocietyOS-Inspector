@@ -61,6 +61,7 @@ const CYCLE_STAGES = [
  ]}
 ] as const;
 
+type StageCode = typeof CYCLE_STAGES[number]['code'];
 const FY_OPTIONS=Array.from({length:9},(_,i)=>{const y=2018+i;return `FY ${y}-${String(y+1).slice(-2)}`;});
 const cycleYear=(fy:string)=>Number(fy.match(/20\d{2}/)?.[0]||2018)+1;
 const dateForCycle=(fy:string,month:number,day:number)=>`${cycleYear(fy)}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
@@ -72,7 +73,7 @@ export const ComplianceCommandCentre:React.FC=()=>{
  const [tasks,setTasks]=useState<Task[]>([]);
  const [obligations,setObligations]=useState<Obligation[]>([]);
  const [approvals,setApprovals]=useState<Approval[]>([]);
- const [selectedStage,setSelectedStage]=useState('01');
+ const [selectedStage,setSelectedStage]=useState<StageCode>('01');
  const [activeView,setActiveView]=useState<'guide'|'controls'|'calendar'|'exceptions'>('guide');
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
@@ -106,7 +107,7 @@ export const ComplianceCommandCentre:React.FC=()=>{
  const stageTasks=useMemo(()=>new Map(CYCLE_STAGES.map(s=>[s.code,tasks.filter(t=>t.task_code?.startsWith(`AGM-${s.code}-`))])),[tasks]);
  const allStageTasks=CYCLE_STAGES.flatMap(s=>stageTasks.get(s.code)||[]);
  const progress=allStageTasks.length?Math.round(allStageTasks.filter(t=>['Completed','Not Applicable'].includes(t.status)).length/allStageTasks.length*100):0;
- const stageProgress=(code:string)=>{const rows=stageTasks.get(code)||[];return {done:rows.filter(t=>['Completed','Not Applicable'].includes(t.status)).length,total:rows.length};};
+ const stageProgress=(code:StageCode)=>{const rows=stageTasks.get(code)||[];return {done:rows.filter(t=>['Completed','Not Applicable'].includes(t.status)).length,total:rows.length};};
  const selected=CYCLE_STAGES.find(s=>s.code===selectedStage)||CYCLE_STAGES[0];
  const selectedRows=stageTasks.get(selected.code)||[];
  const nextTasks=allStageTasks.filter(t=>!['Completed','Not Applicable'].includes(t.status)).slice(0,5);
@@ -216,7 +217,7 @@ export const ComplianceCommandCentre:React.FC=()=>{
     </div>
    </section>
    <aside className="space-y-4">
-    <section className="rounded-2xl border bg-white p-4 shadow-sm"><h2 className="flex items-center gap-2 font-bold"><Flag className="h-4 w-4 text-blue-700"/>Next actions</h2><p className="mt-1 text-xs text-slate-500">The earliest incomplete tasks in this annual cycle.</p><div className="mt-3 space-y-2">{nextTasks.length?nextTasks.map(t=><button key={t.checklist_id} onClick={()=>{setSelectedStage(t.task_code?.slice(4,6)||'01');setExpandedTask(t.task_code||null);setActiveView('guide');}} className="w-full rounded-lg border p-3 text-left hover:bg-slate-50"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-900">{t.task}</span><ArrowRight className="h-3.5 w-3.5 shrink-0"/></div><div className="mt-1 text-[10px] text-slate-500">{t.owner_role||'Unassigned'} · {t.due_date||'Due date to confirm'}</div></button>):<div className="text-xs text-slate-500">No tasks pending. Confirm the cycle is fully reviewed before closure.</div>}</div></section>
+    <section className="rounded-2xl border bg-white p-4 shadow-sm"><h2 className="flex items-center gap-2 font-bold"><Flag className="h-4 w-4 text-blue-700"/>Next actions</h2><p className="mt-1 text-xs text-slate-500">The earliest incomplete tasks in this annual cycle.</p><div className="mt-3 space-y-2">{nextTasks.length?nextTasks.map(t=><button key={t.checklist_id} onClick={()=>{setSelectedStage((t.task_code?.slice(4,6)||'01') as StageCode);setExpandedTask(t.task_code||null);setActiveView('guide');}} className="w-full rounded-lg border p-3 text-left hover:bg-slate-50"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-900">{t.task}</span><ArrowRight className="h-3.5 w-3.5 shrink-0"/></div><div className="mt-1 text-[10px] text-slate-500">{t.owner_role||'Unassigned'} · {t.due_date||'Due date to confirm'}</div></button>):<div className="text-xs text-slate-500">No tasks pending. Confirm the cycle is fully reviewed before closure.</div>}</div></section>
     <section className="rounded-2xl border bg-white p-4 shadow-sm"><h2 className="flex items-center gap-2 font-bold"><CalendarDays className="h-4 w-4 text-blue-700"/>Key dates</h2><p className="mt-1 text-xs text-slate-500">Planning windows only; statutory dates must be verified.</p><div className="mt-3 space-y-3">{CYCLE_STAGES.map(s=><div key={s.code} className="flex gap-3"><span className="mt-1 h-2.5 w-2.5 rounded-full bg-blue-600"/><div><div className="text-xs font-semibold">{s.period}</div><div className="text-[11px] text-slate-600">{s.name}</div></div></div>)}</div></section>
     <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><h2 className="flex items-center gap-2 font-bold text-amber-900"><BookOpen className="h-4 w-4"/>A note about legal dates</h2><p className="mt-2 text-xs leading-5 text-amber-900">This 1 April–30 September timeline is a committee planning guide. It does not override statutory deadlines, extensions, the registered bye-laws or directions from the Registrar. The Secretary must verify the current requirements before issuing notices or filing documents.</p></section>
    </aside>
