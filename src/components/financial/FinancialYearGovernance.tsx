@@ -352,6 +352,7 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
     if(r.error){setError(r.error.message);return;}await log('Handover Package',latestPackage.handover_id,'Issued to Statutory Auditor',{recipient:issueTo});await load();
   };
   const recordApproval = async (stage:string) => {
+    if(stage==='Statutory Audit Completion'&&!packages.some(p=>['Issued','Auditor Acknowledged'].includes(p.status))){setError('Issue the signed statutory auditor handover before recording audit completion.');return;}
     if(!approvalForm.name.trim()||!approvalForm.attestation.trim()){setError('Signatory name and attestation are required.');return;}
     if(stage==='Committee Approval'&&!statutoryComplete){setError('Record statutory audit completion before committee approval.');return;}
     if(stage==='AGM Adoption'&&!committeeApproved){setError('Record Managing Committee approval before AGM adoption.');return;}
