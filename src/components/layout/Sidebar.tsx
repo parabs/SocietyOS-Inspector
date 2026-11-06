@@ -32,6 +32,7 @@ export const Sidebar: React.FC = () => {
   const [openGroups, setOpenGroups] = useState({
     verification: true,
     financial: false,
+    review: false,
     audit: false,
     reports: false,
     admin: false,
@@ -41,6 +42,12 @@ export const Sidebar: React.FC = () => {
   useEffect(() => {
     if (['verification-dashboard','opening-balances','transaction-verification','monthly-reconciliation'].includes(currentScreen)) {
       setOpenGroups(prev => ({ ...prev, verification: true }));
+    }
+    if (['annual-financial-review','year-end-closure'].includes(currentScreen)) {
+      setOpenGroups(prev => ({ ...prev, review: true }));
+    }
+    if (['internal-audit','statutory-audit-handover','final-approval-freeze','audit-evidence','bank-reconciliation','observations-actions'].includes(currentScreen)) {
+      setOpenGroups(prev => ({ ...prev, audit: true }));
     }
     if (currentScreen === 'transactions' || currentScreen === 'data-management' || currentScreen === 'import-wizard' || currentScreen === 'data-quality' || currentScreen === 'options-config' || currentScreen === 'data-audit-trail') {
       setOpenGroups(prev => ({ ...prev, data: true }));
@@ -226,6 +233,27 @@ export const Sidebar: React.FC = () => {
             )}
           </div>
 
+          {/* Group: FINANCIAL YEAR REVIEW & CLOSURE */}
+          <div>
+            <button
+              onClick={() => toggleGroup('review')}
+              className="w-full flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 hover:text-slate-200 cursor-pointer"
+            >
+              <span>FY Review &amp; Closure</span>
+              {openGroups.review ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </button>
+            {openGroups.review && (
+              <div className="mt-1 space-y-1 pl-1">
+                <button onClick={() => handleNavClick('annual-financial-review')} className={navItemClass('annual-financial-review')}>
+                  <div className="flex items-center gap-2.5 truncate"><PieChart className="w-4 h-4 shrink-0" /><span className="truncate">Annual Financial Review</span></div>
+                </button>
+                <button onClick={() => handleNavClick('year-end-closure')} className={navItemClass('year-end-closure')}>
+                  <div className="flex items-center gap-2.5 truncate"><FileCheck2 className="w-4 h-4 shrink-0" /><span className="truncate">Year-End Account Closure</span></div>
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* DATA MANAGEMENT — independent top-level workspace */}
           <div>
             <button
@@ -263,6 +291,18 @@ export const Sidebar: React.FC = () => {
 
             {openGroups.audit && (
               <div className="mt-1 space-y-1 pl-1">
+                <button onClick={() => handleNavClick('internal-audit')} className={navItemClass('internal-audit')}>
+                  <div className="flex items-center gap-2.5 truncate"><ShieldCheck className="w-4 h-4 shrink-0" /><span className="truncate">Internal Audit</span></div>
+                </button>
+
+                <button onClick={() => handleNavClick('statutory-audit-handover')} className={navItemClass('statutory-audit-handover')}>
+                  <div className="flex items-center gap-2.5 truncate"><Files className="w-4 h-4 shrink-0" /><span className="truncate">Statutory Audit Handover</span></div>
+                </button>
+
+                <button onClick={() => handleNavClick('final-approval-freeze')} className={navItemClass('final-approval-freeze')}>
+                  <div className="flex items-center gap-2.5 truncate"><Lock className="w-4 h-4 shrink-0" /><span className="truncate">Final Approval &amp; Freeze</span></div>
+                </button>
+
                 <button
                   onClick={() => handleNavClick('audit-evidence')}
                   className={navItemClass('audit-evidence')}
