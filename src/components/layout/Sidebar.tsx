@@ -11,8 +11,8 @@ type SectionId = 'verification' | 'compliance' | 'reports' | 'admin';
 
 const SECTION_SCREENS: Record<SectionId, ScreenId[]> = {
   verification: ['opening-balances','transaction-verification','monthly-reconciliation'],
-  compliance: ['compliance-command-centre','annual-financial-review','year-end-closure','internal-audit','statutory-audit-handover','final-approval-freeze'],
-  reports: ['financial-summary','demand-collections','payments-expenses','party-ledger','audit-evidence','bank-reconciliation','observations-actions','reports','ledger-reports'],
+  compliance: ['compliance-command-centre','annual-financial-review','year-end-closure','internal-audit','statutory-audit-handover','final-approval-freeze','audit-evidence','observations-actions'],
+  reports: ['financial-summary','demand-collections','payments-expenses','party-ledger','bank-reconciliation','reports','ledger-reports'],
   admin: ['data-management','import-wizard','data-quality','options-config','data-audit-trail','transactions','settings','user-access'],
 };
 
@@ -90,6 +90,8 @@ export const Sidebar: React.FC = () => {
               {item('annual-financial-review','Annual Financial Review',<PieChart className="h-4 w-4"/>)}
               {item('year-end-closure','Year-End Account Closure',<FileCheck2 className="h-4 w-4"/>)}
               {item('final-approval-freeze','Final Approval & Freeze',<Lock className="h-4 w-4"/>)}
+              {item('audit-evidence','Evidence Register',<FolderCheck className="h-4 w-4"/>)}
+              {item('observations-actions','Audit Observations & Actions',<AlertCircle className="h-4 w-4"/>)}
             </div>}
 
             {sectionButton('reports','Reports',<FileChartColumn className="h-5 w-5"/>)}
@@ -100,9 +102,7 @@ export const Sidebar: React.FC = () => {
               {item('party-ledger','Party-wise Ledger',<Users className="h-4 w-4"/>,true)}
               {item('reports','Reports & Registers',<Files className="h-4 w-4"/>)}
               {item('ledger-reports','Ledger Reports',<FileText className="h-4 w-4"/>)}
-              {item('audit-evidence','Audit Evidence',<FolderCheck className="h-4 w-4"/>)}
               {item('bank-reconciliation','Bank Reconciliation',<Landmark className="h-4 w-4"/>)}
-              {item('observations-actions','Observations & Actions',<AlertCircle className="h-4 w-4"/>)}
             </div>}
 
             {sectionButton('admin','Administration',<Settings className="h-5 w-5"/>)}
