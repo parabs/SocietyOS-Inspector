@@ -13,7 +13,7 @@ const SECTION_SCREENS: Record<SectionId, ScreenId[]> = {
   dashboard: ['financial-summary', 'demand-collections', 'payments-expenses', 'party-ledger', 'bank-reconciliation', 'verification-dashboard'],
   verification: ['opening-balances', 'transaction-verification', 'monthly-reconciliation'],
   compliance: ['compliance-command-centre', 'internal-audit', 'statutory-audit-handover', 'annual-financial-review', 'year-end-closure', 'final-approval-freeze', 'audit-evidence', 'observations-actions'],
-  reports: ['reports', 'ledger-reports'],
+  reports: ['reports'],
   admin: ['data-management', 'import-wizard', 'transactions', 'data-quality', 'data-audit-trail', 'options-config', 'user-access', 'settings'],
 };
 
@@ -102,7 +102,6 @@ export const Sidebar: React.FC = () => {
             {sectionButton('reports', 'Reports', <FileChartColumn className="h-5 w-5"/>)}
             {expanded === 'reports' && <div className="mt-1 space-y-1 pl-2">
               {item('reports', 'Reports & Registers', <Files className="h-4 w-4"/>)}
-              {item('ledger-reports', 'Ledger Reports', <FileText className="h-4 w-4"/>)}
             </div>}
 
             {sectionButton('admin', 'Administration', <Settings className="h-5 w-5"/>)}
