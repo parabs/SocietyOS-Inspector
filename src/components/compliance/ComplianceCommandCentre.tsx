@@ -124,7 +124,7 @@ export const ComplianceCommandCentre:React.FC=()=>{
       financial_year:fy,stage:s.name,work_area:s.title,task:name,status:'Pending',
       task_code:`AGM-${s.code}-${String(ti+1).padStart(2,'0')}`,sequence_no:si*10+ti+1,
       guidance,completion_criteria:criteria,owner_role:owner,approver_role:approver,
-      due_date:dateForCycle(fy,si<2?si+4:si<5?7:si===5?8:9,si===0?30:si===1?31:si===2?30:si===3?15:si===4?31:si===5?31:si===6?15:30)
+      due_date:dateForCycle(fy,[4,5,6,7,7,8,9,9][si],[30,31,30,15,31,31,15,30][si])
      });
     });
    });
