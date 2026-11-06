@@ -19,7 +19,7 @@ type TaskActivity = {activity_id:string;checklist_id:string;action:string;field_
 
 const CYCLE_STAGES = [
  {code:'00',name:'Pre-Audit Readiness',period:'Before annual audit',title:'Confirm what is ready and what is missing',description:'A practical readiness check for system data, manual records and work that is not covered by Society OS.',icon:ClipboardCheck,owner:'Secretary / Treasurer',tasks:[
-  ['Confirm statutory auditor appointment','Secretary','Chairman','Record whether the auditor has been appointed, the appointment date, committee resolution, consent and any required eligibility confirmation. If already appointed, mark this task Completed and attach the resolution / appointment letter.','Appointment resolution, appointment letter and auditor consent.','Appointment is recorded and supporting evidence is referenced.'],
+  ['Verify auditor appointment evidence','Secretary','Chairman','Check whether the auditor appointment is already documented for this financial year. Verify the committee resolution, appointment letter, consent and eligibility evidence. Record missing documents as exceptions; do not repeat an appointment already completed.','Appointment resolution, appointment letter, auditor consent and eligibility evidence.','Appointment status is verified and supporting evidence is available or missing items are assigned.'],
   ['Review software coverage and manual work','Secretary','Chairman','List processes or records not maintained in Society OS, such as physical registers, external portals, paper vouchers, manual confirmations or legacy records. Add each gap as a separate custom task with an owner and due date.','System coverage / gap list and assigned action items.','Every out-of-system requirement has an owner, target date and evidence plan.'],
   ['Confirm source records and opening balances','Treasurer','Secretary','Check that the financial year source workbook, opening balances, transaction data, demand records and member / party masters are available and verified. Record unresolved differences; do not silently adjust source records.','Source workbook, opening balance verification and data-quality exceptions.','Source records are identified and material differences are logged.'],
   ['Confirm bank, cash and supporting documents are available','Treasurer','Chairman','Confirm all bank statements, cash records, bills, vouchers, receipt support and prior-year audit papers are collected or assigned for follow-up.','Document availability checklist and missing-document list.','Every missing record has a responsible person and expected date.']
@@ -200,7 +200,7 @@ export const ComplianceCommandCentre:React.FC=()=>{
    &&(filterOwner==='All'||(t.owner_name||t.owner_role||'Unassigned')===filterOwner)
    &&(!q||[t.task,t.task_code,t.owner_name,t.owner_role,t.remarks].some(v=>(v||'').toLowerCase().includes(q)));
  });
- const overdueTasks=filteredTasks.filter(isOverdue);
+ const overdueTasks=filteredTasks.filter(t=>isOverdue(t)&&!['In Progress','Submitted','Awaiting Approval'].includes(t.status));
  const upcomingTasks=filteredTasks.filter(t=>!isDone(t)&&!['In Progress','Submitted','Awaiting Approval'].includes(t.status)&&!isOverdue(t));
  const inProgressTasks=filteredTasks.filter(t=>['In Progress','Submitted','Awaiting Approval'].includes(t.status));
  const completedTasks=filteredTasks.filter(t=>isDone(t));
