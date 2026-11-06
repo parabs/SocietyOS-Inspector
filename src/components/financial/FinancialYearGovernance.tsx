@@ -243,6 +243,41 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
     const r=await (supabaseClient as any).from('audit_queries').update({management_response:response,status:'Response Submitted',responded_by:approvalForm.name||'Management',responded_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('query_id',q.query_id);
     if(r.error){setError(r.error.message);return;}await log('Auditor Query',q.query_id,'Management Response Submitted',{response});await load();
   };
+  const concludeQuery = async (q:Row) => {
+    const conclusion=window.prompt('Auditor conclusion / next action:');
+    if(!conclusion?.trim())return;
+    const choice=window.prompt('Status: Accepted, Further Information Required, or Closed','Closed');
+    const status=['Accepted','Further Information Required','Closed'].includes(choice||'')?choice:'Closed';
+    const r=await (supabaseClient as any).from('audit_queries').update({auditor_conclusion:conclusion,status,closed_at:status==='Closed'?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq('query_id',q.query_id);
+    if(r.error){setError(r.error.message);return;}
+    await log('Auditor Query',q.query_id,'Auditor Conclusion Recorded',{conclusion,status});await load();
+  };
+  const acknowledgeHandover = async (p:Row) => {
+    const by=window.prompt('Name of statutory auditor / firm representative acknowledging receipt:');
+    if(!by?.trim())return;
+    const r=await (supabaseClient as any).from('audit_handover_packages').update({status:'Auditor Acknowledged',acknowledged_by:by,acknowledged_at:new Date().toISOString()}).eq('handover_id',p.handover_id);
+    if(r.error){setError(r.error.message);return;}
+    await log('Handover Package',p.handover_id,'Auditor Acknowledged',{acknowledged_by:by});await load();
+  };
+  const updateAdjustment = async (a:Row,action:'decision'|'journal'|'verify') => {
+    const patch:Row={updated_at:new Date().toISOString()};
+    if(action==='decision'){
+      const v=window.prompt('Management decision: Accepted, Rejected or Modified','Accepted');
+      if(!['Accepted','Rejected','Modified'].includes(v||''))return;
+      patch.management_decision=v;
+      patch.approval_reference=window.prompt('Approval reference (if any):')||null;
+    } else if(action==='journal'){
+      const v=window.prompt('Posted journal / voucher reference. This only records the reference; it does not post a journal:');
+      if(!v?.trim())return;
+      patch.posted_journal_reference=v;patch.posted_at=new Date().toISOString();
+    } else {
+      patch.auditor_verified=true;
+      patch.auditor_remarks=window.prompt('Auditor verification remarks:')||'Verified by auditor';
+    }
+    const r=await (supabaseClient as any).from('audit_adjustment_proposals').update(patch).eq('proposal_id',a.proposal_id);
+    if(r.error){setError(r.error.message);return;}
+    await log('Adjustment Proposal',a.proposal_id,'Adjustment Workflow Updated',patch);await load();
+  };
   const createAdjustment = async (e:React.FormEvent) => {
     e.preventDefault();if(!adjustmentForm.amount||!adjustmentForm.narration.trim())return;setBusy(true);
     try{
