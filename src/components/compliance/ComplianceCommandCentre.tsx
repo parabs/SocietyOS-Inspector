@@ -69,7 +69,7 @@ type StageCode = typeof CYCLE_STAGES[number]['code'];
 const FY_OPTIONS=Array.from({length:9},(_,i)=>{const y=2018+i;return `FY ${y}-${String(y+1).slice(-2)}`;});
 const cycleYear=(fy:string)=>Number(fy.match(/20\d{2}/)?.[0]||2018)+1;
 const dateForCycle=(fy:string,month:number,day:number)=>`${cycleYear(fy)}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-const STATUS_OPTIONS=['Pending','In Progress','Submitted','Completed','Returned for Changes','Not Applicable','Exception'];
+const STATUS_OPTIONS=['Pending','In Progress','Awaiting Approval','Submitted','Returned for Changes','Completed','Exception','Not Applicable'];
 const roleLabel=(role:string)=>role==='Internal Auditor'?'Internal Auditor':role==='Statutory Auditor'?'Statutory Auditor':role;
 
 export const ComplianceCommandCentre:React.FC=()=>{
