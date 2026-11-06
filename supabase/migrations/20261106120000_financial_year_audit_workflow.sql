@@ -268,6 +268,12 @@ begin
   if new.status='Issued' and (new.issued_to is null or new.issued_at is null) then
     raise exception 'Recipient and issue timestamp are required before issuing the handover.';
   end if;
+  if new.status='Issued' and exists (
+    select 1 from public.audit_handover_documents d
+    where d.handover_id=new.handover_id and d.document_status='Pending'
+  ) then
+    raise exception 'Every handover item must be attached, generated, not applicable or exception disclosed before issue.';
+  end if;
   return new;
 end $$;
 drop trigger if exists trg_guard_audit_handover_release on public.audit_handover_packages;
@@ -280,6 +286,12 @@ create or replace function public.guard_financial_year_freeze()
 returns trigger language plpgsql security definer set search_path=public as $$
 begin
   if new.snapshot_status='Frozen' then
+    if not exists (select 1 from public.closure_approvals a where a.financial_year=new.financial_year and a.approval_stage='Internal Audit Sign-off' and a.decision in ('Approved','Approved with Exceptions')) then
+      raise exception 'Internal audit sign-off is required before freeze.';
+    end if;
+    if not exists (select 1 from public.closure_approvals a where a.financial_year=new.financial_year and a.approval_stage='Statutory Audit Completion' and a.decision in ('Approved','Approved with Exceptions')) then
+      raise exception 'Statutory audit completion is required before freeze.';
+    end if;
     if not exists (select 1 from public.closure_approvals a where a.financial_year=new.financial_year and a.approval_stage='Committee Approval' and a.decision in ('Approved','Approved with Exceptions')) then
       raise exception 'Managing Committee approval is required before freeze.';
     end if;
