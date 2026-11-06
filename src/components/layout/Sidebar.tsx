@@ -94,7 +94,7 @@ export const Sidebar: React.FC = () => {
 
             {sectionButton('compliance', 'Compliance & Governance', <ShieldCheck className="h-5 w-5"/>)}
             {expanded === 'compliance' && <div className="mt-1 space-y-1 pl-2">
-              {item('compliance-command-centre', 'Compliance Calendar & Controls', <CalendarCheck className="h-4 w-4"/>)}
+              {item('compliance-command-centre', 'Compliance Command Centre', <CalendarCheck className="h-4 w-4"/>)}
               {item('internal-audit', 'Internal Audit', <ShieldCheck className="h-4 w-4"/>)}
               {item('statutory-audit-handover', 'Statutory Audit Handover', <Files className="h-4 w-4"/>)}
               {item('annual-financial-review', 'Annual Financial Review', <PieChart className="h-4 w-4"/>)}
