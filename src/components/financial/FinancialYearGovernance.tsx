@@ -173,6 +173,31 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
   const latestPackage=packages[0];
   const latestSnapshot=snapshots[0];
   const fyDates=dateForFY(fy);
+  const stageState = (stage:string) => {
+    if (stage==='Statutory Audit') {
+      if (statutoryComplete) return 'Completed';
+      if (latestPackage?.status==='Issued' || latestPackage?.status==='Auditor Acknowledged' || openQueries.length>0) return 'In Progress';
+      return 'Not Started';
+    }
+    if (stage==='Final Approval') {
+      if (committeeApproved && agmAdopted && statutoryComplete) return 'Completed';
+      if (approvals.some(a=>['Committee Approval','AGM Adoption','Treasurer Certification','Secretary Certification'].includes(a.approval_stage))) return 'In Progress';
+      return 'Not Started';
+    }
+    const rows=checklist.filter(x=>x.stage===stage);
+    if (!rows.length) return 'Not Started';
+    const closed=rows.filter(x=>['Completed','Not Applicable','Exception Disclosed'].includes(x.status)).length;
+    if (closed===rows.length) return rows.some(x=>x.status==='Exception Disclosed')?'Completed with Exceptions':'Completed';
+    return closed>0 || rows.some(x=>x.status==='In Progress')?'In Progress':'Not Started';
+  };
+  const stageCards = [
+    {name:'Financial Review',stage:'FY Review',detail:'Source data, balances and controls'},
+    {name:'Account Closure',stage:'Account Closure',detail:'Cut-off, reconciliations and statements'},
+    {name:'Internal Audit',stage:'Internal Audit',detail:internalSigned?'Sign-off recorded':'Testing and independent sign-off'},
+    {name:'Statutory Audit',stage:'Statutory Audit',detail:statutoryComplete?'Audit completion recorded':String(openQueries.length)+' open auditor queries'},
+    {name:'Final Approval',stage:'Final Approval',detail:agmAdopted?'Committee and AGM approvals recorded':'Management, Committee and AGM approvals'},
+    {name:'Final Books Closure',stage:'Books Closure',detail:'Posting lock and approved opening-balance rollover'}
+  ];
 
   const log = async (entityType:string,entityId:string|null,action:string,details:Row={}) => {
     const r=await (supabaseClient as any).from('audit_workflow_activity').insert({financial_year:fy,entity_type:entityType,entity_id:entityId,action,actor_name:approvalForm.name||signoff.name||'Society OS User',actor_role:approvalForm.role||signoff.role,details});
@@ -395,6 +420,11 @@ export const FinancialYearGovernance: React.FC<Props> = ({screen}) => {
     <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
       {[['Transactions',totals.transactions.toLocaleString('en-IN'),'Database rows'],['Receipt total',money(totals.receipts),'Selected FY'],['Payment total',money(totals.payments),'Selected FY'],['Open audit observations',openObs.length,`${criticalObs.length} critical / high`],['Checklist readiness',`${readiness}%`,`${completed} / ${checklist.length} completed or disclosed`]].map(([label,value,sub])=><div key={label} className="bg-white border border-slate-200 rounded-xl p-4"><div className="text-xs text-slate-500">{label}</div><div className="text-xl font-bold text-slate-900 mt-1">{value}</div><div className="text-[11px] text-slate-500 mt-1">{sub}</div></div>)}
     </div>
+    <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-semibold">Financial year control status</h2><p className="text-xs text-slate-500">Stage status is derived from recorded checklist and approval evidence.</p></div><span className="text-[10px] text-slate-500">Selected period: {fy}</span></div>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{stageCards.map(s=>{const value=s.stage==='Books Closure'?'Not Implemented':stageState(s.stage);const color=value==='Completed'?'text-emerald-700 bg-emerald-50':value==='Completed with Exceptions'?'text-amber-800 bg-amber-50':value==='In Progress'?'text-blue-700 bg-blue-50':value==='Not Implemented'?'text-rose-700 bg-rose-50':'text-slate-600 bg-slate-100';return <div key={s.stage} className="rounded-lg border p-3"><div className="flex items-start justify-between gap-2"><div className="text-sm font-semibold">{s.name}</div><span className={'rounded px-2 py-1 text-[10px] font-semibold '+color}>{value}</span></div><p className="mt-1 text-[11px] text-slate-500">{s.detail}</p></div>})}</div>
+      <p className="text-xs text-rose-700">Important: Snapshot freeze is not final book closure. The application does not yet perform an approved closing journal, opening-balance rollover or database posting lock. Do not treat this financial year as closed until those controls are implemented and verified.</p>
+    </section>
     <div className="bg-white border border-slate-200 rounded-xl p-2 flex gap-1 overflow-x-auto">{tabs.map(t=><button key={t} onClick={()=>setTab(t)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold ${tab===t?'bg-slate-900 text-white':'text-slate-600 hover:bg-slate-100'}`}>{t}</button>)}</div>
     {!review&&<div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"><div><div className="font-semibold text-blue-950 text-sm">Initialize this financial-year workspace</div><p className="text-xs text-blue-800 mt-1">Creates the review record and standard checklist. It does not alter accounting transactions or balances.</p></div><button disabled={busy} onClick={()=>void initialize()} className="bg-blue-700 text-white rounded-lg px-4 py-2 text-xs font-semibold">Initialize FY Workflow</button></div>}
     {tab==='Review'&&<section className="space-y-4">
