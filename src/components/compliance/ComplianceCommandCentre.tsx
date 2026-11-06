@@ -55,14 +55,12 @@ const CYCLE_STAGES = [
   ['Track audit observations and proposed adjustments','Treasurer','Chairman','Record each audit observation and proposed adjustment. Obtain proper approval before any accounting entry is posted.','Audit observation and adjustment proposal register.','Each proposed adjustment has a decision and posting reference or reason not posted.'],
   ['Receive and review signed audit report','Secretary','Chairman','Obtain the signed report and record its date, audit opinion, qualifications and annexures. Escalate adverse or qualified matters to the committee.','Signed statutory audit report and auditor communication.','Signed report is received and its key findings are tabled for committee action.']
  ]},
- {code:'07',name:'Finalise Accounts',period:'1–15 September',title:'Approve the accounts for AGM presentation',description:'Close management actions, prepare the AGM pack and obtain the required office-bearer and committee certifications.',icon:CheckCircle2,owner:'Treasurer',tasks:[
+ {code:'07',name:'Finalise Accounts & AGM',period:'1–30 September',title:'Approve accounts, conduct the AGM and close the annual cycle',description:'Complete management responses, approve the AGM pack, issue the verified notice, conduct the meeting and track resolutions.',icon:Users,owner:'Chairman / Secretary',tasks:[
   ['Complete management responses and rectification plan','Secretary','Chairman','For each audit observation, document the society response, corrective action, owner and target date. Do not claim auditor closure without auditor confirmation.','Rectification tracker and supporting evidence.','Every observation is closed with evidence or carried forward transparently.'],
   ['Finalise audited accounts and AGM papers','Treasurer','Secretary','Prepare the final audited accounts, auditor report, committee report, budget / other agenda papers and member-facing summaries as applicable.','Final accounts and AGM paper pack.','Documents are internally checked and ready for notice / circulation.'],
-  ['Obtain Treasurer, Secretary and Chairman review','Treasurer','Chairman','Route the financial accuracy review to Treasurer, records and notice review to Secretary, and overall committee readiness review to Chairman. Record comments and return items needing correction.','Recorded reviews, comments and approval references.','All required reviews are recorded; returned items are resolved or disclosed.']
- ]},
- {code:'08',name:'AGM & Closure',period:'16–30 September',title:'Conduct the AGM and record decisions',description:'Complete notice, meeting, adoption and post-meeting actions in accordance with verified statutory requirements and registered bye-laws.',icon:Users,owner:'Secretary',tasks:[
-  ['Verify AGM notice and service requirements','Secretary','Chairman','Confirm the applicable notice period, agenda, mode of service and required enclosures against current law and the society’s registered bye-laws before issuing.','Approved notice, agenda, dispatch / service proof and enclosures.','Notice and service evidence are reviewed and retained.'],
-  ['Conduct AGM and record proceedings','Chairman','Secretary','Confirm quorum and attendance, conduct the agenda, present audited accounts and audit report, record questions and resolutions in the minutes.','Attendance, quorum record, minutes and resolutions.','Meeting record is complete and decisions are accurately captured.'],
+  ['Obtain Treasurer, Secretary and Chairman review','Treasurer','Chairman','Route financial accuracy review to Treasurer, records and notice review to Secretary, and overall committee readiness review to Chairman. Record comments and return items needing correction.','Recorded reviews, comments and approval references.','All required reviews are recorded; returned items are resolved or disclosed.'],
+  ['Verify AGM notice and service requirements','Secretary','Chairman','Confirm the applicable notice period, agenda, mode of service and required enclosures against current law and registered bye-laws before issuing.','Approved notice, agenda, dispatch / service proof and enclosures.','Notice and service evidence are reviewed and retained.'],
+  ['Conduct AGM and record proceedings','Chairman','Secretary','Confirm quorum and attendance, present audited accounts and audit report, record questions and resolutions in the minutes.','Attendance, quorum record, minutes and resolutions.','Meeting record is complete and decisions are accurately captured.'],
   ['Complete AGM actions and annual closure','Secretary','Chairman','Assign owners and dates to AGM resolutions, circulate approved records and update the annual compliance tracker. Carry forward unresolved audit / rectification items.','Signed minutes, action register and closure checklist.','All resolutions have owners; unresolved matters remain open with target dates.']
  ]}
 ] as const;
@@ -81,6 +79,7 @@ export const ComplianceCommandCentre:React.FC=()=>{
  const [approvals,setApprovals]=useState<Approval[]>([]);
  const [selectedStage,setSelectedStage]=useState<StageCode>('00');
  const [activeView,setActiveView]=useState<'guide'|'controls'|'calendar'|'exceptions'>('guide');
+ const [boardView,setBoardView]=useState<'kanban'|'list'|'calendar'>('kanban');
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
  const [message,setMessage]=useState('');
@@ -133,11 +132,11 @@ export const ComplianceCommandCentre:React.FC=()=>{
       financial_year:fy,stage:s.name,work_area:s.title,task:name,status:'Pending',
       task_code:`AGM-${s.code}-${String(ti+1).padStart(2,'0')}`,sequence_no:si*10+ti+1,
       guidance,completion_criteria:criteria,owner_role:owner,approver_role:approver,
-      due_date:si===0?null:dateForCycle(fy,[4,5,6,7,7,8,9,9][si-1],[30,31,30,15,31,31,15,30][si-1])
+      due_date:s.code==='00'?null:dateForCycle(fy,({'01':4,'02':5,'03':6,'04':7,'05':7,'06':8,'07':9} as Record<string,number>)[s.code],({'01':30,'02':31,'03':30,'04':15,'05':31,'06':31,'07':30} as Record<string,number>)[s.code])
      });
     });
    });
-   const r=await (supabaseClient as any).from('financial_year_checklist').upsert(rows,{onConflict:'financial_year,stage,work_area,task',ignoreDuplicates:true});
+   const r=await (supabaseClient as any).from('financial_year_checklist').upsert(rows,{onConflict:'financial_year,task_code',ignoreDuplicates:true});
    if(r.error)throw r.error;
    setMessage(`AGM closure guide initialised for ${fy}. Existing task statuses and approvals were preserved.`);
    await load();
@@ -178,17 +177,35 @@ export const ComplianceCommandCentre:React.FC=()=>{
 
  const statusClass=(status:string)=>status==='Completed'?'bg-emerald-100 text-emerald-800':status==='In Progress'?'bg-blue-100 text-blue-800':status==='Submitted'?'bg-violet-100 text-violet-800':status==='Exception'?'bg-rose-100 text-rose-800':'bg-slate-100 text-slate-700';
  const cycleStart=`1 April ${cycleYear(fy)}`,cycleEnd=`30 September ${cycleYear(fy)}`;
- const metrics=[
-  {label:'Total',value:allStageTasks.length},
-  {label:'Completed',value:allStageTasks.filter(t=>['Completed','Not Applicable'].includes(t.status)).length},
-  {label:'In progress',value:allStageTasks.filter(t=>['In Progress','Submitted'].includes(t.status)).length},
-  {label:'Awaiting approval',value:allStageTasks.filter(t=>t.status==='Awaiting Approval').length},
-  {label:'Pending / exceptions',value:allStageTasks.filter(t=>['Pending','Exception','Returned for Changes'].includes(t.status)).length}
+ const todayKey=new Date().toISOString().slice(0,10);
+ const cutoffKey=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+ const isDone=(t:Task)=>['Completed','Not Applicable'].includes(t.status);
+ const isOverdue=(t:Task)=>!isDone(t)&&t.due_date!==null&&t.due_date<todayKey;
+ const pendingTasks=allStageTasks.filter(t=>!isDone(t)&&!['In Progress','Submitted','Awaiting Approval'].includes(t.status));
+ const overdueTasks=pendingTasks.filter(isOverdue);
+ const upcomingTasks=pendingTasks.filter(t=>!isOverdue(t));
+ const inProgressTasks=allStageTasks.filter(t=>['In Progress','Submitted','Awaiting Approval'].includes(t.status));
+ const completedTasks=allStageTasks.filter(t=>isDone(t)&&((t.completed_at||t.updated_at||'').slice(0,10)>=cutoffKey||!t.completed_at&&!t.updated_at));
+ const boardColumns=[
+  {id:'overdue',title:'Pending / Overdue',subtitle:`${overdueTasks.length} tasks need attention`,tone:'rose',tasks:overdueTasks},
+  {id:'progress',title:'In Progress',subtitle:`${inProgressTasks.length} active tasks`,tone:'blue',tasks:inProgressTasks},
+  {id:'upcoming',title:'Upcoming',subtitle:`${upcomingTasks.length} waiting to start`,tone:'indigo',tasks:upcomingTasks},
+  {id:'completed',title:'Recently Completed',subtitle:`${completedTasks.length} completed tasks`,tone:'emerald',tasks:completedTasks}
  ];
- const workQueue=allStageTasks.filter(t=>!['Completed','Not Applicable'].includes(t.status)).sort((a,b)=>{
-  const rank=(s:string)=>s==='Exception'||s==='Returned for Changes'?0:s==='In Progress'?1:s==='Awaiting Approval'||s==='Submitted'?2:3;
-  return rank(a.status)-rank(b.status)||(a.due_date||'9999').localeCompare(b.due_date||'9999');
- });
+ const activeStage=CYCLE_STAGES.find(s=>(stageTasks.get(s.code)||[]).some(t=>!isDone(t)))||CYCLE_STAGES[CYCLE_STAGES.length-1];
+ const activeStageRows=stageTasks.get(activeStage.code)||[];
+ const activeStageOpen=activeStageRows.filter(t=>!isDone(t));
+ const overallProgress=allStageTasks.length?Math.round(allStageTasks.filter(isDone).length/allStageTasks.length*100):0;
+ const stageState=(code:StageCode)=>{
+  const rows=stageTasks.get(code)||[];
+  const done=rows.filter(isDone).length;
+  const active=rows.some(t=>['In Progress','Submitted','Awaiting Approval'].includes(t.status));
+  return {done,total:rows.length,complete:rows.length>0&&done===rows.length,active};
+ };
+ const goToTask=(t:Task)=>{
+  const code=t.task_code?.startsWith('CUSTOM-')?'00':t.task_code?.slice(4,6)||'00';
+  setSelectedStage(code as StageCode);setExpandedTask(t.task_code||null);setActiveView('guide');
+ };
 
  return <div className="mx-auto max-w-[1500px] space-y-5 pb-10">
   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -197,25 +214,36 @@ export const ComplianceCommandCentre:React.FC=()=>{
   </div>
   {error&&<div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><AlertCircle className="mr-2 inline h-4 w-4"/>{error}</div>}
   {message&&<div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</div>}
-  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border bg-white px-4 py-3 text-xs">
-   {metrics.map(m=><div key={m.label}><span className="text-slate-500">{m.label}</span> <strong className="ml-1 text-slate-900">{m.value}</strong></div>)}
-   <div className="ml-auto font-bold text-blue-700">{progress}% complete</div>
-  </div>
-  <section className="rounded-xl border bg-white p-4">
-   <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-bold text-slate-900">Current work queue</h2><p className="text-xs text-slate-500">The tasks that still need action, ordered by status and due date.</p></div><button onClick={()=>setShowAddTask(v=>!v)} className="rounded-lg border px-3 py-2 text-xs font-semibold">+ Add task / out-of-system item</button></div>
-   <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="border-b bg-slate-50 text-slate-500"><tr><th className="p-2">Task</th><th className="p-2">Phase</th><th className="p-2">Owner</th><th className="p-2">Due</th><th className="p-2">Status</th><th className="p-2">Action</th></tr></thead><tbody>{workQueue.map(t=><tr key={t.checklist_id} className="border-b last:border-0"><td className="p-2"><button className="text-left font-semibold text-slate-900 hover:text-blue-700" onClick={()=>{setSelectedStage((t.task_code?.startsWith('CUSTOM-')?'00':t.task_code?.slice(4,6)||'00') as StageCode);setExpandedTask(t.task_code||null);}}>{t.task}</button><div className="mt-1 text-[10px] text-slate-500">{t.task_code||'Additional task'}</div></td><td className="p-2">{t.stage}</td><td className="p-2">{t.owner_name||t.owner_role||'Unassigned'}</td><td className="p-2">{t.due_date||'Not set'}</td><td className="p-2"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${statusClass(t.status)}`}>{t.status}</span></td><td className="p-2"><select value={t.status} onChange={e=>void updateTask(t,{status:e.target.value})} className="rounded border bg-white px-2 py-1"><option>Pending</option><option>In Progress</option><option>Awaiting Approval</option><option>Submitted</option><option>Completed</option><option>Returned for Changes</option><option>Exception</option><option>Not Applicable</option></select></td></tr>)}</tbody></table>{workQueue.length===0&&<p className="p-4 text-xs text-slate-500">No open tasks. Review completed items and confirm closure.</p>}</div>
-   {showAddTask&&<div className="mt-4 grid gap-2 rounded-lg border bg-slate-50 p-3 md:grid-cols-4">
-    <label className="text-[11px] font-semibold md:col-span-2">Task / missing requirement<input value={newTask.task} onChange={e=>setNewTask(p=>({...p,task:e.target.value}))} className="mt-1 w-full rounded border bg-white px-2 py-2 text-xs" placeholder="e.g. Obtain prior auditor's working papers"/></label>
-    <label className="text-[11px] font-semibold">Owner role<select value={newTask.owner_role} onChange={e=>setNewTask(p=>({...p,owner_role:e.target.value}))} className="mt-1 w-full rounded border bg-white px-2 py-2 text-xs">{['Secretary','Treasurer','Chairman','Managing Committee','Internal Auditor','Statutory Auditor','Other'].map(x=><option>{x}</option>)}</select></label>
-    <label className="text-[11px] font-semibold">Reviewer role<select value={newTask.approver_role} onChange={e=>setNewTask(p=>({...p,approver_role:e.target.value}))} className="mt-1 w-full rounded border bg-white px-2 py-2 text-xs">{['Chairman','Secretary','Treasurer','Managing Committee'].map(x=><option>{x}</option>)}</select></label>
-    <label className="text-[11px] font-semibold md:col-span-3">Instructions / notes<textarea value={newTask.guidance} onChange={e=>setNewTask(p=>({...p,guidance:e.target.value}))} className="mt-1 w-full rounded border bg-white px-2 py-2 text-xs" rows={2} placeholder="What needs to be done and what evidence should be retained"/></label>
-    <label className="text-[11px] font-semibold">Due date<input type="date" value={newTask.due_date} onChange={e=>setNewTask(p=>({...p,due_date:e.target.value}))} className="mt-1 w-full rounded border bg-white px-2 py-2 text-xs"/></label>
-    <div className="flex items-end gap-2 md:col-span-4"><button disabled={!newTask.task.trim()||busy} onClick={async()=>{setBusy(true);setError('');try{const r=await (supabaseClient as any).from('financial_year_checklist').insert({financial_year:fy,stage:'Pre-Audit Readiness',work_area:newTask.work_area,task:newTask.task.trim(),status:'Pending',owner_role:newTask.owner_role,approver_role:newTask.approver_role,guidance:newTask.guidance||null,due_date:newTask.due_date||null,task_code:`CUSTOM-${Date.now()}`,sequence_no:999});if(r.error)throw r.error;setNewTask({task:'',owner_role:'Secretary',approver_role:'Chairman',guidance:'',due_date:'',work_area:'Additional readiness item'});setShowAddTask(false);setMessage('Additional task added to the readiness checklist.');await load();}catch(e:any){setError(e.message||'Could not add task.');}finally{setBusy(false);}}} className="rounded bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Add task</button><button onClick={()=>setShowAddTask(false)} className="rounded border px-3 py-2 text-xs">Cancel</button></div>
-   </div>}
+  <section className="rounded-2xl border bg-white p-4 shadow-sm">
+   <div className="flex flex-wrap items-center justify-between gap-3">
+    <div><h2 className="flex items-center gap-2 text-base font-bold text-slate-900"><ShieldCheck className="h-5 w-5 text-blue-700"/>Annual Workflow – AGM Closure (1 Apr – 30 Sep)</h2><p className="mt-1 text-xs text-slate-500">Follow the stages in sequence. Select any stage to open its checklist and instructions.</p></div>
+    <div className="min-w-[220px]"><div className="mb-1 flex justify-between text-xs"><span className="text-slate-500">Overall progress</span><strong>{overallProgress}%</strong></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{width:`${overallProgress}%`}}/></div></div>
+   </div>
+   <div className="mt-5 grid gap-2 md:grid-cols-4 xl:grid-cols-8">
+    {CYCLE_STAGES.map((s,i)=>{const p=stageState(s.code);const active=activeStage.code===s.code;const Icon=s.icon;return <button key={s.code} onClick={()=>{setSelectedStage(s.code);setActiveView('guide');}} className={`relative rounded-xl border p-3 text-left transition ${active?'border-blue-500 bg-blue-50 ring-2 ring-blue-100':'border-slate-200 bg-white hover:bg-slate-50'}`}>
+     <div className="flex items-center justify-between"><span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${p.complete?'bg-emerald-600 text-white':active?'bg-blue-600 text-white':'bg-slate-100 text-slate-600'}`}>{p.complete?<CheckCircle2 className="h-4 w-4"/>:String(i+1).padStart(2,'0')}</span><Icon className="h-4 w-4 text-slate-500"/></div>
+     <div className="mt-2 text-xs font-bold leading-4 text-slate-900">{s.name}</div><div className="mt-1 text-[10px] text-slate-500">{s.period}</div>
+     <div className={`mt-2 inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${p.complete?'bg-emerald-100 text-emerald-800':p.active?'bg-blue-100 text-blue-800':'bg-slate-100 text-slate-600'}`}>{p.complete?'Completed':p.active?'In Progress':p.done>0?'Partially Done':'Not Started'} · {p.done}/{p.total||s.tasks.length}</div>
+    </button>})}
+   </div>
   </section>
-  <section className="rounded-xl border bg-white p-3">
-   <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-bold text-slate-900">Annual workflow</h2><p className="text-xs text-slate-500">Select a phase. Each phase shows its checklist and instructions below.</p></div><div className="text-xs text-slate-500">{progress}% complete</div></div>
-   <div className="mt-3 flex flex-wrap gap-2">{CYCLE_STAGES.map(s=>{const p=stageProgress(s.code);const active=selectedStage===s.code;return <button key={s.code} onClick={()=>setSelectedStage(s.code)} className={`rounded-md border px-3 py-2 text-left text-xs ${active?'border-blue-600 bg-blue-50 font-bold text-blue-800':'border-slate-200 text-slate-700 hover:bg-slate-50'}`}><span className="font-bold">{s.name}</span><span className="ml-2 text-slate-500">{p.done}/{p.total||s.tasks.length}</span></button>})}</div>
+  <section className="rounded-2xl border bg-white p-4 shadow-sm">
+   <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="flex items-center gap-2 font-bold text-slate-900"><Flag className="h-4 w-4 text-blue-700"/>Current Work Queue</h2><p className="mt-1 text-xs text-slate-500">Open a task to see its guide, update progress or submit it for review.</p></div>
+    <div className="flex gap-1 rounded-lg bg-slate-100 p-1">{([['kanban','Kanban'],['list','List'],['calendar','Calendar']] as const).map(([id,label])=><button key={id} onClick={()=>setBoardView(id)} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${boardView===id?'bg-blue-600 text-white shadow-sm':'text-slate-600 hover:bg-white'}`}>{label}</button>)}</div>
+   </div>
+   {boardView==='kanban'&&<div className="mt-4 grid gap-3 xl:grid-cols-4">
+    {boardColumns.map(col=><div key={col.id} className={`min-w-0 rounded-xl p-2 ${col.tone==='rose'?'bg-rose-50':col.tone==='blue'?'bg-blue-50':col.tone==='indigo'?'bg-indigo-50':'bg-emerald-50'}`}>
+     <div className="mb-2 flex items-start justify-between gap-2 px-1"><div><h3 className={`text-xs font-bold ${col.tone==='rose'?'text-rose-800':col.tone==='blue'?'text-blue-800':col.tone==='indigo'?'text-indigo-800':'text-emerald-800'}`}>{col.title}</h3><p className="mt-0.5 text-[10px] text-slate-500">{col.subtitle}</p></div><span className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-bold text-slate-700">{col.tasks.length}</span></div>
+     <div className="space-y-2">{col.tasks.slice(0,5).map(t=><article key={t.checklist_id} className="rounded-lg border border-white bg-white p-3 shadow-sm">
+      <button onClick={()=>goToTask(t)} className="w-full text-left text-xs font-semibold leading-4 text-slate-900 hover:text-blue-700">{t.task}</button>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-500"><span>{t.owner_name||t.owner_role||'Unassigned'}</span><span>{t.due_date?new Date(t.due_date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'No due date'}</span></div>
+      {col.id==='progress'&&<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-500" style={{width:t.status==='Submitted'||t.status==='Awaiting Approval'?'85%':'50%'}}/></div>}
+      <div className="mt-2 flex items-center justify-between gap-2"><span className={`rounded-full px-2 py-1 text-[9px] font-semibold ${statusClass(t.status)}`}>{isOverdue(t)?'Overdue':t.status}</span><select aria-label={`Update status for ${t.task}`} value={t.status} onChange={e=>void updateTask(t,{status:e.target.value})} className="max-w-[116px] rounded border border-slate-200 bg-white px-1.5 py-1 text-[10px]"><option>Pending</option><option>In Progress</option><option>Awaiting Approval</option><option>Submitted</option><option>Completed</option><option>Returned for Changes</option><option>Exception</option><option>Not Applicable</option></select></div>
+     </article>)}{col.tasks.length>5&&<button onClick={()=>setBoardView('list')} className="w-full py-2 text-[10px] font-semibold text-blue-700">+ {col.tasks.length-5} more · View all</button>}{col.tasks.length===0&&<div className="rounded-lg border border-dashed border-slate-200 bg-white/70 p-4 text-center text-[10px] text-slate-500">No tasks in this column</div>}</div>
+    </div>)}
+   </div>}
+   {boardView==='list'&&<div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="border-b bg-slate-50 text-slate-500"><tr><th className="p-2">Task</th><th className="p-2">Phase</th><th className="p-2">Owner</th><th className="p-2">Due</th><th className="p-2">Status</th><th className="p-2">Update</th></tr></thead><tbody>{allStageTasks.map(t=><tr key={t.checklist_id} className="border-b"><td className="p-2"><button onClick={()=>goToTask(t)} className="text-left font-semibold hover:text-blue-700">{t.task}</button></td><td className="p-2">{t.stage}</td><td className="p-2">{t.owner_name||t.owner_role||'Unassigned'}</td><td className="p-2">{t.due_date||'—'}</td><td className="p-2">{t.status}</td><td className="p-2"><select value={t.status} onChange={e=>void updateTask(t,{status:e.target.value})} className="rounded border px-2 py-1"><option>Pending</option><option>In Progress</option><option>Awaiting Approval</option><option>Submitted</option><option>Completed</option><option>Returned for Changes</option><option>Exception</option><option>Not Applicable</option></select></td></tr>)}</tbody></table></div>}
+   {boardView==='calendar'&&<div className="mt-4 grid gap-2 md:grid-cols-3">{CYCLE_STAGES.map(s=><div key={s.code} className="rounded-lg border p-3"><div className="text-xs font-bold">{s.period} · {s.name}</div><div className="mt-2 space-y-1">{(stageTasks.get(s.code)||[]).map(t=><button key={t.checklist_id} onClick={()=>goToTask(t)} className="block w-full rounded bg-slate-50 p-2 text-left text-[11px]">{t.task} <span className="text-slate-500">· {t.status}</span></button>)}</div></div>)}</div>}
   </section>
   <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.8fr)]">
    <section className="rounded-2xl border bg-white p-4 shadow-sm">
