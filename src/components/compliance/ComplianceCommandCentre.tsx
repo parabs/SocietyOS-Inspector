@@ -15,6 +15,7 @@ type Task = {
 };
 type Obligation = {obligation_id:string;obligation_code:string;title:string;domain:string;source_reference:string;requirement_summary:string;legal_status:string;applicability:string;owner_role:string|null;reviewer_role:string|null;active:boolean};
 type Approval = {approval_id:string;checklist_id:string;decision:string;approver_role:string;approver_name:string;comments:string|null;decided_at:string};
+type TaskActivity = {activity_id:string;checklist_id:string;action:string;field_name:string|null;old_value:string|null;new_value:string|null;actor_user_id:string|null;created_at:string};
 
 const CYCLE_STAGES = [
  {code:'00',name:'Pre-Audit Readiness',period:'Before annual audit',title:'Confirm what is ready and what is missing',description:'A practical readiness check for system data, manual records and work that is not covered by Society OS.',icon:ClipboardCheck,owner:'Secretary / Treasurer',tasks:[
@@ -77,6 +78,11 @@ export const ComplianceCommandCentre:React.FC=()=>{
  const [tasks,setTasks]=useState<Task[]>([]);
  const [obligations,setObligations]=useState<Obligation[]>([]);
  const [approvals,setApprovals]=useState<Approval[]>([]);
+ const [taskActivities,setTaskActivities]=useState<TaskActivity[]>([]);
+ const [filterStage,setFilterStage]=useState('All');
+ const [filterStatus,setFilterStatus]=useState('All');
+ const [filterOwner,setFilterOwner]=useState('All');
+ const [taskSearch,setTaskSearch]=useState('');
  const [activeView,setActiveView]=useState<'guide'|'controls'|'calendar'|'exceptions'>('guide');
  const [boardView,setBoardView]=useState<'kanban'|'list'|'calendar'>('kanban');
  const [busy,setBusy]=useState(false);
@@ -107,9 +113,13 @@ export const ComplianceCommandCentre:React.FC=()=>{
    setTasks(taskRows);setObligations((o.data||[]) as Obligation[]);
    const ids=taskRows.map(x=>x.checklist_id);
    if(ids.length){
-    const a=await db.from('governance_task_approvals').select('*').in('checklist_id',ids).order('decided_at',{ascending:false});
-    if(a.error)throw a.error;setApprovals((a.data||[]) as Approval[]);
-   }else setApprovals([]);
+    const [a,h]=await Promise.all([
+     db.from('governance_task_approvals').select('*').in('checklist_id',ids).order('decided_at',{ascending:false}),
+     db.from('governance_task_activity').select('*').in('checklist_id',ids).order('created_at',{ascending:false})
+    ]);
+    if(a.error)throw a.error;if(h.error)throw h.error;
+    setApprovals((a.data||[]) as Approval[]);setTaskActivities((h.data||[]) as TaskActivity[]);
+   }else {setApprovals([]);setTaskActivities([]);}
   }catch(e:any){setError(e.message||'Unable to load the guided compliance workspace.');}
   finally{setBusy(false);}
  },[fy]);
@@ -120,6 +130,7 @@ export const ComplianceCommandCentre:React.FC=()=>{
  const progress=allStageTasks.length?Math.round(allStageTasks.filter(t=>['Completed','Not Applicable'].includes(t.status)).length/allStageTasks.length*100):0;
  const stageProgress=(code:StageCode)=>{const rows=stageTasks.get(code)||[];return {done:rows.filter(t=>['Completed','Not Applicable'].includes(t.status)).length,total:rows.length};};
   const approvalsFor=(id:string)=>approvals.filter(a=>a.checklist_id===id);
+ const activityFor=(id:string)=>taskActivities.filter(a=>a.checklist_id===id).slice(0,12);
  
  const initialise=async()=>{
   setBusy(true);setError('');setMessage('');
