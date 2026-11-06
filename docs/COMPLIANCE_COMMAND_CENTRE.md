@@ -27,6 +27,9 @@ The initial obligation library is seeded from the Society-supplied 2014 Model By
 - The seeded master is intentionally marked "Draft - Verify" and "To Verify".
 - Initial RLS is aligned to the existing authenticated workspace model. Role-specific access for Treasurer, Secretary, Committee, members, internal auditor and statutory auditor is not yet implemented and is a production blocker. Do not expose this workspace to external auditors or members until access policies are connected to a trusted server-side role model.
 
+## FY governance status integration
+The existing FY governance workspace now shows a consolidated stage tracker for Financial Review, Account Closure, Internal Audit, Statutory Audit and Final Approval. It separately labels Final Books Closure as Not Implemented and explicitly warns that a frozen snapshot is not a posting lock or opening-balance rollover.
+
 ## Next implementation increments
 1. Verify registered bye-laws/amendments and current statutory source references; configure applicability and due-date rules with the appointed auditor.
 2. Add evidence uploads to a private compliance evidence bucket and reviewer sign-off.
