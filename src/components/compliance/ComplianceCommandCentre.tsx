@@ -255,7 +255,7 @@ export const ComplianceCommandCentre:React.FC=()=>{
    {boardView==='kanban'&&<div className="mt-4 grid gap-3 xl:grid-cols-4">
     {boardColumns.map(col=><div key={col.id} className={`min-w-0 rounded-xl p-2 ${col.tone==='rose'?'bg-rose-50':col.tone==='blue'?'bg-blue-50':col.tone==='indigo'?'bg-indigo-50':'bg-emerald-50'}`}>
      <div className="mb-2 flex items-start justify-between gap-2 px-1"><div><h3 className={`text-xs font-bold ${col.tone==='rose'?'text-rose-800':col.tone==='blue'?'text-blue-800':col.tone==='indigo'?'text-indigo-800':'text-emerald-800'}`}>{col.title}</h3><p className="mt-0.5 text-[10px] text-slate-500">{col.subtitle}</p></div><span className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-bold text-slate-700">{col.tasks.length}</span></div>
-     <div className="space-y-2">{col.tasks.slice(0,5).map(t=><article key={t.checklist_id} className="rounded-lg border border-white bg-white p-3 shadow-sm">
+     <div className="space-y-2">{col.tasks.map(t=><article key={t.checklist_id} className="rounded-lg border border-white bg-white p-3 shadow-sm">
       <button onClick={()=>goToTask(t)} className="w-full text-left text-xs font-semibold leading-4 text-slate-900 hover:text-blue-700">{t.task}</button>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-500"><span>{t.owner_name||t.owner_role||'Unassigned'}</span><span>{t.due_date?new Date(t.due_date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'No due date'}</span></div>
       {col.id==='progress'&&<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-500" style={{width:t.status==='Submitted'||t.status==='Awaiting Approval'?'85%':'50%'}}/></div>}
