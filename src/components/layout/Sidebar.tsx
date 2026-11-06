@@ -16,6 +16,7 @@ import {
   Settings,
   Database,
   ShieldCheck,
+  ClipboardCheck,
   ChevronDown,
   ChevronRight,
   Menu,
@@ -34,6 +35,7 @@ export const Sidebar: React.FC = () => {
     financial: false,
     review: false,
     audit: false,
+    compliance: true,
     reports: false,
     admin: false,
     data: true,
@@ -45,6 +47,9 @@ export const Sidebar: React.FC = () => {
     }
     if (['annual-financial-review','year-end-closure'].includes(currentScreen)) {
       setOpenGroups(prev => ({ ...prev, review: true }));
+    }
+    if (currentScreen === 'compliance-command-centre') {
+      setOpenGroups(prev => ({ ...prev, compliance: true }));
     }
     if (['internal-audit','statutory-audit-handover','final-approval-freeze','audit-evidence','bank-reconciliation','observations-actions'].includes(currentScreen)) {
       setOpenGroups(prev => ({ ...prev, audit: true }));
@@ -228,6 +233,24 @@ export const Sidebar: React.FC = () => {
                     <span className="truncate">Party-wise Ledger</span>
                   </div>
                   <Lock className="w-3 h-3 text-slate-500" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Compliance command centre */}
+          <div>
+            <button
+              onClick={() => toggleGroup('compliance')}
+              className="w-full flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 hover:text-slate-200 cursor-pointer"
+            >
+              <span>Compliance Centre</span>
+              {openGroups.compliance ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </button>
+            {openGroups.compliance && (
+              <div className="mt-1 space-y-1 pl-1">
+                <button onClick={() => handleNavClick('compliance-command-centre')} className={navItemClass('compliance-command-centre')}>
+                  <div className="flex items-center gap-2.5 truncate"><ClipboardCheck className="w-4 h-4 shrink-0"/><span className="truncate">Compliance Command Centre</span></div>
                 </button>
               </div>
             )}
