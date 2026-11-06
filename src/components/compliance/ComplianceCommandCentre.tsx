@@ -119,10 +119,8 @@ export const ComplianceCommandCentre:React.FC=()=>{
  const allStageTasks=CYCLE_STAGES.flatMap(s=>stageTasks.get(s.code)||[]);
  const progress=allStageTasks.length?Math.round(allStageTasks.filter(t=>['Completed','Not Applicable'].includes(t.status)).length/allStageTasks.length*100):0;
  const stageProgress=(code:StageCode)=>{const rows=stageTasks.get(code)||[];return {done:rows.filter(t=>['Completed','Not Applicable'].includes(t.status)).length,total:rows.length};};
-  const nextTasks=allStageTasks.filter(t=>!['Completed','Not Applicable'].includes(t.status)).slice(0,5);
- const approvalsFor=(id:string)=>approvals.filter(a=>a.checklist_id===id);
- const isApproved=(t:Task)=>approvalsFor(t.checklist_id).some(a=>a.decision==='Approved');
-
+  const approvalsFor=(id:string)=>approvals.filter(a=>a.checklist_id===id);
+ 
  const initialise=async()=>{
   setBusy(true);setError('');setMessage('');
   try{
@@ -183,16 +181,23 @@ export const ComplianceCommandCentre:React.FC=()=>{
  const cutoffKey=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
  const isDone=(t:Task)=>['Completed','Not Applicable'].includes(t.status);
  const isOverdue=(t:Task)=>!isDone(t)&&t.due_date!==null&&t.due_date<todayKey;
- const pendingTasks=allStageTasks.filter(t=>!isDone(t)&&!['In Progress','Submitted','Awaiting Approval'].includes(t.status));
- const overdueTasks=pendingTasks.filter(isOverdue);
- const upcomingTasks=pendingTasks.filter(t=>!isOverdue(t));
- const inProgressTasks=allStageTasks.filter(t=>['In Progress','Submitted','Awaiting Approval'].includes(t.status));
- const completedTasks=allStageTasks.filter(t=>isDone(t)&&((t.completed_at||t.updated_at||'').slice(0,10)>=cutoffKey||!t.completed_at&&!t.updated_at));
+ const filteredTasks=allStageTasks.filter(t=>{
+  const q=taskSearch.trim().toLowerCase();
+  const stageCode=t.task_code?.startsWith('CUSTOM-')?'00':t.task_code?.slice(4,6)||'00';
+  return (filterStage==='All'||stageCode===filterStage)
+   &&(filterStatus==='All'||(filterStatus==='Overdue'?isOverdue(t):t.status===filterStatus))
+   &&(filterOwner==='All'||(t.owner_name||t.owner_role||'Unassigned')===filterOwner)
+   &&(!q||[t.task,t.task_code,t.owner_name,t.owner_role,t.remarks].some(v=>(v||'').toLowerCase().includes(q)));
+ });
+ const overdueTasks=filteredTasks.filter(isOverdue);
+ const upcomingTasks=filteredTasks.filter(t=>!isDone(t)&&!['In Progress','Submitted','Awaiting Approval'].includes(t.status)&&!isOverdue(t));
+ const inProgressTasks=filteredTasks.filter(t=>['In Progress','Submitted','Awaiting Approval'].includes(t.status));
+ const completedTasks=filteredTasks.filter(t=>isDone(t));
  const boardColumns=[
   {id:'overdue',title:'Pending / Overdue',subtitle:`${overdueTasks.length} tasks need attention`,tone:'rose',tasks:overdueTasks},
   {id:'progress',title:'In Progress',subtitle:`${inProgressTasks.length} active tasks`,tone:'blue',tasks:inProgressTasks},
   {id:'upcoming',title:'Upcoming',subtitle:`${upcomingTasks.length} waiting to start`,tone:'indigo',tasks:upcomingTasks},
-  {id:'completed',title:'Recently Completed',subtitle:`${completedTasks.length} completed tasks`,tone:'emerald',tasks:completedTasks}
+  {id:'completed',title:'Completed',subtitle:`${completedTasks.length} tasks`,tone:'emerald',tasks:completedTasks}
  ];
  const overallProgress=allStageTasks.length?Math.round(allStageTasks.filter(isDone).length/allStageTasks.length*100):0;
  const stageState=(code:StageCode)=>{
@@ -229,7 +234,7 @@ export const ComplianceCommandCentre:React.FC=()=>{
     <div className="min-w-[220px]"><div className="mb-1 flex justify-between text-xs"><span className="text-slate-500">Overall progress</span><strong>{overallProgress}%</strong></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{width:`${overallProgress}%`}}/></div></div>
    </div>
    <div className="mt-5 grid gap-2 md:grid-cols-4 xl:grid-cols-8">
-    {CYCLE_STAGES.map((s,i)=>{const p=stageState(s.code);const active=activeStage.code===s.code;const Icon=s.icon;return <button key={s.code} onClick={()=>{setSelectedStage(s.code);setActiveView('guide');}} className={`relative rounded-xl border p-3 text-left transition ${active?'border-blue-500 bg-blue-50 ring-2 ring-blue-100':'border-slate-200 bg-white hover:bg-slate-50'}`}>
+    {CYCLE_STAGES.map((s,i)=>{const p=stageState(s.code);const active=filterStage===s.code;const Icon=s.icon;return <button key={s.code} onClick={()=>setFilterStage(filterStage===s.code?'All':s.code)} className={`relative rounded-xl border p-3 text-left transition ${active?'border-blue-500 bg-blue-50 ring-2 ring-blue-100':'border-slate-200 bg-white hover:bg-slate-50'}`}>
      <div className="flex items-center justify-between"><span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${p.complete?'bg-emerald-600 text-white':active?'bg-blue-600 text-white':'bg-slate-100 text-slate-600'}`}>{p.complete?<CheckCircle2 className="h-4 w-4"/>:String(i+1).padStart(2,'0')}</span><Icon className="h-4 w-4 text-slate-500"/></div>
      <div className="mt-2 text-xs font-bold leading-4 text-slate-900">{s.name}</div><div className="mt-1 text-[10px] text-slate-500">{s.period}</div>
      <div className={`mt-2 inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${p.complete?'bg-emerald-100 text-emerald-800':p.active?'bg-blue-100 text-blue-800':'bg-slate-100 text-slate-600'}`}>{p.complete?'Completed':p.active?'In Progress':p.done>0?'Partially Done':'Not Started'} · {p.done}/{p.total||s.tasks.length}</div>
