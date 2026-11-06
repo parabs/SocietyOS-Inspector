@@ -16,6 +16,7 @@ import { SettingsView } from './components/admin/SettingsView';
 import { DataManagement } from './components/admin/DataManagement';
 import { DataManagementHub } from './components/admin/DataManagementHub';
 import { DataManagementControlCenter } from './components/admin/DataManagementControlCenter';
+import { FinancialPlaceholder } from './components/financial/FinancialPlaceholder';
 
 const MainContent: React.FC = () => {
   const { currentScreen, setCurrentScreen } = useVerification();
@@ -32,6 +33,21 @@ const MainContent: React.FC = () => {
 
     case 'monthly-reconciliation':
       return <MonthlyReconciliation />;
+
+    case 'annual-financial-review':
+      return <FinancialPlaceholder moduleName="Annual Financial Review" moduleDescription="Annual review of financial statements, demand and collection performance, debtors, creditors, cash, bank and unresolved monthly exceptions" />;
+
+    case 'year-end-closure':
+      return <FinancialPlaceholder moduleName="Year-End Account Closure" moduleDescription="Year-end checklist, trial balance, supporting schedules, closing balances and provisional financial statements" />;
+
+    case 'internal-audit':
+      return <FinancialPlaceholder moduleName="Internal Audit" moduleDescription="Internal audit programme, audit testing, observations, management responses and corrective-action closure" />;
+
+    case 'statutory-audit-handover':
+      return <FinancialPlaceholder moduleName="Statutory Audit Handover" moduleDescription="Controlled handover of financial statements, registers, internal-audit remarks, supporting evidence and auditor queries" />;
+
+    case 'final-approval-freeze':
+      return <FinancialPlaceholder moduleName="Final Approval & Account Freeze" moduleDescription="Committee approval, AGM adoption, versioned closing snapshot and controlled financial-year freeze" />;
 
     case 'financial-summary':
     case 'demand-collections':
