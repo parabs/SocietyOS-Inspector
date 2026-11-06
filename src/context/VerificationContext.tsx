@@ -67,6 +67,7 @@ export type ScreenId =
   | 'internal-audit'
   | 'statutory-audit-handover'
   | 'final-approval-freeze'
+  | 'compliance-command-centre'
   | 'audit-evidence'
   | 'bank-reconciliation'
   | 'observations-actions'
