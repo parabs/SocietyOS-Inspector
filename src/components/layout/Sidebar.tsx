@@ -4,29 +4,17 @@ import {
   Settings, Database, FileCheck2, CheckSquare, BarChart3, PieChart,
   Receipt, CreditCard, Users, Files, FileText, Landmark, AlertCircle,
   ChevronDown, ChevronRight, Menu, X, Lock, CalendarCheck, FolderCheck,
-  Upload, SlidersHorizontal, History, Wallet, Building2,
 } from 'lucide-react';
 import { useVerification, ScreenId } from '../../context/VerificationContext';
 
-type SectionId =
-  | 'dashboard'
-  | 'reports'
-  | 'verification'
-  | 'audit'
-  | 'data'
-  | 'admin';
+type SectionId = 'dashboard' | 'verification' | 'compliance' | 'reports' | 'admin';
 
 const SECTION_SCREENS: Record<SectionId, ScreenId[]> = {
-  dashboard: ['verification-dashboard', 'financial-summary', 'demand-collections', 'payments-expenses', 'party-ledger'],
-  reports: ['reports', 'ledger-reports', 'bank-reconciliation'],
-  verification: ['opening-balances', 'transaction-verification', 'monthly-reconciliation', 'data-quality'],
-  audit: [
-    'compliance-command-centre', 'annual-financial-review', 'year-end-closure',
-    'internal-audit', 'statutory-audit-handover', 'final-approval-freeze',
-    'audit-evidence', 'observations-actions', 'data-audit-trail',
-  ],
-  data: ['data-management', 'import-wizard', 'transactions', 'options-config'],
-  admin: ['user-access', 'settings'],
+  dashboard: ['financial-summary', 'demand-collections', 'payments-expenses', 'party-ledger', 'verification-dashboard'],
+  verification: ['opening-balances', 'transaction-verification', 'monthly-reconciliation'],
+  compliance: ['compliance-command-centre', 'internal-audit', 'statutory-audit-handover', 'annual-financial-review', 'year-end-closure', 'final-approval-freeze', 'audit-evidence', 'observations-actions'],
+  reports: ['financial-summary', 'demand-collections', 'payments-expenses', 'party-ledger', 'reports', 'ledger-reports', 'bank-reconciliation'],
+  admin: ['data-management', 'import-wizard', 'transactions', 'data-quality', 'data-audit-trail', 'options-config', 'user-access', 'settings'],
 };
 
 export const Sidebar: React.FC = () => {
@@ -42,9 +30,7 @@ export const Sidebar: React.FC = () => {
 
   const navItemClass = (screen: ScreenId) =>
     `w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors text-left ${
-      currentScreen === screen
-        ? 'bg-blue-600 text-white font-semibold shadow-xs'
-        : 'text-slate-300 hover:text-white hover:bg-slate-800'
+      currentScreen === screen ? 'bg-blue-600 text-white font-semibold shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-800'
     }`;
 
   const go = (screen: ScreenId) => {
@@ -53,31 +39,28 @@ export const Sidebar: React.FC = () => {
   };
 
   const sectionButton = (id: SectionId, title: string, icon: React.ReactNode) => (
-    <button
-      onClick={() => setExpanded(prev => prev === id ? null : id)}
+    <button onClick={() => setExpanded(prev => prev === id ? null : id)}
       aria-expanded={expanded === id}
       className={`w-full flex items-center justify-between rounded-lg px-3 py-3 text-sm font-semibold transition-colors ${
         expanded === id ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-      }`}
-    >
+      }`}>
       <span className="flex items-center gap-3">{icon}{title}</span>
       {expanded === id ? <ChevronDown className="h-4 w-4"/> : <ChevronRight className="h-4 w-4"/>}
     </button>
   );
 
-  const item = (screen: ScreenId, label: string, icon: React.ReactNode) => (
+  const item = (screen: ScreenId, label: string, icon: React.ReactNode, locked = false) => (
     <button key={screen} onClick={() => go(screen)} className={navItemClass(screen)}>
       {icon}<span className="min-w-0 flex-1 truncate">{label}</span>
+      {locked && <Lock className="h-3 w-3 shrink-0 text-slate-500"/>}
     </button>
   );
 
   return (
     <>
-      <button
-        onClick={() => setMobileOpen(!mobileOpen)}
+      <button onClick={() => setMobileOpen(!mobileOpen)}
         className="lg:hidden fixed bottom-4 right-4 z-50 rounded-full bg-blue-600 p-3 text-white shadow-lg"
-        aria-label="Toggle navigation"
-      >
+        aria-label="Toggle navigation">
         {mobileOpen ? <X className="h-5 w-5"/> : <Menu className="h-5 w-5"/>}
       </button>
       {mobileOpen && <div onClick={() => setMobileOpen(false)} className="lg:hidden fixed inset-0 z-40 bg-slate-900/60"/>}
@@ -89,65 +72,61 @@ export const Sidebar: React.FC = () => {
           <div className="pt-3">
             {sectionButton('dashboard', 'Dashboard', <LayoutDashboard className="h-5 w-5"/>)}
             {expanded === 'dashboard' && <div className="mt-1 space-y-1 pl-2">
-              {item('verification-dashboard', 'Overview', <PieChart className="h-4 w-4"/>)}
-              {item('financial-summary', 'Overall Financial Position', <BarChart3 className="h-4 w-4"/>)}
-              {item('demand-collections', 'Demand & Collections', <Receipt className="h-4 w-4"/>)}
-              {item('payments-expenses', 'Payments & Expenses', <CreditCard className="h-4 w-4"/>)}
-              {item('party-ledger', 'Financial Risk & Accountability', <Users className="h-4 w-4"/>)}
+              {item('financial-summary', 'Financial Summary', <PieChart className="h-4 w-4"/>, true)}
+              {item('demand-collections', 'Demand & Collections', <Receipt className="h-4 w-4"/>, true)}
+              {item('payments-expenses', 'Payments & Expenses', <CreditCard className="h-4 w-4"/>, true)}
+              {item('party-ledger', 'Party-wise Ledger', <Users className="h-4 w-4"/>, true)}
+              {item('verification-dashboard', 'Verification Dashboard', <LayoutDashboard className="h-4 w-4"/>)}
             </div>}
 
-            {sectionButton('reports', 'Reports & Registers', <FileChartColumn className="h-5 w-5"/>)}
-            {expanded === 'reports' && <div className="mt-1 space-y-1 pl-2">
-              {item('reports', 'All Reports & Registers', <Files className="h-4 w-4"/>)}
-              {item('ledger-reports', 'Account, Party & Category Ledgers', <FileText className="h-4 w-4"/>)}
-              {item('bank-reconciliation', 'Bank & UPI Reconciliation', <Landmark className="h-4 w-4"/>)}
-            </div>}
-
-            {sectionButton('verification', 'Verification & Data Quality', <ClipboardCheck className="h-5 w-5"/>)}
+            {sectionButton('verification', 'Verification', <ClipboardCheck className="h-5 w-5"/>)}
             {expanded === 'verification' && <div className="mt-1 space-y-1 pl-2">
               {item('opening-balances', 'Opening Balance Verification', <CheckSquare className="h-4 w-4"/>)}
               {item('transaction-verification', 'Transaction Verification', <FileCheck2 className="h-4 w-4"/>)}
               {item('monthly-reconciliation', 'Monthly Reconciliation', <BarChart3 className="h-4 w-4"/>)}
-              {item('data-quality', 'Data Quality & Exceptions', <AlertCircle className="h-4 w-4"/>)}
             </div>}
 
-            {sectionButton('audit', 'Audit & Governance', <ShieldCheck className="h-5 w-5"/>)}
-            {expanded === 'audit' && <div className="mt-1 space-y-1 pl-2">
+            {sectionButton('compliance', 'Compliance & Governance', <ShieldCheck className="h-5 w-5"/>)}
+            {expanded === 'compliance' && <div className="mt-1 space-y-1 pl-2">
               {item('compliance-command-centre', 'Compliance Calendar & Controls', <CalendarCheck className="h-4 w-4"/>)}
-              {item('annual-financial-review', 'Annual Financial Review', <PieChart className="h-4 w-4"/>)}
-              {item('year-end-closure', 'Year-End Account Closure', <Wallet className="h-4 w-4"/>)}
               {item('internal-audit', 'Internal Audit', <ShieldCheck className="h-4 w-4"/>)}
               {item('statutory-audit-handover', 'Statutory Audit Handover', <Files className="h-4 w-4"/>)}
-              {item('audit-evidence', 'Audit Evidence Register', <FolderCheck className="h-4 w-4"/>)}
-              {item('observations-actions', 'Audit Rectification & Actions', <AlertCircle className="h-4 w-4"/>)}
-              {item('final-approval-freeze', 'Final Approval & Books Freeze', <Lock className="h-4 w-4"/>)}
-              {item('data-audit-trail', 'Data Audit Trail', <History className="h-4 w-4"/>)}
+              {item('annual-financial-review', 'Annual Financial Review', <PieChart className="h-4 w-4"/>)}
+              {item('year-end-closure', 'Year-End Account Closure', <FileCheck2 className="h-4 w-4"/>)}
+              {item('final-approval-freeze', 'Final Approval & Freeze', <Lock className="h-4 w-4"/>)}
+              {item('audit-evidence', 'Evidence Register', <FolderCheck className="h-4 w-4"/>)}
+              {item('observations-actions', 'Audit Observations & Actions', <AlertCircle className="h-4 w-4"/>)}
             </div>}
 
-            {sectionButton('data', 'Data Management', <Database className="h-5 w-5"/>)}
-            {expanded === 'data' && <div className="mt-1 space-y-1 pl-2">
-              {item('transactions', 'Transactions Workspace', <Receipt className="h-4 w-4"/>)}
-              {item('import-wizard', 'Import & Source Data', <Upload className="h-4 w-4"/>)}
-              {item('data-management', 'Masters & Registers Setup', <Building2 className="h-4 w-4"/>)}
-              {item('options-config', 'Rules & Configuration', <SlidersHorizontal className="h-4 w-4"/>)}
+            {sectionButton('reports', 'Reports', <FileChartColumn className="h-5 w-5"/>)}
+            {expanded === 'reports' && <div className="mt-1 space-y-1 pl-2">
+              {item('financial-summary', 'Financial Summary', <PieChart className="h-4 w-4"/>, true)}
+              {item('demand-collections', 'Demand & Collections', <Receipt className="h-4 w-4"/>, true)}
+              {item('payments-expenses', 'Payments & Expenses', <CreditCard className="h-4 w-4"/>, true)}
+              {item('party-ledger', 'Party-wise Ledger', <Users className="h-4 w-4"/>, true)}
+              {item('reports', 'Reports & Registers', <Files className="h-4 w-4"/>)}
+              {item('ledger-reports', 'Ledger Reports', <FileText className="h-4 w-4"/>)}
+              {item('bank-reconciliation', 'Bank Reconciliation', <Landmark className="h-4 w-4"/>)}
             </div>}
 
             {sectionButton('admin', 'Administration', <Settings className="h-5 w-5"/>)}
             {expanded === 'admin' && <div className="mt-1 space-y-1 pl-2">
+              {item('data-management', 'Data Management & Masters', <Database className="h-4 w-4"/>)}
+              {item('import-wizard', 'Import Wizard', <Files className="h-4 w-4"/>)}
+              {item('transactions', 'Transactions Workspace', <Receipt className="h-4 w-4"/>)}
+              {item('data-quality', 'Data Quality', <CheckSquare className="h-4 w-4"/>)}
+              {item('data-audit-trail', 'Data Audit Trail', <FileText className="h-4 w-4"/>)}
+              {item('options-config', 'Configuration', <Settings className="h-4 w-4"/>)}
               {item('user-access', 'User & Role Access', <ShieldCheck className="h-4 w-4"/>)}
-              {item('settings', 'Society & System Settings', <Settings className="h-4 w-4"/>)}
+              {item('settings', 'Settings', <Settings className="h-4 w-4"/>)}
             </div>}
           </div>
         </div>
-
         <div className="border-t border-slate-800 bg-slate-950/40 p-3 text-[11px] text-slate-400">
           <div className="mb-1 flex items-center justify-between font-semibold text-slate-300">
-            <span>Verification Engine</span>
-            <span className="flex items-center gap-1 text-emerald-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/>Phase 1 Active
-            </span>
+            <span>Verification Engine</span><span className="flex items-center gap-1 text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/>Phase 1 Active</span>
           </div>
-          <div className="text-[10px]">Source records remain protected; verification and audit actions are tracked separately.</div>
+          <div className="text-[10px]">Source data is strictly read-only. Inspections stored separately.</div>
         </div>
       </aside>
     </>
