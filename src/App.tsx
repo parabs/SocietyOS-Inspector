@@ -17,11 +17,14 @@ import { DataManagement } from './components/admin/DataManagement';
 import { DataManagementHub } from './components/admin/DataManagementHub';
 import { DataManagementControlCenter } from './components/admin/DataManagementControlCenter';
 import { FinancialYearGovernance } from './components/financial/FinancialYearGovernance';
+import { ComplianceCommandCentre } from './components/compliance/ComplianceCommandCentre';
 
 const MainContent: React.FC = () => {
   const { currentScreen, setCurrentScreen } = useVerification();
 
   switch (currentScreen) {
+    case 'compliance-command-centre':
+      return <ComplianceCommandCentre />;
     case 'verification-dashboard':
       return <VerificationDashboard />;
 
