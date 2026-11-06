@@ -308,3 +308,38 @@ for each row execute function public.prevent_audit_record_mutation();
 drop trigger if exists trg_audit_activity_immutable on public.audit_workflow_activity;
 create trigger trg_audit_activity_immutable before update or delete on public.audit_workflow_activity
 for each row execute function public.prevent_audit_record_mutation();
+
+
+-- Private evidence bucket. Files are accessible only to authenticated society users via
+-- short-lived signed URLs; the document index stores the object path, not a public URL.
+insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+values (
+  'audit-evidence',
+  'audit-evidence',
+  false,
+  26214400,
+  array[
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword',
+    'text/csv',
+    'image/png',
+    'image/jpeg'
+  ]
+)
+on conflict(id) do update set
+  public=false,
+  file_size_limit=26214400,
+  allowed_mime_types=excluded.allowed_mime_types;
+
+drop policy if exists audit_evidence_read on storage.objects;
+create policy audit_evidence_read on storage.objects
+for select to authenticated using (bucket_id='audit-evidence');
+drop policy if exists audit_evidence_insert on storage.objects;
+create policy audit_evidence_insert on storage.objects
+for insert to authenticated with check (bucket_id='audit-evidence' and auth.uid() is not null);
+drop policy if exists audit_evidence_update on storage.objects;
+create policy audit_evidence_update on storage.objects
+for update to authenticated using (bucket_id='audit-evidence') with check (bucket_id='audit-evidence');
