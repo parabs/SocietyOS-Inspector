@@ -7,7 +7,7 @@ type Obligation = {
   source_type: string; source_name: string; source_reference: string; requirement_summary: string;
   applicability: string; frequency: string; due_rule: string | null; owner_role: string | null;
   reviewer_role: string | null; evidence_required: string | null; legal_status: string;
-  verification_notes: string | null;
+  verification_notes: string | null; active: boolean;
 };
 type Instance = {
   instance_id: string; obligation_id: string; period_key: string; due_date: string | null;
