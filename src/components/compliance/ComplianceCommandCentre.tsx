@@ -8,7 +8,7 @@ import { supabaseClient } from '../../services/supabaseClient';
 
 type Task = {
   checklist_id:string; financial_year:string; stage:string; work_area:string; task:string;
-  status:string; owner_name:string|null; owner_role:string|null; due_date:string|null;
+  status:string; owner_name:string|null; owner_role:string|null; due_date:string|null; completed_at?:string|null; updated_at?:string|null;
   evidence_reference:string|null; remarks:string|null; completed_by:string|null;
   task_code?:string; sequence_no?:number; guidance?:string; completion_criteria?:string;
   approver_role?:string; approval_status?:string; dependency_codes?:string[];
