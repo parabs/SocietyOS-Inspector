@@ -44,7 +44,10 @@ export const Sidebar: React.FC = () => {
       className={`w-full flex items-center justify-between rounded-lg px-3 py-3 text-sm font-semibold transition-colors ${
         expanded === id ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
       }`}>
-      <span className="flex items-center gap-3">{icon}{title}</span>
+      <span className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <span className="shrink-0">{icon}</span>
+        <span className="min-w-0 flex-1 text-left leading-5">{title}</span>
+      </span>
       {expanded === id ? <ChevronDown className="h-4 w-4"/> : <ChevronRight className="h-4 w-4"/>}
     </button>
   );
