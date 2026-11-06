@@ -343,3 +343,24 @@ for insert to authenticated with check (bucket_id='audit-evidence' and auth.uid(
 drop policy if exists audit_evidence_update on storage.objects;
 create policy audit_evidence_update on storage.objects
 for update to authenticated using (bucket_id='audit-evidence') with check (bucket_id='audit-evidence');
+
+
+-- Internal audit sign-off is permitted only after the audit programme checklist is
+-- completed, marked not applicable, or explicitly disclosed as an exception.
+create or replace function public.guard_internal_audit_signoff()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare v_total integer; v_open integer;
+begin
+  if new.approval_stage='Internal Audit Sign-off' then
+    select count(*),count(*) filter (where status not in ('Completed','Not Applicable','Exception Disclosed'))
+      into v_total,v_open
+    from public.financial_year_checklist
+    where financial_year=new.financial_year and stage='Internal Audit';
+    if v_total=0 then raise exception 'Initialize the FY workflow and internal audit checklist before sign-off.'; end if;
+    if v_open>0 then raise exception 'Complete or explicitly disclose every internal audit checklist item before sign-off.'; end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists trg_guard_internal_audit_signoff on public.closure_approvals;
+create trigger trg_guard_internal_audit_signoff before insert on public.closure_approvals
+for each row execute function public.guard_internal_audit_signoff();
