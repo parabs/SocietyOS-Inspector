@@ -9,7 +9,7 @@ import {
 import { useVerification, ScreenId } from '../../context/VerificationContext';
 
 type SectionId =
-  | 'dashboards'
+  | 'dashboard'
   | 'reports'
   | 'verification'
   | 'audit'
@@ -17,7 +17,7 @@ type SectionId =
   | 'admin';
 
 const SECTION_SCREENS: Record<SectionId, ScreenId[]> = {
-  dashboards: ['financial-summary', 'demand-collections', 'payments-expenses', 'party-ledger'],
+  dashboard: ['verification-dashboard', 'financial-summary', 'demand-collections', 'payments-expenses', 'party-ledger'],
   reports: ['reports', 'ledger-reports', 'bank-reconciliation'],
   verification: ['opening-balances', 'transaction-verification', 'monthly-reconciliation', 'data-quality'],
   audit: [
@@ -86,26 +86,14 @@ export const Sidebar: React.FC = () => {
       }`}>
         <div className="space-y-2 p-3">
           <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Workspace</div>
-          <button
-            onClick={() => go('verification-dashboard')}
-            className={`w-full flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold ${
-              currentScreen === 'verification-dashboard'
-                ? 'bg-blue-600 text-white'
-                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <LayoutDashboard className="h-5 w-5"/>Dashboard
-          </button>
-
           <div className="pt-3">
-            <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Explore</div>
-
-            {sectionButton('dashboards', 'Dashboards', <BarChart3 className="h-5 w-5"/>)}
-            {expanded === 'dashboards' && <div className="mt-1 space-y-1 pl-2">
-              {item('financial-summary', 'Overall Financial Position', <PieChart className="h-4 w-4"/>)}
+            {sectionButton('dashboard', 'Dashboard', <LayoutDashboard className="h-5 w-5"/>)}
+            {expanded === 'dashboard' && <div className="mt-1 space-y-1 pl-2">
+              {item('verification-dashboard', 'Overview', <PieChart className="h-4 w-4"/>)}
+              {item('financial-summary', 'Overall Financial Position', <BarChart3 className="h-4 w-4"/>)}
               {item('demand-collections', 'Demand & Collections', <Receipt className="h-4 w-4"/>)}
               {item('payments-expenses', 'Payments & Expenses', <CreditCard className="h-4 w-4"/>)}
-              {item('party-ledger', 'Financial Risk & Party Balances', <Users className="h-4 w-4"/>)}
+              {item('party-ledger', 'Financial Risk & Accountability', <Users className="h-4 w-4"/>)}
             </div>}
 
             {sectionButton('reports', 'Reports & Registers', <FileChartColumn className="h-5 w-5"/>)}
