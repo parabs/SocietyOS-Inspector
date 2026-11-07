@@ -76,6 +76,93 @@ The first release should focus on four jobs:
 
 The existing financial engine, registers, views and reports should be reused and simplified through presentation and guided workflows. Do not rebuild working accounting logic just to change the user experience.
 
+
+## 4A. Signature volunteer workflows: member maintenance payments and expense requests
+
+These two workflows are core MVP differentiators. They create a clear, auditable hand-off between the person initiating an action and the Treasurer who verifies or approves it. They must be designed as simple task flows, not accounting forms.
+
+### Workflow 1 — Member pays maintenance; Treasurer verifies; receipt is generated
+
+**Member experience**
+
+1. Member opens their society account and sees current monthly bills, previous outstanding amount, any approved additional charges, and total payable.
+2. Member selects a bill and chooses a payment method:
+   - integrated payment gateway / UPI, where enabled;
+   - bank transfer / UPI outside the app;
+   - cheque or cash, if the society accepts it.
+3. For external payments, member enters the payment date, amount, payment reference / UTR and optionally uploads proof. The member can also submit a partial payment or payment against multiple bills where the society's policy permits.
+4. The app shows **Payment submitted — awaiting Treasurer verification**. It must not show the payment as confirmed or issue an official receipt merely because a member submitted a claim or screenshot.
+5. Member can track the status and receive a notification when verified, rejected or clarification is requested.
+
+**Treasurer experience**
+
+1. Treasurer sees a single **Payments to verify** queue with member, flat/unit, amount, date, method, reference and proof.
+2. Treasurer compares the submission with the bank statement / payment gateway settlement / cash or cheque evidence.
+3. Treasurer can confirm, reject with a reason, or request more information. Duplicate references and possible duplicate submissions should be highlighted.
+4. On confirmation, Society OS records the receipt, applies the payment to the appropriate outstanding demands according to the approved allocation rules, and generates a unique official receipt number and downloadable/shareable receipt.
+5. If allocation is uncertain, the receipt can still record money received while the amount remains explicitly unallocated / on-account for later allocation. Never force a guessed demand allocation.
+6. The member is notified and can download the receipt and see the updated balance.
+
+**Important control rules**
+
+- Payment submission, payment verification, receipt issuance and demand allocation are distinct states / events.
+- Suggested statuses: Draft, Submitted, Under Verification, Clarification Required, Verified, Rejected, Reversed / Refunded.
+- A gateway-confirmed payment may follow an automated verification path based on a verified provider callback and reconciliation controls; manual Treasurer approval need not be imposed on every confirmed gateway transaction. The society can configure this policy.
+- For bank transfer / UPI proof submitted by a member, the proof is evidence for review, not proof of settlement by itself.
+- Do not issue duplicate receipts for the same confirmed payment. Corrections must use cancellation / reversal / replacement workflows with a reason and audit trail, not deletion.
+- Partial payments, advance payments, excess payments, payment covering multiple months, and payments without a clear demand match must be supported.
+- The system must distinguish payment date, bank value date, verification date and receipt issue date where relevant.
+- Treasurer cannot verify their own submitted payment where separation of duties is configured; provide an exception path for very small societies with a recorded reason and optional secondary review.
+
+### Workflow 2 — A person raises an expense; Treasurer approves; payment and accounting follow
+
+The person raising an expense may be a committee member, caretaker, facility volunteer, staff member or another society-authorised requester. This is an **expense request**, not yet an accounting payment.
+
+**Requester / sender experience**
+
+1. Select **Request an expense**.
+2. Enter a short description in plain language, amount, purpose, vendor / payee, expense category (suggested by the system), urgency and requested date.
+3. Attach a quotation, invoice, bill, photo or other supporting evidence where available.
+4. Submit and see status: Submitted, Under Review, More Information Required, Approved, Rejected, Payment in Progress or Paid.
+5. The requester can respond to questions and see the decision and reason.
+
+**Treasurer experience**
+
+1. Treasurer sees an **Expenses awaiting approval** queue.
+2. Reviews amount, purpose, category, payee, supporting document, available funds and any configured spending limit / approval requirement.
+3. Can approve, reject, or request clarification. Approval may be full, partial, conditional, or require an additional committee approver depending on society policy.
+4. Approval records who approved, when, the approved amount, any conditions and the supporting evidence.
+5. After approval, an authorised payer records or initiates payment and attaches payment proof / transaction reference.
+6. Once paid, Society OS creates the payment transaction and links it to the approved expense request. It updates cash / bank balances and reports through the existing financial calculation layer.
+7. The requester receives the decision and payment status. The Treasurer can see approved-but-unpaid commitments separately from expenses already paid.
+
+**Important control rules**
+
+- Raising an expense does not create a posted payment or reduce the bank balance.
+- Approval is not the same as payment. An approved request remains a commitment / pending payment until payment is recorded.
+- Record requested amount, approved amount and paid amount separately; support partial approval and instalment payments.
+- Require evidence according to configurable policy and amount thresholds. Do not make a quotation or invoice mandatory for every small expense if society policy permits exceptions; record the reason.
+- Flag duplicate invoices / requests, unusual amounts, missing payee details and requests exceeding configured limits.
+- The requester should not approve their own request. The Treasurer should not approve their own request where separation of duties applies. Small-society exception rules must be explicit and auditable.
+- Bank/cash payment, payment reference, payee, date and evidence must be linked to the approved request.
+- Rejection, cancellation, amendment and post-payment correction must preserve history.
+- The system should support additional committee approval for high-value or policy-defined expenses without burdening low-value routine expenses.
+
+### Shared approval and audit design
+
+Both workflows should use a reusable approval/task engine with:
+
+- society-scoped requester, reviewer and approver identities;
+- configurable approval thresholds and optional multiple approval steps;
+- separation-of-duties checks and explicit small-society exception handling;
+- immutable status history with actor, timestamp, reason and before/after details;
+- attachments stored privately and scoped to the correct society;
+- notifications and reminders;
+- a clear queue for each person's next action;
+- exportable evidence trail for committee review and statutory audit.
+
+The interface should always answer: **What is waiting? Who needs to act? What evidence is needed? What happens next?**
+
 ## 5. Plain-language interface rules
 
 - Prefer “Money received” over “Receipts” where context permits.
@@ -154,7 +241,7 @@ A pilot society should be able to:
 1. Complete guided setup without needing to understand accounting terminology.
 2. Import or enter members, units and opening financial information with clear review steps.
 3. Generate a monthly maintenance bill run using approved society settings.
-4. Record a receipt and expense and understand the effect on balances.
+4. Submit a maintenance payment, track verification and receive an official receipt after confirmation.\n5. Raise an expense request, receive a Treasurer decision, and track payment without creating an unapproved accounting entry.\n6. Record permitted direct receipts and expenses and understand the effect on balances.
 5. Identify unpaid members and issue statements/reminders.
 6. See bank/cash position, collections and expenses with clear explanations.
 7. Produce the core reports required for committee review and auditor handover.
