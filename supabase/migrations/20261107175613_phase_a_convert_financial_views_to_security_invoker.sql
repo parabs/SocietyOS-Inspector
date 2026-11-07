@@ -1,0 +1,13 @@
+begin;
+alter view public.v_account_monthly_movement set (security_invoker=true);
+alter view public.v_opening_balance_register set (security_invoker=true);
+alter view public.v_member_financial_year_balance set (security_invoker=true);
+alter view public.balance_register set (security_invoker=true);
+alter view public.v_account_financial_year_balance set (security_invoker=true);
+alter view public.v_demand_transaction_reconciliation set (security_invoker=true);
+alter view public.v_member_financial_year_balance_calculated set (security_invoker=true);
+alter view public.v_transaction_cutoff_exceptions set (security_invoker=true);
+alter view public.v_party_financial_year_balance set (security_invoker=true);
+alter view public.v_transaction_financial_year_movement set (security_invoker=true);
+alter view public.v_member_cumulative_outstanding set (security_invoker=true);
+commit;

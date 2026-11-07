@@ -685,7 +685,21 @@ export interface Database {
       };
     };
     Functions: {
-      [_ in never]: never;
+      get_my_society_access: { Args: Record<PropertyKey, never>; Returns: Json };
+      get_my_society_invitations: { Args: Record<PropertyKey, never>; Returns: Json };
+      get_society_members_directory: { Args: { p_society_id: string }; Returns: Json };
+      accept_society_invitation: { Args: { p_society_id: string }; Returns: boolean };
+      grant_society_role: {
+        Args: { p_society_id: string; p_user_id: string; p_role_code: string; p_valid_from?: string; p_valid_until?: string | null; p_reason?: string | null };
+        Returns: string;
+      };
+      revoke_society_role: { Args: { p_society_id: string; p_user_id: string; p_role_code: string; p_reason: string }; Returns: boolean };
+      set_society_membership_status: { Args: { p_society_id: string; p_user_id: string; p_status: string; p_reason: string }; Returns: boolean };
+      verify_party_user_link: {
+        Args: { p_society_id: string; p_party_id: string; p_user_id: string; p_relationship_code: string; p_valid_until?: string | null; p_reason?: string | null };
+        Returns: string;
+      };
+      is_society_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
     };
     Enums: {
       [_ in never]: never;
