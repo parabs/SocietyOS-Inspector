@@ -58,3 +58,16 @@ Do not:
 ## Next input needed to complete the reconciliation
 
 The missing migration source files must come from a trusted source. The live migration ledger exposes version/name metadata, not the original SQL bodies. A schema dump can help compare end-state structure but cannot reliably recreate the original migration intent, ordering, data transformations, or rollback assumptions.
+
+
+## Repository branch recovery check (2026-11-07)
+
+A read-only search of the repository's available branches and commit history was performed after the initial reconciliation:
+
+- The branch search returned 68 branches, including `main`, the active foundation branch, and the relevant FY2018 import, financial-year audit, compliance, and audit-reconciliation feature branches.
+- No second page of branches was returned.
+- Seven targeted fetches for production-only migration paths across `main`, the related feature branches, and the active foundation branch returned 404/not found.
+- Commit-history searches for several distinctive production-only migration identifiers (including the society import guard, historical demand due-date change, and compliance RLS cleanup) returned no matching commits.
+- Some migration concepts do exist in repository commit history (for example, the central financial calculation layer and audit reconciliation wizard), but this does not recover the production-versioned SQL file bodies or prove equivalence to production migrations with different timestamps.
+
+**Conclusion:** the available repository branches and searchable commit history do not currently provide a trustworthy source for the missing production migration SQL. This is a bounded search, not proof that no external backup or inaccessible Git history exists. The next safe route remains obtaining the original deployment/workspace migration folder or a trusted backup. No repository migration files, Supabase data, or production migration ledger were changed by this investigation.
