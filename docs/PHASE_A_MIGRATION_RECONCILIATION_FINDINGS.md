@@ -134,3 +134,15 @@ Do not:
 - No existing FY 2018–19 transactions, demands, allocations, balances or reports modified.
 - The A1 identity SQL remains a review draft, not an executable production migration.
 - Existing multi-tenant security blockers remain open; member-facing access must not be enabled until views, policies, functions and storage are tenant-safe.
+
+
+## 9. Additional repository version collision
+
+A subsequent check of the current `main` migration directory found that two different files share the same version prefix `20261107100000`:
+
+- `20261107100000_financial_year_audit_reconciliation_wizard.sql`
+- `20261107100000_guided_agm_compliance_workflow.sql`
+
+The production ledger has the related changes recorded under different versions/names (`20261107042505 financial_year_audit_reconciliation_wizard` and `20261106115244 expand_financial_year_checklist_stages_for_guided_agm`). Read-only catalog inspection confirms that the principal objects from both repository files exist in production, but does not prove the file bytes are the original deployed migration SQL.
+
+This duplicate repository version is an independent replay blocker. See [PHASE_A_MIGRATION_VERSION_COLLISION.md](PHASE_A_MIGRATION_VERSION_COLLISION.md) for the object-level cross-check and safe handling. Do not replay either file, change a timestamp blindly, or mark either migration as applied to silence the collision.
