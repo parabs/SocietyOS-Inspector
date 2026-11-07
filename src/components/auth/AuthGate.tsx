@@ -5,16 +5,8 @@ import { supabaseClient } from '../../services/supabaseClient';
 type AuthState =
   | { status: 'loading' }
   | { status: 'signed-out' }
-  | { status: 'unauthorized'; email: string | null }
   | { status: 'authorized'; session: Session }
   | { status: 'error'; message: string };
-
-const isSocietyAdmin = (session: Session) => {
-  const metadata = session.user.app_metadata ?? {};
-  const roles = metadata.roles;
-  return metadata.role === 'society_admin' ||
-    (Array.isArray(roles) && roles.includes('society_admin'));
-};
 
 export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
@@ -27,9 +19,9 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
       if (!mounted) return;
       if (!session) {
         setAuth({ status: 'signed-out' });
-      } else if (!isSocietyAdmin(session)) {
-        setAuth({ status: 'unauthorized', email: session.user.email ?? null });
       } else {
+        // Authentication is common to every role. Authorization is enforced
+        // separately by the application's assigned-role access controls.
         setAuth({ status: 'authorized', session });
       }
     };
@@ -85,19 +77,9 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   if (auth.status === 'signed-out') {
     return (
-      <AuthPanel title="Society OS" detail="Sign in with your authorized Google account to continue.">
+      <AuthPanel title="Society OS" detail="Sign in with your Google account to continue.">
         <button onClick={signIn} disabled={busy} className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
           {busy ? 'Redirecting…' : 'Continue with Google'}
-        </button>
-      </AuthPanel>
-    );
-  }
-
-  if (auth.status === 'unauthorized') {
-    return (
-      <AuthPanel title="Access not authorized" detail={auth.email ? `The signed-in account (${auth.email}) does not have the Society Admin role.` : 'This account does not have the Society Admin role.'}>
-        <button onClick={signOut} disabled={busy} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-          {busy ? 'Signing out…' : 'Sign out'}
         </button>
       </AuthPanel>
     );
