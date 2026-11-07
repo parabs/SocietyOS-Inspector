@@ -4,6 +4,8 @@ import { supabaseClient } from '../../services/supabaseClient';
 import { SocietyAccessProvider } from '../../context/SocietyAccessContext';
 import type { SocietyAccess } from '../../context/SocietyAccessContext';
 
+const callSocietyRpc = (supabaseClient.rpc as unknown as (name: string, args?: Record<string, unknown>) => Promise<{ data: any; error: any }>).bind(supabaseClient);
+
 interface SocietyInvitation {
   membership_id: string;
   society_id: string;
@@ -112,7 +114,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   const acceptInvitation = async (societyId: string) => {
     setBusy(true);
-    const { error } = await supabaseClient.rpc('accept_society_invitation', { p_society_id: societyId });
+    const { error } = await callSocietyRpc('accept_society_invitation', { p_society_id: societyId });
     if (error) {
       setAuth({ status: 'error', message: error.message });
       setBusy(false);
