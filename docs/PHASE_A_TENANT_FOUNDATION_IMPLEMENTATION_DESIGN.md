@@ -256,12 +256,17 @@ Phase B workflow tables and Phase C/D payment/expense tables are explicitly out 
 - If A3 RLS causes app regressions, revert to the documented temporary admin compatibility policy; do not disable RLS globally.
 - Never merge/apply a production migration solely because the SQL compiles.
 
-## 11. Decisions required before executable SQL
+## 11. Decisions and remaining approval gates
 
-1. Confirm the exact legal society name and whether “C Wing” is part of the registered society name or a building/block descriptor.
-2. Confirm every existing record in this project belongs to that one society.
-3. Confirm the initial society administrator (the existing single Auth user may be a candidate, but must be explicitly designated).
-4. Confirm the building name/code to create, if a building row is required now.
-5. Approve the A1/A2/A3 rollout sequence after the dry-run mapping report.
+### Established legal identity from prior explicit user statements
 
-**Next deliverable after these decisions:** an executable, additive Phase A migration set plus a dry-run/backfill script and RLS test suite, initially targeted only to a development branch. Production application remains a separate approval.
+The user has previously identified C Wing as a separate registered cooperative housing society and used the legal name **“PEARL MEADOWS C-TYPE WING CO-OPERATIVE HOUSING SOCIETY LTD.”** (also referred to as “Pearl Meadows 'C' Type 'C' Wing Chs Ltd.”). Therefore, for the tenant identity design, treat C Wing as the society tenant itself, not merely as a building within a larger society. Do not create a separate parent society based on the Pearl Meadows name. Store the legal name exactly as confirmed; use a separate building row only if the society confirms an internal building/block structure.
+
+### Still required before any data backfill or administrator grant
+
+1. Confirm that every existing record in this Supabase project belongs exclusively to this one registered society. The historical use of the project for Pearl Meadows is not sufficient proof for an automatic all-row backfill.
+2. Designate the initial Society Admin. There is one Auth user in the project, but the user has not explicitly designated that account; do not grant it admin membership automatically.
+3. Confirm the building name/code only if a building record is needed now. This can remain empty for the first migration if the society is modelled as a single operating unit.
+4. Approve the A1/A2/A3 rollout sequence after reviewing the dry-run mapping report.
+
+**Next deliverable:** prepare the additive A1 identity-table migration without inserting a society, assigning memberships/roles, backfilling financial records, or enabling tenant RLS. Prepare the A2 dry-run mapping separately. Target development first; production application requires a separate explicit approval.
