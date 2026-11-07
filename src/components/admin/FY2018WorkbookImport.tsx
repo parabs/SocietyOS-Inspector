@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { AlertTriangle, CheckCircle2, Database, FileSpreadsheet, Loader2, UploadCloud } from 'lucide-react';
 import { supabaseClient } from '../../services/supabaseClient';
+import { useSocietyAccess } from '../../context/SocietyAccessContext';
 
 type ImportPlanRow = { table: string; count: number; note: string };
 type ResultRow = { table: string; attempted: number; succeeded: number; error?: string };
@@ -61,6 +62,7 @@ const batches = <T,>(items: T[], size = BATCH_SIZE): T[][] => {
 };
 
 export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const { activeSociety } = useSocietyAccess();
   const [file, setFile] = useState<File | null>(null);
   const [plan, setPlan] = useState<ImportPlanRow[]>([]);
   const [previewError, setPreviewError] = useState('');
@@ -387,7 +389,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       }
 
       // Preflight: reject overlapping imports and inspect existing destination counts.
-      const { data: status, error: statusError } = await supabaseClient.functions.invoke('import-fy2018-workbook', { body: { action: 'status' } });
+      const { data: status, error: statusError } = await supabaseClient.functions.invoke('import-fy2018-workbook', { body: { action: 'status', societyId: activeSociety?.society_id } });
       if (statusError) throw new Error(statusError.message || 'Could not check current import status.');
       if (status?.error) throw new Error(status.error);
       if (status?.active) throw new Error(`Import ${status.active.id} is already running. Do not start another import until it is resolved.`);
@@ -403,7 +405,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
 
       const rowCounts = Object.fromEntries(selectedTables.map(table => [table, (payload[table] || []).length]));
       const { data: started, error: startError } = await supabaseClient.functions.invoke('import-fy2018-workbook', {
-        body: { action: 'start', fileName, financialYear: 'FY 2018-19', tables: selectedTables, rowCounts },
+        body: { action: 'start', societyId: activeSociety?.society_id, fileName, financialYear: 'FY 2018-19', tables: selectedTables, rowCounts },
       });
       if (startError) throw new Error(startError.message || 'Could not start import batch.');
       if (started?.error) throw new Error(started.error);
@@ -421,7 +423,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
         }
         for (const group of batches(rows, BATCH_SIZE)) {
           const { data: batchData, error: batchError } = await supabaseClient.functions.invoke('import-fy2018-workbook', {
-            body: { action: 'batch', batchId, table, rows: group },
+            body: { action: 'batch', societyId: activeSociety?.society_id, batchId, table, rows: group },
           });
           if (batchError) {
             let detail = batchError.message || `Batch failed for ${table}`;
@@ -441,7 +443,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       }
 
       const { data: finished, error: finishError } = await supabaseClient.functions.invoke('import-fy2018-workbook', {
-        body: { action: 'finish', batchId, success: true },
+        body: { action: 'finish', societyId: activeSociety?.society_id, batchId, success: true },
       });
       if (finishError) throw new Error(finishError.message || 'Records were written but final audit verification failed.');
       if (finished?.error || finished?.success !== true) throw new Error(finished?.error || 'Server did not confirm all selected table counts.');
@@ -472,7 +474,7 @@ export const FY2018WorkbookImport: React.FC<{ onClose: () => void }> = ({ onClos
       const message = e?.message || String(e);
       if (batchId) {
         try {
-          await supabaseClient.functions.invoke('import-fy2018-workbook', { body: { action: 'finish', batchId, success: false, error: message } });
+          await supabaseClient.functions.invoke('import-fy2018-workbook', { body: { action: 'finish', societyId: activeSociety?.society_id, batchId, success: false, error: message } });
         } catch {}
       }
       setResults(prev => {
