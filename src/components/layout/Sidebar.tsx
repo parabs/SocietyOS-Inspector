@@ -6,6 +6,8 @@ import {
   ChevronDown, ChevronRight, Menu, X, Lock, CalendarCheck, FolderCheck,
 } from 'lucide-react';
 import { useVerification, ScreenId } from '../../context/VerificationContext';
+import { useSocietyAccess } from '../../context/SocietyAccessContext';
+import { SCREEN_PERMISSIONS } from '../../auth/permissions';
 
 type SectionId = 'dashboard' | 'verification' | 'compliance' | 'reports' | 'admin';
 
@@ -19,6 +21,11 @@ const SECTION_SCREENS: Record<SectionId, ScreenId[]> = {
 
 export const Sidebar: React.FC = () => {
   const { currentScreen, setCurrentScreen } = useVerification();
+  const { hasPermission } = useSocietyAccess();
+  const canSee = (screen: ScreenId) => {
+    const required = SCREEN_PERMISSIONS[screen];
+    return Boolean(required?.length && hasPermission(...required));
+  };
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState<SectionId | null>(null);
 
@@ -38,7 +45,9 @@ export const Sidebar: React.FC = () => {
     setMobileOpen(false);
   };
 
-  const sectionButton = (id: SectionId, title: string, icon: React.ReactNode) => (
+  const sectionButton = (id: SectionId, title: string, icon: React.ReactNode) => {
+    if (!SECTION_SCREENS[id].some(canSee)) return null;
+    return (
     <button onClick={() => setExpanded(prev => prev === id ? null : id)}
       aria-expanded={expanded === id}
       className={`w-full flex items-center justify-between rounded-lg px-3 py-3 text-sm font-semibold transition-colors ${
