@@ -22,6 +22,14 @@ Applied migration `20261107174331_phase_a_restrict_legacy_rpc_and_trigger_functi
 - Restricted the legacy missing-transaction correction RPC to authenticated callers. Its existing internal Society Admin check remains a legacy global-claim check and must be replaced before multi-society use.
 - Kept the `is_society_admin()` helper callable only by authenticated users because current RLS policies still depend on it.
 
+## Additional production change completed
+
+Applied migration `20261107174556_phase_a_lock_unscoped_audit_evidence_storage`.
+
+- Removed the three broad authenticated policies from the private `audit-evidence` bucket.
+- Preflight confirmed zero objects in the bucket and zero populated evidence paths in the three linked evidence tables.
+- The bucket remains private. Evidence upload/download is intentionally blocked until society + record + permission-scoped storage paths and signed URL checks are implemented.
+
 ## Verification
 
 The post-migration catalog query confirmed:
