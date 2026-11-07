@@ -47,3 +47,27 @@ The repository file names therefore resemble already-applied production changes,
 ## Conclusion
 
 This is an additional, independently verifiable migration-history defect. The repository's migration directory is not currently a safe source for production replay. The right next step is source recovery and semantic reconciliation, not a production migration or a blind timestamp rename.
+
+
+## Live schema cross-check completed
+
+Read-only production catalog checks confirm that both repository SQL files have corresponding objects in the live database:
+
+### Audit reconciliation wizard
+
+- `financial_year_audit_reconciliations` exists with the expected 20 columns, including generated `variance`, `system_snapshot`, and resolution metadata.
+- The live table has the unique key on `(financial_year, reconciliation_key)`, the auditor-document and financial-year foreign keys, the resolution status/type checks, and the resolution consistency check.
+- The three policies from the repository SQL are present with the same broad predicates: authenticated SELECT `true`, INSERT `auth.uid() IS NOT NULL`, UPDATE `auth.uid() IS NOT NULL`.
+- The `trg_guard_financial_year_audit_reconciliation_write` trigger is present for INSERT and UPDATE.
+
+### Guided AGM workflow
+
+- `financial_year_checklist` contains the added task code, sequence, guidance, completion criteria, owner/approver roles, dependency, submission and approval fields.
+- `governance_task_approvals` exists with the expected approval fields and checklist foreign key.
+- The checklist task-code index and governance-approval checklist index are present.
+- The broad authenticated checklist read/insert/update policies are present. The approval table has authenticated read-all and insert-own-actor policies.
+- The governance task activity trigger is present on checklist INSERT and UPDATE.
+
+**Interpretation:** the production end state is consistent with the principal DDL and policy intent visible in these two repository files. This is useful end-state evidence, but it is not proof that these exact file bytes were the SQL applied in production. The production ledger records the related migrations under different versions/names, and the duplicate repository version still makes the current migration directory ambiguous.
+
+This cross-check also confirms that the duplicate-version files are not simply unused drafts: their principal database objects already exist in production. Do not replay them.
