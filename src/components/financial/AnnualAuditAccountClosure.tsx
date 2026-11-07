@@ -145,8 +145,8 @@ export const AnnualAuditAccountClosure: React.FC = () => {
     finally { setBusy(false); }
   };
 
-  const resolveRow = (key: string, field: string, value: string) => setResolutions(prev => ({ ...prev, [key]: { resolution_type: '', resolution_reference: '', resolution_note: '', ...prev[key], [field]: value } }));
-  const updateEdited = (key: string, field: string, value: string) => setEdited(prev => ({ ...prev, [key]: { audited_amount: '', audited_page_reference: '', auditor_document_id: '', ...prev[key], [field]: value } }));
+  const resolveRow = (key: string, field: string, value: string) => setResolutions(prev => { const current = prev[key] || { resolution_type: '', resolution_reference: '', resolution_note: '' }; return { ...prev, [key]: { ...current, [field]: value } }; });
+  const updateEdited = (key: string, field: string, value: string) => setEdited(prev => { const current = prev[key] || { audited_amount: '', audited_page_reference: '', auditor_document_id: '' }; return { ...prev, [key]: { ...current, [field]: value } }; });
 
   const persistedResolved = items.filter(i => i.resolution_status === 'Matched' || i.resolution_status === 'Resolved').length;
   const unresolvedCount = systemRows.length ? systemRows.length - persistedResolved : 0;
@@ -158,6 +158,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
   const closeFinancialYear = async () => {
     setBusy(true); setError(''); setNotice('');
     try {
+      if (!record) throw new Error('Save the auditor details before closing this financial year.');
       if (!readyToClose) throw new Error('Complete every account reconciliation line before closing this financial year.');
       const db: any = supabaseClient;
       const snapshot = {
