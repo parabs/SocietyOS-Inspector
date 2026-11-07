@@ -42,7 +42,10 @@ begin
     'guard_financial_year_freeze',
     'guard_internal_audit_signoff',
     'log_data_management_change',
-    'prevent_audit_record_mutation'
+    'prevent_audit_record_mutation',
+    'log_governance_task_activity',
+    'log_transaction_inspection_change',
+    'set_updated_at'
   ] loop
     select p.oid into v_oid
     from pg_proc p
@@ -63,7 +66,19 @@ begin
       raise exception 'Empty search_path is not configured on public.%', v_name;
     end if;
   end loop;
-end $$;
+
+  v_oid := to_regprocedure('public.add_missing_transaction(date,text,numeric,text,text,text,text,text,text,text,text,text)');
+  if v_oid is null or has_function_privilege('anon', v_oid, 'EXECUTE')
+     or not has_function_privilege('authenticated', v_oid, 'EXECUTE') then
+    raise exception 'Legacy correction RPC must be authenticated-only';
+  end if;
+
+  v_oid := to_regprocedure('public.is_society_admin()');
+  if v_oid is null or has_function_privilege('anon', v_oid, 'EXECUTE')
+     or not has_function_privilege('authenticated', v_oid, 'EXECUTE') then
+    raise exception 'Legacy RLS helper must be authenticated-only';
+  end if;
+end $;
 
 -- All current public base tables must continue to have RLS enabled.
 do $$
