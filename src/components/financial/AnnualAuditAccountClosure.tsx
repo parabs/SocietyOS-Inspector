@@ -9,9 +9,9 @@ type DocType = 'Statutory Audit Report' | 'Audited Financial Statements' | 'AGM 
 const DOCS: DocType[] = ['Statutory Audit Report', 'Audited Financial Statements', 'AGM Report'];
 const FY_DATES = (fy: string) => {
   const m = fy.match(/(20\\d{2})\\s*[-–/]\\s*(\\d{2,4})/);
-  if (!m) return { start: '2018-04-01', end: '2019-03-31' };
+  if (!m) return { start: '2018-04-01', end: '2019-03-31', endExclusive: '2019-04-01' };
   const y = Number(m[1]), ey = m[2].length === 2 ? 2000 + Number(m[2]) : Number(m[2]);
-  return { start: `${y}-04-01`, end: `${ey}-03-31` };
+  return { start: `${y}-04-01`, end: `${ey}-03-31`, endExclusive: `${ey}-04-01` };
 };
 const money = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(n) || 0);
 const num = (v: any) => Number(v || 0);
@@ -38,7 +38,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
       const [r, d, t, b] = await Promise.all([
         db.from('financial_year_audit_closures').select('*').eq('financial_year', fy).maybeSingle(),
         db.from('financial_year_audit_documents').select('*').eq('financial_year', fy).order('uploaded_at', { ascending: false }),
-        db.from('transactions').select('transaction_date,transaction_type,amount').gte('transaction_date', dates.start).lte('transaction_date', dates.end).limit(10000),
+        db.from('transactions').select('transaction_date,transaction_type,amount').gte('transaction_date', dates.start).lt('transaction_date', dates.endExclusive).limit(10000),
         db.from('v_account_financial_year_balance').select('account_id,opening_balance,current_fy_receipts,current_fy_payments,closing_book_balance').eq('financial_year', fy)
       ]);
       for (const x of [r,d,t,b]) if (x.error) throw x.error;
@@ -76,8 +76,8 @@ export const AnnualAuditAccountClosure: React.FC = () => {
 
   const comparisons = useMemo(() => ([
     { key: 'opening_balance', label: 'Opening cash / bank balance' },
-    { key: 'total_receipts', label: 'Total receipts' },
-    { key: 'total_payments', label: 'Total payments' },
+    { key: 'total_receipts', label: 'Total receipts (raw transactions)' },
+    { key: 'total_payments', label: 'Total payments (raw transactions)' },
     { key: 'closing_balance', label: 'Closing cash / bank balance' }
   ]).map(x => ({ ...x, system: systemFigures[x.key as keyof typeof systemFigures], audited: audited[x.key as keyof typeof audited] === '' ? null : num(audited[x.key as keyof typeof audited]), difference: audited[x.key as keyof typeof audited] === '' ? null : num(systemFigures[x.key as keyof typeof systemFigures]) - num(audited[x.key as keyof typeof audited]) })), [systemFigures, audited]);
 
