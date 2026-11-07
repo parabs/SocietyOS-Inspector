@@ -42,7 +42,7 @@ Deno.serve(async (req: Request) => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !anonKey || !serviceKey) return json({ error: "Supabase function environment is not fully configured." }, 500);
-  const token = req.headers.get("Authorization")?.replace(/^Bearer\\s+/i, "");
+  const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "Sign in with Google through Supabase before importing." }, 401);
 
   const auth = createClient(url, anonKey, {
