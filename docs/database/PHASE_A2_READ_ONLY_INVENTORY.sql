@@ -12,7 +12,7 @@ create temporary table if not exists phase_a2_inventory (
   rows_with_society_id bigint,
   rows_without_society_id bigint,
   primary key (schema_name, table_name)
-) on commit drop;
+);
 
 truncate table phase_a2_inventory;
 
