@@ -234,3 +234,8 @@ Additional hardening required before multi-society use:
 - Add adversarial tests for forged society IDs, arbitrary columns, duplicate/replayed chunks, concurrent starts, stale cleanup races, finish/retry races and cross-society foreign keys.
 
 Do not deploy a replacement importer until the tenant schema, membership helper and importer contracts are in place. The existing version 3 function was not changed by this inspection.
+
+
+## Recovery check against the user's Library
+
+A Library search for the exact missing production migration filenames and migration SQL archives did not locate those production migration sources. It returned older schema-rebuild scripts, including scripts explicitly marked destructive (DROP/recreate operational tables). Those files are not canonical migration history and are not safe substitutes. They were not materialized, executed or edited. The production migration-source blocker therefore remains open.
