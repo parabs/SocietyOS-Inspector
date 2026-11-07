@@ -182,3 +182,40 @@ This is a design sequence, not an instruction to run production SQL immediately.
 Evidence came from read-only inspection of the live production PostgreSQL catalogs (`pg_class`, `pg_attribute`, `pg_policies`, `pg_proc`, `pg_constraint`, `information_schema.triggers`), Storage bucket metadata and the Supabase security advisor on 2026-11-07.
 
 This report does not claim that every application route or every external integration has been penetration-tested. The next safe step is to map view/storage consumers in the repository and prepare a tested remediation plan, not to infer that a policy change is safe from catalog inspection alone.
+
+
+## 9. Frontend dependency and evidence-path review
+
+A repository review confirms that the browser application initializes Supabase with the public anon/publishable key and persists the user's Supabase session. This is expected for a browser client; it means database security must be correct at the database/API boundary and cannot depend on hiding the public key.
+
+The current audit screens consume the exposed views and directly query workflow tables:
+
+- `VerificationContext` reads `v_account_financial_year_balance`, `balance_register`, `v_member_financial_year_balance`, `v_party_financial_year_balance`, `v_member_cumulative_outstanding`, and `v_demand_transaction_reconciliation`.
+- `FinancialYearGovernance` directly reads and writes review, checklist, observation, query, adjustment, handover, approval, snapshot, transaction, demand and account-balance tables. The main filters shown in the inspected code are financial-year filters, not society filters.
+- `AnnualAuditAccountClosure` directly reads/writes closure, document and reconciliation tables and consumes `v_account_financial_year_balance`.
+
+This means a view-security or policy correction must be validated against these consumers. In particular, the six RLS-enabled/no-policy tables are queried directly by the app in some workflows; their current policy state may produce access errors for normal authenticated users. Do not solve that by granting broad access. Add the intended role and membership checks first.
+
+### Evidence upload paths
+
+Two frontend upload paths were inspected:
+
+- Financial-year governance handover evidence: `<financial-year>/<handover-id>/<document-id>_<filename>`.
+- Annual audit closure evidence: `<financial-year>/annual-audit/<timestamp>_<filename>`.
+
+Neither path begins with a society identifier. Current storage policies also do not validate a society folder prefix. A multi-society path convention should use a server-validated society ID as the first path segment, for example `<society-id>/<financial-year>/...`, with policies verifying both membership and object-path scope. Existing paths need an explicit migration plan so prior evidence links are not broken.
+
+### Client-supplied audit attribution
+
+The inspected `FinancialYearGovernance` handlers submit actor display names and roles from client-side form state (with fallback labels such as `Society OS User`). These fields are useful as a human-readable attestation, but must not be treated as verified identity or authorization. The authenticated user ID should be derived server-side from `auth.uid()`; role and society membership must be checked independently. Preserve the entered signatory name as an attestation field, clearly distinct from the authenticated actor.
+
+### Impact on remediation order
+
+1. First, restrict anonymous financial-view access and test every listed view consumer with a real authenticated session.
+2. Next, redesign audit/compliance policies so read and write rights are role-specific; use verified user IDs for audit actor attribution.
+3. Then migrate storage paths and policies in a backwards-compatible way.
+4. Only after the single-society experience is regression-tested should the society membership model and tenant keys be introduced across the schema.
+
+## 10. Additional evidence and scope limitations
+
+The frontend review covered `src/services/supabaseClient.ts`, `src/context/VerificationContext.tsx`, `src/components/financial/FinancialYearGovernance.tsx`, and `src/components/financial/AnnualAuditAccountClosure.tsx` on the repository's `main` branch. It was a static source review, not a browser penetration test or a test with an anonymous JWT against production endpoints.
