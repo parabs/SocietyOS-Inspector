@@ -21,6 +21,7 @@ type AuthState =
   | { status: 'loading' }
   | { status: 'signed-out' }
   | { status: 'unassigned'; email: string | null }
+  | { status: 'role-unavailable'; email: string | null; roles: string[] }
   | { status: 'invited'; email: string | null; invitations: SocietyInvitation[] }
   | { status: 'authorized'; session: Session; societies: SocietyAccess[] }
   | { status: 'error'; message: string };
@@ -44,8 +45,20 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
       const societies = Array.isArray(accessData) ? accessData as SocietyAccess[] : [];
       if (requestId !== requestSequence.current) return;
       const authorizedSocieties = societies.filter((society) => society.roles.length > 0 && society.permissions.length > 0);
+      const workspacePermissions = new Set([
+        'finance.read.society', 'finance.read.audit', 'finance.read.linked',
+        'compliance.read', 'compliance.manage', 'master.read.society', 'master.draft.manage',
+        'finance.import.manage', 'finance.reconciliation.manage', 'data_quality.read',
+        'audit.evidence.read', 'society.roles.manage', 'society.settings.manage',
+        'governance.read', 'finance.transaction.create_draft', 'finance.transaction.edit_draft',
+      ]);
+      const workspaceSocieties = authorizedSocieties.filter((society) => society.permissions.some((permission) => workspacePermissions.has(permission)));
+      if (workspaceSocieties.length > 0) {
+        setAuth({ status: 'authorized', session, societies: workspaceSocieties });
+        return;
+      }
       if (authorizedSocieties.length > 0) {
-        setAuth({ status: 'authorized', session, societies: authorizedSocieties });
+        setAuth({ status: 'role-unavailable', email: session.user.email ?? null, roles: authorizedSocieties.flatMap((society) => society.roles.map((role) => role.role_name)) });
         return;
       }
 
@@ -158,6 +171,19 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
             Sign out
           </button>
         </div>
+      </AuthPanel>
+    );
+  }
+
+  if (auth.status === 'role-unavailable') {
+    return (
+      <AuthPanel
+        title="Role assigned — workspace not yet available"
+        detail={`Your account has the assigned role(s): ${auth.roles.join(', ')}. The current application release does not yet include the dedicated workspace for this role. Your access to financial and society records remains blocked until the relevant module is released.`}
+      >
+        <button onClick={signOut} disabled={busy} className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-60">
+          {busy ? 'Signing out…' : 'Sign out'}
+        </button>
       </AuthPanel>
     );
   }
