@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronRight, FileText, LockKeyhole, RefreshCw, Upload, Wrench } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, LockKeyhole, RefreshCw, Upload, Wrench } from 'lucide-react';
 import { supabaseClient } from '../../services/supabaseClient';
 import { useVerification } from '../../context/VerificationContext';
+import { APP_CONFIG } from '../../config';
 
 type Row = Record<string, any>;
 type DocType = 'Statutory Audit Report' | 'Audited Financial Statements' | 'AGM Report';
@@ -111,6 +112,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
     setBusy(true); setError(''); setNotice('');
     try {
       if (!record?.audit_status || record.audit_status !== 'Completed') throw new Error('Record statutory audit completion before uploading the audit pack.');
+      if (type === 'AGM Report' && !auditForm.agm_meeting_date) throw new Error('Enter the actual AGM meeting date before uploading its report.');
       const db: any = supabaseClient;
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const path = `${fy.replace(/[^a-zA-Z0-9-]/g, '_')}/annual-audit/${Date.now()}_${safeName}`;
@@ -131,7 +133,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
       const hasAllDocs = DOCS.every(type => docs.some(d => d.document_type === type));
       if (!hasAllDocs) throw new Error('Upload the statutory audit report, audited financial statements and AGM report first.');
       const diffs = comparisons.filter(c => c.difference !== null && Math.abs(c.difference) > 0.01);
-      const payload = { audited_figures: Object.fromEntries(Object.entries(audited).map(([k,v]) => [k, Number(v)])), system_figures: systemFigures, balances_confirmed: diffs.length === 0, balance_comparison: comparisons };
+      const payload = { audited_figures: Object.fromEntries(Object.entries(audited).map(([k,v]) => [k, Number(v)])), system_figures: systemFigures, balances_confirmed: diffs.length === 0, confirmed_by: diffs.length === 0 ? APP_CONFIG.currentReviewer.name : null, confirmed_at: diffs.length === 0 ? new Date().toISOString() : null, balance_comparison: comparisons };
       await ensureRecord(payload);
       if (diffs.length) setNotice(`${diffs.length} difference(s) found. Rectify the relevant records and compare again before confirming.`);
       else setNotice('All four balances match. You can proceed to close the financial year.');
@@ -150,7 +152,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
         system_figures: systemFigures, audited_figures: record.audited_figures, balance_comparison: comparisons,
         source_counts: { transactions: transactions.length, account_monthly_balances: bankRows.length }, closed_at: new Date().toISOString()
       };
-      const { data, error: e } = await db.from('financial_year_audit_closures').update({ status: 'Closed', closing_snapshot: snapshot, closed_at: new Date().toISOString(), closed_by: 'Current user' }).eq('financial_year', fy).eq('balances_confirmed', true).select('*').single();
+      const { data, error: e } = await db.from('financial_year_audit_closures').update({ status: 'Closed', closing_snapshot: snapshot, closed_at: new Date().toISOString(), closed_by: APP_CONFIG.currentReviewer.name }).eq('financial_year', fy).eq('balances_confirmed', true).select('*').single();
       if (e) throw e;
       setRecord(data);
       setNotice('Financial year closed. Closing balances and supporting document references have been saved.');
