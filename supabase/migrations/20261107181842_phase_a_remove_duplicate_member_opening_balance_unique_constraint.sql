@@ -1,0 +1,1 @@
+alter table public.member_opening_balances drop constraint if exists uq_member_opening_balance_party_fy;
