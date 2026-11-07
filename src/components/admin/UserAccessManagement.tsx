@@ -39,7 +39,7 @@ export const UserAccessManagement: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
-  const canManage = hasPermission('society.members.manage', 'society.roles.manage');
+  const canManage = hasPermission('society.members.manage') && hasPermission('society.roles.manage');
 
   const refresh = useCallback(async () => {
     if (!activeSociety || !canManage) return;
