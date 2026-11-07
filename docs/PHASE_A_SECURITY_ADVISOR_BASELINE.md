@@ -77,3 +77,26 @@ The view advisor identifies SECURITY DEFINER behavior, which can cause underlyin
 ## Status
 
 This is an advisor snapshot, not a remediation migration. No production setting, grant, policy, function, view, index, storage policy, row or migration record was changed.
+
+
+## Additional catalog inspection — view grants and trigger function definitions
+
+A read-only catalog query confirmed that all 11 public views:
+- are owned by `postgres`;
+- have no `security_invoker=true` reloption (the reloptions are empty);
+- grant SELECT and broad table-style privileges (including INSERT, UPDATE, DELETE, TRUNCATE, TRIGGER and REFERENCES) to both `anon` and `authenticated`.
+
+The effective ability to mutate a particular view depends on whether PostgreSQL considers it automatically updatable and on underlying privileges/rules. Nevertheless, these grants are unnecessarily broad and, combined with owner-context view behavior, create an avoidable exposure. The remediation must explicitly reduce view grants to the minimum required (normally SELECT for the intended authenticated application role, and no anon access) after identifying current application consumers. Do not assume all views should be readable by all authenticated users in the eventual multi-tenant model.
+
+Catalog inspection of the four flagged SECURITY DEFINER trigger functions confirmed:
+- Each is a trigger-returning function, not a business RPC intended for direct clients.
+- Each has `search_path=public`.
+- `anon` and `authenticated` currently have EXECUTE privilege.
+- The three guard functions read audit/closure workflow tables to enforce sign-off/release/freeze requirements.
+- `log_data_management_change()` writes actor attribution using JWT email or `auth.uid()` into the data-management change log.
+
+A separate function, `prevent_audit_record_mutation()`, is SECURITY INVOKER but has no fixed `search_path`; its body raises an immutable-record exception. Its search path should be fixed as a low-risk hardening change only after confirming the trigger binding and canonical migration source.
+
+The existing `is_society_admin()` helper is SECURITY INVOKER and reads `app_metadata.role/roles` from the JWT. This confirms it is a global-role helper, not an active-society membership authorization check.
+
+**Priority update:** the combination of SECURITY DEFINER views, `postgres` ownership, missing security-invoker options, and anon/authenticated grants means public-view access should be treated as a P0 security gate. Before exposing any new member or tenant functionality, inspect the actual API exposure and application paths, then prepare a least-privilege view/grant migration with report regression tests.
