@@ -1,51 +1,74 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabaseClient } from '../../services/supabaseClient';
+import { SocietyAccessProvider, SocietyAccess } from '../../context/SocietyAccessContext';
+
+interface SocietyInvitation {
+  membership_id: string;
+  society_id: string;
+  tenant_code: string;
+  display_name: string;
+  legal_name: string;
+  valid_from: string;
+  valid_until: string | null;
+  roles: string[];
+}
 
 type AuthState =
   | { status: 'loading' }
   | { status: 'signed-out' }
   | { status: 'unassigned'; email: string | null }
-  | { status: 'authorized'; session: Session }
+  | { status: 'invited'; email: string | null; invitations: SocietyInvitation[] }
+  | { status: 'authorized'; session: Session; societies: SocietyAccess[] }
   | { status: 'error'; message: string };
 
 export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
   const [busy, setBusy] = useState(false);
+  const requestSequence = useRef(0);
+
+  const applySession = useCallback(async (session: Session | null) => {
+    const requestId = ++requestSequence.current;
+    if (!session) {
+      setAuth({ status: 'signed-out' });
+      return;
+    }
+
+    setAuth({ status: 'loading' });
+    try {
+      const { data: accessData, error: accessError } = await supabaseClient.rpc('get_my_society_access');
+      if (accessError) throw accessError;
+      const societies = Array.isArray(accessData) ? accessData as SocietyAccess[] : [];
+      if (requestId !== requestSequence.current) return;
+      if (societies.some((society) => society.roles.length > 0 && society.permissions.length > 0)) {
+        setAuth({ status: 'authorized', session, societies });
+        return;
+      }
+
+      const { data: invitationData, error: invitationError } = await supabaseClient.rpc('get_my_society_invitations');
+      if (invitationError) throw invitationError;
+      const invitations = Array.isArray(invitationData) ? invitationData as SocietyInvitation[] : [];
+      if (requestId !== requestSequence.current) return;
+      if (invitations.length) {
+        setAuth({ status: 'invited', email: session.user.email ?? null, invitations });
+      } else {
+        setAuth({ status: 'unassigned', email: session.user.email ?? null });
+      }
+    } catch (error) {
+      if (requestId !== requestSequence.current) return;
+      setAuth({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unable to verify your society membership.',
+      });
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
-
-    const applySession = (session: Session | null) => {
-      if (!mounted) return;
-      if (!session) {
-        setAuth({ status: 'signed-out' });
-        return;
-      }
-
-      // Only trusted app_metadata is used for authorization. user_metadata is
-      // user-editable and must never grant application access.
-      const metadata = session.user.app_metadata ?? {};
-      const roleClaim = metadata.role;
-      const roleClaims = metadata.roles;
-      const hasAssignedRole =
-        (typeof roleClaim === 'string' && roleClaim.trim().length > 0) ||
-        (Array.isArray(roleClaims) && roleClaims.some(
-          (role) => typeof role === 'string' && role.trim().length > 0,
-        ));
-
-      if (!hasAssignedRole) {
-        setAuth({ status: 'unassigned', email: session.user.email ?? null });
-        return;
-      }
-
-      setAuth({ status: 'authorized', session });
-    };
-
     supabaseClient.auth.getSession()
       .then(({ data, error }) => {
         if (error) throw error;
-        applySession(data.session);
+        if (mounted) void applySession(data.session);
       })
       .catch((error: unknown) => {
         if (mounted) setAuth({
@@ -55,20 +78,22 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
       });
 
     const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((_event, session) => {
-      applySession(session);
+      if (mounted) void applySession(session);
     });
 
     return () => {
       mounted = false;
+      requestSequence.current += 1;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [applySession]);
 
   const signIn = async () => {
     setBusy(true);
+    const redirectTo = `${window.location.origin}${window.location.pathname}`;
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo },
     });
     if (error) {
       setAuth({ status: 'error', message: error.message });
@@ -83,23 +108,65 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
     setBusy(false);
   };
 
+  const acceptInvitation = async (societyId: string) => {
+    setBusy(true);
+    const { error } = await supabaseClient.rpc('accept_society_invitation', { p_society_id: societyId });
+    if (error) {
+      setAuth({ status: 'error', message: error.message });
+      setBusy(false);
+      return;
+    }
+    const { data } = await supabaseClient.auth.getSession();
+    await applySession(data.session);
+    setBusy(false);
+  };
+
   if (auth.status === 'loading') {
-    return <AuthMessage title="Checking secure session" detail="Verifying your Society OS access…" />;
+    return <AuthMessage title="Checking secure session" detail="Verifying your society membership and assigned permissions…" />;
   }
 
   if (auth.status === 'authorized') {
-    return <>{children}</>;
+    return (
+      <SocietyAccessProvider societies={auth.societies}>
+        {children}
+      </SocietyAccessProvider>
+    );
+  }
+
+  if (auth.status === 'invited') {
+    return (
+      <AuthPanel title="Society invitation" detail="Your Google account has a pending society invitation. Accept it to activate your assigned role.">
+        <div className="space-y-3">
+          {auth.invitations.map((invitation) => (
+            <div key={invitation.membership_id} className="rounded-lg border border-slate-700 bg-slate-800/70 p-3">
+              <div className="font-semibold text-white">{invitation.display_name}</div>
+              <div className="mt-1 text-xs text-slate-400">{invitation.roles.join(', ') || 'Role assignment pending'}</div>
+              <button
+                onClick={() => void acceptInvitation(invitation.society_id)}
+                disabled={busy}
+                className="mt-3 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                {busy ? 'Activating…' : 'Accept invitation'}
+              </button>
+            </div>
+          ))}
+          <button onClick={signOut} disabled={busy} className="w-full rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-60">
+            Sign out
+          </button>
+        </div>
+      </AuthPanel>
+    );
   }
 
   if (auth.status === 'unassigned') {
     return (
       <AuthPanel
-        title="Role assignment required"
+        title="Society access not assigned"
         detail={auth.email
-          ? `Your Google account (${auth.email}) is signed in, but no application role has been assigned. Contact the Society Admin to request access.`
-          : 'Your Google account is signed in, but no application role has been assigned. Contact the Society Admin to request access.'}
+          ? `Your Google account (${auth.email}) is signed in, but there is no active society membership with an assigned role. Contact the Society Admin to request access.`
+          : 'Your Google account is signed in, but there is no active society membership with an assigned role. Contact the Society Admin to request access.'}
       >
-        <button onClick={signOut} disabled={busy} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+        <button onClick={signOut} disabled={busy} className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-60">
           {busy ? 'Signing out…' : 'Sign out'}
         </button>
       </AuthPanel>
@@ -108,7 +175,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   if (auth.status === 'signed-out') {
     return (
-      <AuthPanel title="Society OS" detail="Sign in with your Google account to continue.">
+      <AuthPanel title="Society OS" detail="Sign in with your Google account to continue. Your society membership and assigned role will be checked after sign-in.">
         <button onClick={signIn} disabled={busy} className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
           {busy ? 'Redirecting…' : 'Continue with Google'}
         </button>
@@ -118,7 +185,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   return (
     <AuthPanel title="Unable to verify access" detail={auth.message}>
-      <button onClick={() => window.location.reload()} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+      <button onClick={() => window.location.reload()} className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800">
         Retry
       </button>
     </AuthPanel>
