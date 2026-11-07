@@ -24,7 +24,7 @@ Deno.serve(async (req: Request) => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !anonKey || !serviceKey) return json({ error: "Supabase function environment is not fully configured." }, 500);
-  const token = req.headers.get("Authorization")?.replace(/^Bearer\\s+/i, "");
+  const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "Authentication required." }, 401);
 
   const auth = createClient(url, anonKey, {
@@ -43,7 +43,7 @@ Deno.serve(async (req: Request) => {
   const roleCode = String(body.roleCode ?? "").trim();
   const validUntil = body.validUntil ? String(body.validUntil) : null;
   const reason = String(body.reason ?? "Role assigned by Society Admin").trim();
-  if (!societyId || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || !roleCode) {
+  if (!societyId || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !roleCode) {
     return json({ error: "Society, valid email and role are required." }, 400);
   }
   if (email === (userResult.user.email ?? "").toLowerCase()) {
