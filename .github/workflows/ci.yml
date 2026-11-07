@@ -36,3 +36,6 @@ jobs:
 
       - name: Run TypeScript typecheck
         run: bun run lint
+
+      - name: Test FY2018 import batch validation
+        run: node --experimental-strip-types --test supabase/functions/import-fy2018-workbook/batchProgress.test.mjs
