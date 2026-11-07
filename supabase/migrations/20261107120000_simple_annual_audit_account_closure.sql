@@ -45,6 +45,10 @@ create index if not exists idx_fy_audit_documents_fy_type
 alter table public.financial_year_audit_closures enable row level security;
 alter table public.financial_year_audit_documents enable row level security;
 
+-- Supabase no longer exposes newly created public tables to the Data API by default.
+grant select, insert, update on public.financial_year_audit_closures to authenticated;
+grant select, insert on public.financial_year_audit_documents to authenticated;
+
 drop policy if exists fy_audit_closure_read on public.financial_year_audit_closures;
 create policy fy_audit_closure_read on public.financial_year_audit_closures
   for select to authenticated using (true);
@@ -82,6 +86,12 @@ begin
     end if;
     if not new.balances_confirmed or new.confirmed_at is null then
       raise exception 'Confirm audited balances before closing the financial year.';
+    end if;
+    if jsonb_array_length(new.balance_comparison) <> 4 or exists (
+      select 1 from jsonb_array_elements(new.balance_comparison) item
+      where item->>'difference' is null or abs((item->>'difference')::numeric) > 0.01
+    ) then
+      raise exception 'Every balance comparison must contain a verified zero difference before closure.';
     end if;
     if new.closing_snapshot is null then
       raise exception 'A closing snapshot is required.';
