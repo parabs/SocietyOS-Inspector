@@ -3,6 +3,8 @@ import { RefreshCw, UserPlus, ShieldCheck, UserX, UserCheck, AlertCircle } from 
 import { supabaseClient } from '../../services/supabaseClient';
 import { useSocietyAccess } from '../../context/SocietyAccessContext';
 
+const callSocietyRpc = (supabaseClient.rpc as unknown as (name: string, args?: Record<string, unknown>) => Promise<{ data: any; error: any }>).bind(supabaseClient);
+
 interface MemberRole {
   role_code: string;
   role_name: string;
@@ -46,7 +48,7 @@ export const UserAccessManagement: React.FC = () => {
     setLoading(true);
     setMessage(null);
     const [directory, roleResult] = await Promise.all([
-      supabaseClient.rpc('get_society_members_directory', { p_society_id: activeSociety.society_id }),
+      callSocietyRpc('get_society_members_directory', { p_society_id: activeSociety.society_id }),
       supabaseClient.from('society_roles').select('role_code,role_name')
         .eq('society_id', activeSociety.society_id).order('role_name'),
     ]);
@@ -98,7 +100,7 @@ export const UserAccessManagement: React.FC = () => {
   const revokeRole = async (member: MemberRecord, role: MemberRole) => {
     if (!activeSociety || !window.confirm(`Revoke ${role.role_name} from ${member.email}?`)) return;
     setSubmitting(true);
-    const { error } = await supabaseClient.rpc('revoke_society_role', {
+    const { error } = await callSocietyRpc('revoke_society_role', {
       p_society_id: activeSociety.society_id,
       p_user_id: member.user_id,
       p_role_code: role.role_code,
@@ -112,7 +114,7 @@ export const UserAccessManagement: React.FC = () => {
   const changeMembership = async (member: MemberRecord, status: 'active' | 'suspended' | 'ended') => {
     if (!activeSociety || !window.confirm(`${status === 'suspended' ? 'Suspend' : status === 'active' ? 'Reactivate' : 'End'} access for ${member.email}?`)) return;
     setSubmitting(true);
-    const { error } = await supabaseClient.rpc('set_society_membership_status', {
+    const { error } = await callSocietyRpc('set_society_membership_status', {
       p_society_id: activeSociety.society_id,
       p_user_id: member.user_id,
       p_status: status,
