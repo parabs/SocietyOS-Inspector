@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabaseClient } from '../../services/supabaseClient';
-import { SocietyAccessProvider, SocietyAccess } from '../../context/SocietyAccessContext';
+import { SocietyAccessProvider } from '../../context/SocietyAccessContext';
+import type { SocietyAccess } from '../../context/SocietyAccessContext';
 
 interface SocietyInvitation {
   membership_id: string;
@@ -40,8 +41,9 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
       if (accessError) throw accessError;
       const societies = Array.isArray(accessData) ? accessData as SocietyAccess[] : [];
       if (requestId !== requestSequence.current) return;
-      if (societies.some((society) => society.roles.length > 0 && society.permissions.length > 0)) {
-        setAuth({ status: 'authorized', session, societies });
+      const authorizedSocieties = societies.filter((society) => society.roles.length > 0 && society.permissions.length > 0);
+      if (authorizedSocieties.length > 0) {
+        setAuth({ status: 'authorized', session, societies: authorizedSocieties });
         return;
       }
 
