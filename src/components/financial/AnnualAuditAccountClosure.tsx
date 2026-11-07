@@ -28,7 +28,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
   const [record, setRecord] = useState<Row | null>(null);
   const [docs, setDocs] = useState<Row[]>([]);
   const [transactions, setTransactions] = useState<Row[]>([]);
-  const [bankRows, setBankRows] = useState<Row[]>([]);
+  const [accountBalances, setAccountBalances] = useState<Row[]>([]);
   const [auditForm, setAuditForm] = useState({ auditor_name: '', auditor_firm: '', audit_completion_date: '', agm_meeting_date: '' });
   const [audited, setAudited] = useState({ opening_balance: '', total_receipts: '', total_payments: '', closing_balance: '' });
   const [busy, setBusy] = useState(false);
@@ -45,10 +45,10 @@ export const AnnualAuditAccountClosure: React.FC = () => {
         db.from('financial_year_audit_closures').select('*').eq('financial_year', fy).maybeSingle(),
         db.from('financial_year_audit_documents').select('*').eq('financial_year', fy).order('uploaded_at', { ascending: false }),
         db.from('transactions').select('transaction_date,transaction_type,type,amount').gte('transaction_date', dates.start).lte('transaction_date', dates.end).limit(10000),
-        db.from('account_monthly_balance').select('account_id,month,opening_balance,closing_balance').eq('financial_year', fy)
+        db.from('v_account_financial_year_balance').select('account_id,opening_balance,current_fy_receipts,current_fy_payments,closing_book_balance').eq('financial_year', fy)
       ]);
       for (const x of [r,d,t,b]) if (x.error) throw x.error;
-      setRecord(r.data || null); setDocs(d.data || []); setTransactions(t.data || []); setBankRows(b.data || []);
+      setRecord(r.data || null); setDocs(d.data || []); setTransactions(t.data || []); setAccountBalances(b.data || []);
       if (r.data) {
         setAuditForm({ auditor_name: r.data.auditor_name || '', auditor_firm: r.data.auditor_firm || '', audit_completion_date: r.data.audit_completion_date || '', agm_meeting_date: r.data.agm_meeting_date || '' });
         setAudited({
@@ -69,18 +69,16 @@ export const AnnualAuditAccountClosure: React.FC = () => {
 
   const systemFigures = useMemo(() => {
     const receipts = transactions.filter(t => String(t.transaction_type || t.type || '').toLowerCase() === 'receipt').reduce((s,t) => s + num(t.amount), 0);
-    const payments = transactions.filter(t => String(t.transaction_type || t.type || '').toLowerCase() === 'payment').reduce((s,t) => s + num(t.amount), 0);
-    const byAccount = new Map<string, Row[]>();
-    bankRows.forEach(r => byAccount.set(String(r.account_id || 'unknown'), [...(byAccount.get(String(r.account_id || 'unknown')) || []), r]));
-    const latest = [...byAccount.values()].map(rows => [...rows].sort((a,b) => monthRank(String(b.month)) - monthRank(String(a.month)))[0]).filter(Boolean);
-    const earliest = [...byAccount.values()].map(rows => [...rows].sort((a,b) => monthRank(String(a.month)) - monthRank(String(b.month)))[0]).filter(Boolean);
+    const payments = transactions.filter(t => String(t.transaction_type || t.type || '').toLowerCase() === 'payment').reduce((s,t) => s + Math.abs(num(t.amount)), 0);
+    const openingRows = accountBalances.filter(r => r.opening_balance !== null && r.opening_balance !== undefined);
+    const closingRows = accountBalances.filter(r => r.closing_book_balance !== null && r.closing_book_balance !== undefined);
     return {
-      opening_balance: earliest.reduce((s,r) => s + num(r.opening_balance), 0),
+      opening_balance: openingRows.length ? openingRows.reduce((s,r) => s + num(r.opening_balance), 0) : null,
       total_receipts: receipts,
       total_payments: payments,
-      closing_balance: latest.reduce((s,r) => s + num(r.closing_balance), 0)
+      closing_balance: closingRows.length ? closingRows.reduce((s,r) => s + num(r.closing_book_balance), 0) : null
     };
-  }, [transactions, bankRows]);
+  }, [transactions, accountBalances]);
 
   const comparisons = useMemo(() => ([
     { key: 'opening_balance', label: 'Opening cash / bank balance' },
@@ -91,7 +89,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
 
   const ensureRecord = async (patch: Row = {}) => {
     const db: any = supabaseClient;
-    const payload = { financial_year: fy, period_start: dates.start, period_end: dates.end, ...auditForm, ...patch, updated_at: new Date().toISOString() };
+    const payload = { financial_year: fy, period_start: dates.start, period_end: dates.end, ...auditForm, agm_meeting_date: auditForm.agm_meeting_date || null, ...patch, updated_at: new Date().toISOString() };
     const { data, error: e } = await db.from('financial_year_audit_closures').upsert(payload, { onConflict: 'financial_year' }).select('*').single();
     if (e) throw e;
     setRecord(data);
@@ -130,6 +128,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
     try {
       const required = Object.values(audited);
       if (required.some(v => v === '' || !Number.isFinite(Number(v)))) throw new Error('Enter all four audited figures from the signed financial statements.');
+      if (systemFigures.opening_balance === null || systemFigures.closing_balance === null) throw new Error('System opening or closing cash/bank balances are not available for this financial year. Complete the account balance records before confirming.');
       const hasAllDocs = DOCS.every(type => docs.some(d => d.document_type === type));
       if (!hasAllDocs) throw new Error('Upload the statutory audit report, audited financial statements and AGM report first.');
       const diffs = comparisons.filter(c => c.difference !== null && Math.abs(c.difference) > 0.01);
@@ -150,7 +149,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
         financial_year: fy, period: dates, audit: { auditor_name: record.auditor_name, auditor_firm: record.auditor_firm, audit_completion_date: record.audit_completion_date, agm_meeting_date: record.agm_meeting_date },
         documents: docs.map(d => ({ document_type: d.document_type, file_name: d.file_name, file_path: d.file_path, uploaded_at: d.uploaded_at })),
         system_figures: systemFigures, audited_figures: record.audited_figures, balance_comparison: comparisons,
-        source_counts: { transactions: transactions.length, account_monthly_balances: bankRows.length }, closed_at: new Date().toISOString()
+        source_counts: { transactions: transactions.length, account_balance_accounts: accountBalances.length }, closed_at: new Date().toISOString()
       };
       const { data, error: e } = await db.from('financial_year_audit_closures').update({ status: 'Closed', closing_snapshot: snapshot, closed_at: new Date().toISOString(), closed_by: APP_CONFIG.currentReviewer.name }).eq('financial_year', fy).eq('balances_confirmed', true).select('*').single();
       if (e) throw e;
@@ -166,10 +165,10 @@ export const AnnualAuditAccountClosure: React.FC = () => {
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
   };
 
-  const step = record?.status === 'Closed' ? 4 : record?.balances_confirmed ? 3 : docs.length >= 3 ? 2 : record?.audit_status === 'Completed' ? 1 : 0;
+  const allDocumentsUploaded = DOCS.every(type => docs.some(d => d.document_type === type));
+  const step = record?.status === 'Closed' ? 4 : record?.balances_confirmed ? 3 : allDocumentsUploaded ? 2 : record?.audit_status === 'Completed' ? 1 : 0;
   const pendingDiffs = comparisons.filter(c => c.difference !== null && Math.abs(c.difference) > 0.01);
-  const latestDocs = DOCS.map(type => docs.find(d => d.document_type === type)).filter(Boolean) as Row[];
-
+  
   return <div className="mx-auto max-w-[1500px] space-y-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><div className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-700">Compliance & Governance</div><h1 className="text-2xl font-bold mt-1">Annual Audit & Account Closure</h1><p className="text-sm text-slate-500 mt-1">Four simple steps to record the statutory audit, confirm balances and close the financial year.</p></div>
@@ -200,7 +199,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
         <section className="rounded-xl border bg-white p-4">
           <div className="flex items-center justify-between gap-2 mb-3"><div className="flex items-center gap-2"><span className="rounded-full bg-blue-600 text-white w-7 h-7 grid place-items-center font-bold">3</span><div><h2 className="font-semibold">Confirm financial balances</h2><p className="text-xs text-slate-500">Compare actual Society OS receipts, payments and cash/bank balances with audited statements.</p></div></div><span className={record?.balances_confirmed?'text-xs text-emerald-700 font-semibold':'text-xs text-amber-700'}>{record?.balances_confirmed?'Balances matched':'Confirmation pending'}</span></div>
           <div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="bg-slate-50 text-slate-600"><th className="text-left p-2">Particulars</th><th className="text-right p-2">Society OS</th><th className="text-right p-2">Audited (₹)</th><th className="text-right p-2">Difference</th><th className="p-2">Status</th></tr></thead><tbody>{comparisons.map(c=><tr key={c.key} className="border-t"><td className="p-2 font-medium">{c.label}</td><td className="p-2 text-right">{money(c.system)}</td><td className="p-2 text-right"><input type="number" step="0.01" value={audited[c.key as keyof typeof audited]} onChange={e=>setAudited({...audited,[c.key]:e.target.value})} className="w-32 border rounded px-2 py-1 text-right"/></td><td className="p-2 text-right">{c.difference===null?'—':money(c.difference)}</td><td className="p-2 text-center">{c.difference===null?<span className="text-slate-400">Enter figure</span>:Math.abs(c.difference)<=0.01?<span className="text-emerald-700">Match</span>:<span className="text-amber-700">Review</span>}</td></tr>)}</tbody></table></div>
-          <div className="mt-3 flex flex-wrap justify-between items-center gap-2"><span className="text-[11px] text-slate-500">Source: transactions and account-monthly balance records for the selected FY.</span><button onClick={()=>void saveAuditedFigures()} disabled={busy||DOCS.some(t=>!docs.some(d=>d.document_type===t))} className="bg-blue-700 text-white rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-40">Save comparison & confirm if matched</button></div>
+          <div className="mt-3 flex flex-wrap justify-between items-center gap-2"><span className="text-[11px] text-slate-500">Source: raw transaction rows and the account financial-year balance view for the selected FY.</span><button onClick={()=>void saveAuditedFigures()} disabled={busy||DOCS.some(t=>!docs.some(d=>d.document_type===t))} className="bg-blue-700 text-white rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-40">Save comparison & confirm if matched</button></div>
           {pendingDiffs.length>0&&<div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800"><AlertTriangle className="inline w-4 h-4 mr-1"/> {pendingDiffs.length} difference(s) need attention. <button onClick={()=>setRectificationOpen(v=>!v)} className="underline font-semibold">Rectification options</button></div>}
           {rectificationOpen&&<div className="mt-3 rounded-lg border p-3"><h3 className="text-sm font-semibold flex items-center gap-2"><Wrench className="w-4 h-4"/>Rectification required?</h3><p className="text-xs text-slate-600 mt-1">Review the underlying transactions in the Transactions Workspace. Do not overwrite imported source rows; use the approved correction workflow and preserve the original entry.</p><button onClick={()=>setCurrentScreen('transactions')} className="mt-2 bg-blue-700 text-white rounded-lg px-3 py-2 text-xs font-semibold">Open Transactions Workspace</button></div>}
         </section>
