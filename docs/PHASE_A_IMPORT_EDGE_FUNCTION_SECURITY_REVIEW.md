@@ -9,7 +9,7 @@
 
 ## Executive result
 
-The deployed Edge Function source matches `supabase/functions/import-fy2018-workbook/index.ts` on GitHub `main` byte-for-byte at inspection time (10,872 characters). Supabase reports `verify_jwt=true`.
+The deployed Edge Function version 3 matched `supabase/functions/import-fy2018-workbook/index.ts` on GitHub `main` byte-for-byte during the initial inspection (10,872 characters). After the source-only correction was merged in PR #79, the repository's `main` source changed while the deployed Edge Function remained at version 3. Supabase still reports `verify_jwt=true`. The deployed function has **not** been updated by this work.
 
 The function is designed for the current single-society admin import. It is **not yet a tenant-aware import boundary** and must not be reused for multi-society imports without authorization and data-scope changes.
 
@@ -46,9 +46,11 @@ The database has a trigger-based change logger on `party_master` and `transactio
 
 ## Source correction prepared
 
-PR #79 moves the row-budget check ahead of the target-table upsert and adds five focused tests for the pure validation helper. The five helper tests passed under Node 22's TypeScript type-stripping support.
+PR #79 has been merged to GitHub `main`. It moves the row-budget check ahead of the target-table upsert and adds five focused tests for the pure validation helper. All five tests passed in the PR's GitHub Actions run, together with the application build and TypeScript typecheck.
 
-This patch does **not** solve concurrent chunk reservation, tenant scoping, strict per-table column validation, or atomic completion. It has not been merged or deployed. Deno is not installed in the current environment, so a full Edge Runtime integration test was not run.
+The source correction is **not deployed** to Supabase. The live function remains version 3 and still runs the pre-fix code until a separate deployment is approved and completed. Deno is not installed in the current environment, so a full Edge Runtime integration test was not run.
+
+The merged patch does **not** solve concurrent chunk reservation, tenant scoping, strict per-table column validation, or atomic completion. Those remain separate release gates.
 
 ## Release gate
 
