@@ -12,7 +12,7 @@ import { supabaseClient } from '../../services/supabaseClient';
 export const Header: React.FC = () => {
   const { resetAllData, supabaseSync, refetchFromSupabase } = useVerification();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [signedInUser, setSignedInUser] = useState<{ name: string; email: string; initials: string } | null>(null);
+  const [signedInUser, setSignedInUser] = useState<{ name: string; email: string; initials: string; role: string } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -20,8 +20,13 @@ export const Header: React.FC = () => {
       if (!mounted || !data.user) return;
       const email = data.user.email ?? '';
       const name = String(data.user.user_metadata?.full_name || data.user.user_metadata?.name || email || 'Society Admin');
-      const initials = name.split(/\\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'SA';
-      setSignedInUser({ name, email, initials });
+      const initials = name.split(/\\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'U';
+      const appMetadata = data.user.app_metadata ?? {};
+      const roleClaims = Array.isArray(appMetadata.roles) ? appMetadata.roles.filter((role): role is string => typeof role === 'string') : [];
+      const role = typeof appMetadata.role === 'string'
+        ? appMetadata.role
+        : roleClaims.length ? roleClaims.join(', ') : 'Authenticated';
+      setSignedInUser({ name, email, initials, role });
     });
     return () => { mounted = false; };
   }, []);
@@ -158,8 +163,8 @@ export const Header: React.FC = () => {
                 {signedInUser?.initials ?? 'SA'}
               </div>
               <div className="hidden sm:block text-xs leading-tight">
-                <div className="font-semibold text-white">{signedInUser?.name ?? 'Society Admin'}</div>
-                <div className="text-[10px] text-slate-400">Society Admin</div>
+                <div className="font-semibold text-white">{signedInUser?.name ?? 'Signed-in user'}</div>
+                <div className="text-[10px] text-slate-400">{signedInUser?.role ?? 'Authenticated'}</div>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
             </button>
@@ -168,9 +173,9 @@ export const Header: React.FC = () => {
             {showProfileMenu && (
               <div className="absolute right-0 mt-2 w-56 bg-white text-slate-800 rounded-lg shadow-xl border border-slate-200 py-1.5 z-50 text-xs">
                 <div className="px-3 py-2 border-b border-slate-100">
-                  <div className="font-semibold text-slate-900">{APP_CONFIG.currentReviewer.name}</div>
+                  <div className="font-semibold text-slate-900">{signedInUser?.name ?? 'Signed-in user'}</div>
                   <div className="text-[11px] text-slate-500">{signedInUser?.email ?? ''}</div>
-                  <div className="text-[10px] text-blue-600 font-medium mt-1">Authorized Reviewer</div>
+                  <div className="text-[10px] text-blue-600 font-medium mt-1">Google account authenticated</div>
                 </div>
 
                 <button
