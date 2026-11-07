@@ -153,3 +153,27 @@ All expected row counts must be re-read immediately before backfill. The numbers
 - No financial calculations, IDs, transactions, demands or allocations were modified.
 
 **Next implementation step:** validate the A1 schema against the full live schema and prepare a development-only executable migration plus a separate, reviewed tenant backfill manifest. Production execution remains a distinct approval.
+
+
+## 9. Additional security and storage preflight (read-only, 2026-11-07)
+
+### Functions and triggers
+
+The live database has the following relevant privileged functions:
+- `guard_audit_handover_release()` — SECURITY DEFINER trigger function on audit handover release.
+- `guard_financial_year_freeze()` — SECURITY DEFINER trigger function on financial-year snapshot freeze.
+- `guard_internal_audit_signoff()` — SECURITY DEFINER trigger function on closure approval.
+- `log_data_management_change()` — SECURITY DEFINER trigger function writing change-log rows.
+- `is_society_admin()` — SECURITY INVOKER SQL function reading the global JWT `app_metadata.role/roles` claims.
+
+The three audit guard functions and the change logger use a fixed `search_path` of `public`. Their table access and execute privileges must be reviewed before tenant rollout. Do not casually convert trigger functions to invoker mode or change their search path without regression tests; do not introduce a new SECURITY DEFINER tenant helper into the exposed `public` schema.
+
+Existing triggers also include immutable audit/snapshot guards, governance activity logging, and data-management change logging on core master/transaction tables. Tenant backfill and future updates must be tested with these triggers active. In particular, ensure tenant-key backfill does not create misleading user-attributed business-change events or mutate immutable records.
+
+### Storage
+
+The project has one private bucket, `audit-evidence`, with a 25 MiB file limit and document/image MIME allow-list. Its current authenticated policies scope only to the bucket, not to a society or a specific workflow/record. These policies are not tenant-safe. Do not reuse this bucket for member payment proof or expense submissions. A separate tenant/workflow-scoped storage design and policy migration are required.
+
+### Additional rollout warning
+
+Existing public audit/compliance/governance tables with `USING (true)` or authenticated-only write policies remain a current exposure. A1 identity-table creation does not fix these. Do not enable member features or treat the existing policy set as an acceptable multi-tenant baseline.
