@@ -15,12 +15,6 @@ const FY_DATES = (fy: string) => {
 };
 const money = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(n) || 0);
 const num = (v: any) => Number(v || 0);
-const monthRank = (v: string) => {
-  const m = String(v || '').match(/(Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Jan|Feb|Mar)[ -](20\\d{2})/i);
-  if (!m) return -1;
-  const idx = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'].indexOf(m[1][0].toUpperCase() + m[1].slice(1,3).toLowerCase());
-  return Number(m[2]) * 12 + idx;
-};
 
 export const AnnualAuditAccountClosure: React.FC = () => {
   const { setCurrentScreen } = useVerification();
@@ -44,7 +38,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
       const [r, d, t, b] = await Promise.all([
         db.from('financial_year_audit_closures').select('*').eq('financial_year', fy).maybeSingle(),
         db.from('financial_year_audit_documents').select('*').eq('financial_year', fy).order('uploaded_at', { ascending: false }),
-        db.from('transactions').select('transaction_date,transaction_type,type,amount').gte('transaction_date', dates.start).lte('transaction_date', dates.end).limit(10000),
+        db.from('transactions').select('transaction_date,transaction_type,amount').gte('transaction_date', dates.start).lte('transaction_date', dates.end).limit(10000),
         db.from('v_account_financial_year_balance').select('account_id,opening_balance,current_fy_receipts,current_fy_payments,closing_book_balance').eq('financial_year', fy)
       ]);
       for (const x of [r,d,t,b]) if (x.error) throw x.error;
