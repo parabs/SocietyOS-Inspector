@@ -56,6 +56,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "You do not have both membership and role management permissions for this society." }, 403);
   }
 
+  (auth.rest as unknown as { headers: Record<string, string> }).headers['x-society-id'] = societyId;
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: roles, error: rolesError } = await admin.from("society_roles")
     .select("role_id,role_code").eq("society_id", societyId).eq("role_code", roleCode).limit(1);
