@@ -109,3 +109,18 @@ Until then:
 - No financial data has been modified.
 - No new Supabase project or paid branch has been created.
 - The anonymous financial-view exposure remains open and should be treated as urgent.
+
+
+## 8. Storage evidence preflight
+
+A read-only production check found:
+
+- `audit-evidence` bucket is private.
+- Current object count in that bucket: **0**.
+- `audit_handover_documents`: 0 rows and 0 populated `file_path` values.
+- `financial_year_audit_documents`: 0 rows and 0 populated `file_path` values.
+- `compliance_evidence`: 0 rows and 0 populated `storage_path` values.
+
+This means there are currently no uploaded evidence objects or stored evidence paths to migrate. The safest approach is to adopt the society-first path convention (for example, `<society-id>/<financial-year>/...`) before the first evidence upload, and enforce the same prefix in Storage RLS policies. Do not loosen the existing private bucket setting.
+
+The current frontend upload paths still need to be updated before enabling uploads under the new convention. Both upload and signed-URL download flows must use the same validated society prefix.
