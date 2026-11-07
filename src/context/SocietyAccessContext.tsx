@@ -54,9 +54,9 @@ export const SocietyAccessProvider: React.FC<React.PropsWithChildren<{ societies
 
   // Every PostgREST request is pinned to the selected tenant. RLS independently
   // verifies that the authenticated user has an active membership in this tenant.
-  const restClient = supabaseClient.rest as unknown as { headers: Record<string, string> };
-  if (activeSocietyId) restClient.headers['x-society-id'] = activeSocietyId;
-  else delete restClient.headers['x-society-id'];
+  const clientWithRest = supabaseClient as unknown as { rest: { headers: Record<string, string> } };
+  if (activeSocietyId) clientWithRest.rest.headers['x-society-id'] = activeSocietyId;
+  else delete clientWithRest.rest.headers['x-society-id'];
 
   const value = useMemo(() => ({
     societies,
