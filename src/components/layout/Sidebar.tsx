@@ -12,7 +12,7 @@ type SectionId = 'dashboard' | 'verification' | 'compliance' | 'reports' | 'admi
 const SECTION_SCREENS: Record<SectionId, ScreenId[]> = {
   dashboard: ['financial-summary', 'demand-collections', 'payments-expenses', 'party-ledger', 'bank-reconciliation', 'verification-dashboard'],
   verification: ['opening-balances', 'transaction-verification', 'monthly-reconciliation'],
-  compliance: ['compliance-command-centre', 'internal-audit', 'statutory-audit-handover', 'annual-financial-review', 'year-end-closure', 'final-approval-freeze', 'audit-evidence', 'observations-actions'],
+  compliance: ['compliance-command-centre', 'annual-financial-review', 'audit-evidence'],
   reports: ['reports'],
   admin: ['data-management', 'import-wizard', 'transactions', 'data-quality', 'data-audit-trail', 'options-config', 'user-access', 'settings'],
 };
@@ -95,13 +95,8 @@ export const Sidebar: React.FC = () => {
             {sectionButton('compliance', 'Compliance & Governance', <ShieldCheck className="h-5 w-5"/>)}
             {expanded === 'compliance' && <div className="mt-1 space-y-1 pl-2">
               {item('compliance-command-centre', 'Compliance Command Centre', <CalendarCheck className="h-4 w-4"/>)}
-              {item('internal-audit', 'Internal Audit', <ShieldCheck className="h-4 w-4"/>)}
-              {item('statutory-audit-handover', 'Statutory Audit Handover', <Files className="h-4 w-4"/>)}
-              {item('annual-financial-review', 'Annual Financial Review', <PieChart className="h-4 w-4"/>)}
-              {item('year-end-closure', 'Year-End Account Closure', <FileCheck2 className="h-4 w-4"/>)}
-              {item('final-approval-freeze', 'Final Approval & Freeze', <Lock className="h-4 w-4"/>)}
-              {item('audit-evidence', 'Evidence Register', <FolderCheck className="h-4 w-4"/>)}
-              {item('observations-actions', 'Audit Observations & Actions', <AlertCircle className="h-4 w-4"/>)}
+              {item('annual-financial-review', 'Annual Audit & Account Closure', <FileCheck2 className="h-4 w-4"/>)}
+              {item('audit-evidence', 'Documents & Evidence', <FolderCheck className="h-4 w-4"/>)}
             </div>}
 
             {sectionButton('reports', 'Reports', <FileChartColumn className="h-5 w-5"/>)}
