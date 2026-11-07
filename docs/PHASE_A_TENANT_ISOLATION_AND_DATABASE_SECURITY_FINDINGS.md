@@ -219,3 +219,18 @@ The inspected `FinancialYearGovernance` handlers submit actor display names and 
 ## 11. Additional evidence and scope limitations
 
 The frontend review covered `src/services/supabaseClient.ts`, `src/context/VerificationContext.tsx`, `src/components/financial/FinancialYearGovernance.tsx`, and `src/components/financial/AnnualAuditAccountClosure.tsx` on the repository's `main` branch. It was a static source review, not a browser penetration test or a test with an anonymous JWT against production endpoints.
+
+
+## 12. Application-wide authentication and role presentation
+
+The current application shell does not establish an authenticated session before rendering the workspace:
+
+- `src/App.tsx` wraps the application in `VerificationProvider`; there is no application-wide auth/session gate or protected-route check.
+- The browser Supabase client uses the public anon/publishable key, which is expected, but anonymous database permissions therefore matter.
+- `src/config/index.ts` contains a fixed `APP_CONFIG.currentReviewer` name, role, initials and email.
+- `src/components/layout/Header.tsx` renders that fixed reviewer identity and labels it "Authorized Reviewer"; it does not derive the displayed identity from `auth.getUser()`.
+- `src/components/layout/Sidebar.tsx` displays the navigation without role-based guards. The `user-access` screen is routed to the same `SettingsView` as `settings`; it is not a separate user/role administration module in the inspected route map.
+
+This is not a criticism of the public anon key itself. It means the application is currently a single-workspace UI with static reviewer presentation, not an authenticated multi-user workspace. Combined with anonymous SELECT on the 11 owner-context financial views, an unauthenticated visitor may be able to query financial view data through the Supabase API even if the UI is later hidden behind a login screen. A UI login screen alone would not fix the database exposure.
+
+**Required before any public multi-user release:** implement a real session gate, derive user identity from the verified Supabase session, enforce route/action permissions in the database, and independently remove anonymous access to private financial datasets. Do not rely on sidebar visibility, a hard-coded reviewer label, or client-supplied actor fields as security controls.
