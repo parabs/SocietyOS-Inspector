@@ -8,6 +8,7 @@
 
 1. Every existing record in Supabase project `hklibokniuwurdxndxfd` belongs exclusively to **PEARL MEADOWS C-TYPE WING CO-OPERATIVE HOUSING SOCIETY LTD.**
 2. The existing Auth user is designated as the initial Society Admin.
+3. The product is a non-profit initiative; the user declined the additional recurring cost of a Supabase development branch. Phase A validation must use local tooling and read-only production checks.
 
 Read-only Auth lookup identified exactly one user:
 - Auth UUID: `3f0cb220-de2d-4c08-9380-39a160842afd`
@@ -61,14 +62,23 @@ Other tables include audit, compliance, governance, configuration, execution-tes
 
 It creates only a session-scoped temporary table and does not change persistent schema or data.
 
-## Required sequence
+## Revised validation sequence — no paid branch
 
-1. Review the inventory and explicitly classify every public base table.
-2. Validate the A1 identity schema against live foreign keys and naming conventions.
-3. Prepare an explicit mapping manifest for each society-owned base table.
-4. Dry-run tenant assignment and report mapped, unmapped, duplicate-key and parent/child mismatch counts.
-5. Review the report before any persistent backfill.
-6. Only after separate approval: apply A1 on a development database, insert the society and initial membership/role grant, then backfill in a separate controlled migration.
-7. Enforce tenant RLS only after app compatibility and cross-tenant tests pass.
+1. Inspect the repository's Supabase CLI configuration, migration history, application auth/session logic, and test scripts.
+2. Validate the proposed identity schema locally using the repository's migration conventions and a local Supabase stack, if Docker is available.
+3. Run synthetic multi-society membership, RLS, cross-tenant, storage, view, and function tests locally.
+4. Prepare an explicit mapping manifest for every society-owned base table.
+5. Re-read production row counts and perform read-only dry-run checks for unmapped rows, duplicate keys, and parent/child tenant mismatches.
+6. Compare FY 2018–19 report outputs before and after local changes.
+7. Submit the migration, mapping report, test evidence, and recovery plan for review.
+8. Obtain separate explicit approval before each production stage: additive identity schema, society/admin seed, tenant backfill, and tenant RLS/application enforcement.
+
+The detailed no-cost procedure is in `PHASE_A_LOCAL_VALIDATION_AND_ZERO_COST_PLAN.md`.
+
+## Production status and restrictions
 
 **No production DDL, society row, membership, role grant, tenant-key backfill, or RLS policy change has been applied.**
+
+No Supabase development branch or second paid project is authorised or to be created. If local Docker/Supabase is unavailable, continue static SQL review and read-only production inspection; do not substitute production writes for local validation.
+
+The user's confirmation that all current records belong to the named society establishes the intended mapping, but it does not waive dry-run validation or the separate production approval gates.
