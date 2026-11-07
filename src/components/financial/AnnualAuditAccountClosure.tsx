@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronRight, FileText, LockKeyhole, RefreshCw, Upload, Wrench } from 'lucide-react';
 import { supabaseClient } from '../../services/supabaseClient';
+import { useVerification } from '../../context/VerificationContext';
 
 type Row = Record<string, any>;
 type DocType = 'Statutory Audit Report' | 'Audited Financial Statements' | 'AGM Report';
@@ -21,6 +22,7 @@ const monthRank = (v: string) => {
 };
 
 export const AnnualAuditAccountClosure: React.FC = () => {
+  const { setCurrentScreen } = useVerification();
   const [fy, setFy] = useState('FY 2018-19');
   const [record, setRecord] = useState<Row | null>(null);
   const [docs, setDocs] = useState<Row[]>([]);
@@ -32,7 +34,6 @@ export const AnnualAuditAccountClosure: React.FC = () => {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [rectificationOpen, setRectificationOpen] = useState(false);
-  const [rectificationNote, setRectificationNote] = useState('');
 
   const dates = useMemo(() => FY_DATES(fy), [fy]);
   const load = useCallback(async () => {
@@ -199,7 +200,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
           <div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="bg-slate-50 text-slate-600"><th className="text-left p-2">Particulars</th><th className="text-right p-2">Society OS</th><th className="text-right p-2">Audited (₹)</th><th className="text-right p-2">Difference</th><th className="p-2">Status</th></tr></thead><tbody>{comparisons.map(c=><tr key={c.key} className="border-t"><td className="p-2 font-medium">{c.label}</td><td className="p-2 text-right">{money(c.system)}</td><td className="p-2 text-right"><input type="number" step="0.01" value={audited[c.key as keyof typeof audited]} onChange={e=>setAudited({...audited,[c.key]:e.target.value})} className="w-32 border rounded px-2 py-1 text-right"/></td><td className="p-2 text-right">{c.difference===null?'—':money(c.difference)}</td><td className="p-2 text-center">{c.difference===null?<span className="text-slate-400">Enter figure</span>:Math.abs(c.difference)<=0.01?<span className="text-emerald-700">Match</span>:<span className="text-amber-700">Review</span>}</td></tr>)}</tbody></table></div>
           <div className="mt-3 flex flex-wrap justify-between items-center gap-2"><span className="text-[11px] text-slate-500">Source: transactions and account-monthly balance records for the selected FY.</span><button onClick={()=>void saveAuditedFigures()} disabled={busy||DOCS.some(t=>!docs.some(d=>d.document_type===t))} className="bg-blue-700 text-white rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-40">Save comparison & confirm if matched</button></div>
           {pendingDiffs.length>0&&<div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800"><AlertTriangle className="inline w-4 h-4 mr-1"/> {pendingDiffs.length} difference(s) need attention. <button onClick={()=>setRectificationOpen(v=>!v)} className="underline font-semibold">Rectification options</button></div>}
-          {rectificationOpen&&<div className="mt-3 rounded-lg border p-3"><h3 className="text-sm font-semibold flex items-center gap-2"><Wrench className="w-4 h-4"/>Rectification required?</h3><p className="text-xs text-slate-600 mt-1">Review the underlying transactions in the Transactions Workspace. Do not overwrite imported source rows; use the approved correction workflow and preserve the original entry.</p><textarea value={rectificationNote} onChange={e=>setRectificationNote(e.target.value)} placeholder="Record the difference and affected transaction references" className="mt-2 w-full border rounded-lg p-2 text-xs" rows={2}/><button onClick={()=>{setNotice('Rectification note retained in this screen only. Use the transaction correction workflow to make an approved correction.');}} className="mt-2 border rounded-lg px-3 py-2 text-xs">Record note</button></div>}
+          {rectificationOpen&&<div className="mt-3 rounded-lg border p-3"><h3 className="text-sm font-semibold flex items-center gap-2"><Wrench className="w-4 h-4"/>Rectification required?</h3><p className="text-xs text-slate-600 mt-1">Review the underlying transactions in the Transactions Workspace. Do not overwrite imported source rows; use the approved correction workflow and preserve the original entry.</p><button onClick={()=>setCurrentScreen('transactions')} className="mt-2 bg-blue-700 text-white rounded-lg px-3 py-2 text-xs font-semibold">Open Transactions Workspace</button></div>}
         </section>
         <section className="rounded-xl border bg-white p-4">
           <div className="flex items-center gap-2 mb-3"><span className="rounded-full bg-blue-600 text-white w-7 h-7 grid place-items-center font-bold">4</span><div><h2 className="font-semibold">Record completion & close FY</h2><p className="text-xs text-slate-500">Save the confirmed closing balances and supporting evidence as the year-end snapshot.</p></div></div>
