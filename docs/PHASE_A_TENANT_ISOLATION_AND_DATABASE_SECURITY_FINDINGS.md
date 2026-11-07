@@ -184,7 +184,7 @@ Evidence came from read-only inspection of the live production PostgreSQL catalo
 This report does not claim that every application route or every external integration has been penetration-tested. The next safe step is to map view/storage consumers in the repository and prepare a tested remediation plan, not to infer that a policy change is safe from catalog inspection alone.
 
 
-## 9. Frontend dependency and evidence-path review
+## 10. Frontend dependency and evidence-path review
 
 A repository review confirms that the browser application initializes Supabase with the public anon/publishable key and persists the user's Supabase session. This is expected for a browser client; it means database security must be correct at the database/API boundary and cannot depend on hiding the public key.
 
@@ -216,6 +216,6 @@ The inspected `FinancialYearGovernance` handlers submit actor display names and 
 3. Then migrate storage paths and policies in a backwards-compatible way.
 4. Only after the single-society experience is regression-tested should the society membership model and tenant keys be introduced across the schema.
 
-## 10. Additional evidence and scope limitations
+## 11. Additional evidence and scope limitations
 
 The frontend review covered `src/services/supabaseClient.ts`, `src/context/VerificationContext.tsx`, `src/components/financial/FinancialYearGovernance.tsx`, and `src/components/financial/AnnualAuditAccountClosure.tsx` on the repository's `main` branch. It was a static source review, not a browser penetration test or a test with an anonymous JWT against production endpoints.
