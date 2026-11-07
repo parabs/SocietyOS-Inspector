@@ -214,3 +214,23 @@ Tests must cover REST table access, views, RPCs, Edge Functions, storage object 
 5. A tested coordinated migration, rollback plan and FY2018–19 regression report.
 
 Until these are satisfied, Phase A cannot honestly be marked complete or safely opened to additional users. The correct interim state is Google authentication preparation with no claim of full authorization.
+
+
+## Additional Edge Function inspection — FY2018 workbook importer
+
+The only active production Edge Function returned by the project inventory is `import-fy2018-workbook`, version 3, with JWT verification enabled. Its deployed source was inspected read-only. It uses the service-role key for all database writes, so database RLS does not constrain the function's writes. It currently authorizes by a global `app_metadata.role(s) = society_admin` claim, not by active membership in a selected society.
+
+Additional hardening required before multi-society use:
+- Replace the global role-claim authorization with server-validated active society membership and the import permission for the explicit target society.
+- Bind each batch to a society ID and validate every referenced party, account, category, demand, transaction and related master against that same society.
+- Restrict allowed request origins instead of returning wildcard CORS for a privileged service-role endpoint; CORS is defense-in-depth, not the authorization control.
+- Make batch reservation atomic. The current read-then-insert check for a running batch is race-prone unless the deployed unique constraint fully covers the intended scope.
+- Validate the complete row schema and allowed columns per table, not only a short required-field list.
+- Verify the selected table is in the batch, row counts cannot be exceeded, and batch status remains Running at the point of each write.
+- Make progress updates concurrency-safe; read-modify-write JSON row_counts can lose increments when concurrent chunks arrive.
+- Scope status/count responses to the requesting society and avoid returning global operational counts.
+- Ensure stale-batch cleanup is scoped, audited and safe under concurrent imports.
+- Ensure all service-role paths write trusted actor, membership, society, batch and provenance metadata.
+- Add adversarial tests for forged society IDs, arbitrary columns, duplicate/replayed chunks, concurrent starts, stale cleanup races, finish/retry races and cross-society foreign keys.
+
+Do not deploy a replacement importer until the tenant schema, membership helper and importer contracts are in place. The existing version 3 function was not changed by this inspection.
