@@ -54,7 +54,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
 
   useEffect(() => { void load(); }, [load]);
 
-  const systemRows = useMemo(() => accountBalances.flatMap((a: Row) => {
+  const systemRows = useMemo(() => accountBalances.filter((a: Row) => [a.opening_balance, a.current_fy_receipts, a.current_fy_payments, a.closing_book_balance].some(v => v !== null && v !== undefined && Math.abs(num(v)) > 0.001)).flatMap((a: Row) => {
     const base = { account_id: a.account_id, account_name: a.account_name, account_type: a.account_type, verification_status: a.verification_status };
     return [
       { key: `${a.account_id}:opening`, line: 'Opening balance', system: num(a.opening_balance), report: 'Account-wise Financial Year Balance' },
@@ -115,11 +115,13 @@ export const AnnualAuditAccountClosure: React.FC = () => {
         const current = edited[x.key] || { audited_amount: '', audited_page_reference: '', auditor_document_id: '' };
         const auditedAmount = current.audited_amount.trim() === '' ? null : Number(current.audited_amount);
         if (auditedAmount !== null && !Number.isFinite(auditedAmount)) throw new Error(`Enter a valid audited figure for ${x.account_name} — ${x.line}.`);
+        if (auditedAmount !== null && (!current.auditor_document_id || !current.audited_page_reference.trim())) throw new Error(`Select the source audit document and page number for ${x.account_name} — ${x.line}.`);
+        if (auditedAmount !== null && (!current.auditor_document_id || !current.audited_page_reference.trim())) throw new Error(`Select the source audit document and page number for ${x.account_name} — ${x.line}.`);
         const difference = auditedAmount === null ? null : Number((x.system - auditedAmount).toFixed(2));
         const matched = difference !== null && Math.abs(difference) <= 0.01;
         const resolution = resolutions[x.key] || { resolution_type: '', resolution_reference: '', resolution_note: '' };
         const prior = items.find(i => i.reconciliation_key === x.key);
-        const isResolved = !matched && resolution.resolution_type && resolution.resolution_note.trim();
+        const isResolved = !matched && resolution.resolution_type && resolution.resolution_note.trim() && (resolution.resolution_type === 'Accepted Explanation' || resolution.resolution_reference.trim());
         return {
           financial_year: fy, reconciliation_key: x.key, schedule_name: x.schedule, line_item: `${x.account_name} — ${x.line}`,
           system_report_name: x.report, system_amount: x.system, audited_amount: auditedAmount,
