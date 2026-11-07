@@ -1,6 +1,12 @@
 import type { ScreenId } from '../context/VerificationContext';
 
 export const SCREEN_PERMISSIONS: Partial<Record<ScreenId, string[]>> = {
+  'treasurer-dashboard': ['finance.read.society'],
+  'secretary-dashboard': ['governance.read', 'compliance.read'],
+  'chairman-dashboard': ['governance.read'],
+  'member-dashboard': ['finance.read.linked'],
+  'auditor-dashboard': ['finance.read.audit', 'audit.evidence.read'],
+  'observations-actions': ['audit.observations.manage', 'audit.evidence.read'],
   'financial-summary': ['finance.read.society', 'finance.read.audit', 'finance.read.linked'],
   'demand-collections': ['finance.read.society', 'finance.read.audit', 'finance.read.linked'],
   'payments-expenses': ['finance.read.society', 'finance.read.audit', 'finance.read.linked'],
