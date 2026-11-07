@@ -5,6 +5,7 @@ import { supabaseClient } from '../../services/supabaseClient';
 type AuthState =
   | { status: 'loading' }
   | { status: 'signed-out' }
+  | { status: 'unassigned'; email: string | null }
   | { status: 'authorized'; session: Session }
   | { status: 'error'; message: string };
 
@@ -19,11 +20,26 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
       if (!mounted) return;
       if (!session) {
         setAuth({ status: 'signed-out' });
-      } else {
-        // Authentication is common to every role. Authorization is enforced
-        // separately by the application's assigned-role access controls.
-        setAuth({ status: 'authorized', session });
+        return;
       }
+
+      // Only trusted app_metadata is used for authorization. user_metadata is
+      // user-editable and must never grant application access.
+      const metadata = session.user.app_metadata ?? {};
+      const roleClaim = metadata.role;
+      const roleClaims = metadata.roles;
+      const hasAssignedRole =
+        (typeof roleClaim === 'string' && roleClaim.trim().length > 0) ||
+        (Array.isArray(roleClaims) && roleClaims.some(
+          (role) => typeof role === 'string' && role.trim().length > 0,
+        ));
+
+      if (!hasAssignedRole) {
+        setAuth({ status: 'unassigned', email: session.user.email ?? null });
+        return;
+      }
+
+      setAuth({ status: 'authorized', session });
     };
 
     supabaseClient.auth.getSession()
@@ -73,6 +89,21 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   if (auth.status === 'authorized') {
     return <>{children}</>;
+  }
+
+  if (auth.status === 'unassigned') {
+    return (
+      <AuthPanel
+        title="Role assignment required"
+        detail={auth.email
+          ? `Your Google account (${auth.email}) is signed in, but no application role has been assigned. Contact the Society Admin to request access.`
+          : 'Your Google account is signed in, but no application role has been assigned. Contact the Society Admin to request access.'}
+      >
+        <button onClick={signOut} disabled={busy} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+          {busy ? 'Signing out…' : 'Sign out'}
+        </button>
+      </AuthPanel>
+    );
   }
 
   if (auth.status === 'signed-out') {
