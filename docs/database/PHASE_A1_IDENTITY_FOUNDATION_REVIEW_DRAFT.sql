@@ -42,6 +42,12 @@ create index if not exists idx_society_memberships_user_society
 create index if not exists idx_society_memberships_society_status
   on public.society_memberships (society_id, status);
 
+-- Retain ended membership history while preventing duplicate live invitations
+-- or active memberships for the same user within one society.
+create unique index if not exists uq_society_memberships_live_user
+  on public.society_memberships (society_id, user_id)
+  where status in ('invited', 'active');
+
 create table if not exists public.permission_catalog (
   permission_code text primary key,
   description text not null,
@@ -89,6 +95,8 @@ create table if not exists public.society_membership_roles (
   constraint society_membership_roles_valid_dates
     check (valid_until is null or valid_until >= valid_from)
 );
+create index if not exists idx_society_membership_roles_society_membership
+  on public.society_membership_roles (society_id, membership_id);
 
 create table if not exists public.party_user_links (
   party_user_link_id uuid primary key default gen_random_uuid(),
@@ -134,7 +142,7 @@ create table if not exists public.society_membership_audit (
   actor_user_id uuid references auth.users(id) on delete set null,
   action_code text not null,
   target_type text not null,
-  target_id uuid,
+  target_id text,
   reason text,
   before_state jsonb,
   after_state jsonb,
@@ -143,6 +151,13 @@ create table if not exists public.society_membership_audit (
   constraint society_membership_audit_target_nonblank check (length(btrim(target_type)) > 0)
 );
 
+-- Permission catalogue is intended for trusted server-side authorization logic.
+-- It remains RLS-enabled without client-facing policies.
+--
+-- updated_at is intentionally maintained by trusted application/RPC write paths
+-- in this draft. Add a database trigger only after selecting and testing one
+-- shared trigger convention across the repository.
+--
 -- Seed only the permission vocabulary. No society-specific roles or grants.
 insert into public.permission_catalog (permission_code, description, permission_group)
 values
