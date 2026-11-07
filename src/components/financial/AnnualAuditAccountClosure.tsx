@@ -152,14 +152,23 @@ export const AnnualAuditAccountClosure: React.FC = () => {
   const unresolvedCount = systemRows.length ? systemRows.length - persistedResolved : 0;
   const docsComplete = DOCS.every(t => docs.some(d => d.document_type === t));
   const readyToCompare = Boolean(record?.audit_status === 'Completed' && docsComplete);
-  const readyToClose = Boolean(record?.balances_confirmed && items.length === systemRows.length && unresolvedCount === 0);
+  const hasUnsavedChanges = systemRows.some(x => {
+    const saved = items.find(i => i.reconciliation_key === x.key);
+    const edit = edited[x.key];
+    const resolution = resolutions[x.key];
+    if (!saved) return true;
+    if (edit && (edit.audited_amount !== (saved.audited_amount == null ? '' : String(saved.audited_amount)) || edit.audited_page_reference !== (saved.audited_page_reference || '') || edit.auditor_document_id !== (saved.auditor_document_id || ''))) return true;
+    if (resolution && (resolution.resolution_type !== (saved.resolution_type || '') || resolution.resolution_reference !== (saved.resolution_reference || '') || resolution.resolution_note !== (saved.resolution_note || ''))) return true;
+    return false;
+  });
+  const readyToClose = Boolean(record?.balances_confirmed && items.length === systemRows.length && unresolvedCount === 0 && !hasUnsavedChanges);
   const progress = record?.status === 'Closed' ? 4 : readyToClose ? 3 : docsComplete ? 2 : record?.audit_status === 'Completed' ? 1 : 0;
 
   const closeFinancialYear = async () => {
     setBusy(true); setError(''); setNotice('');
     try {
       if (!record) throw new Error('Save the auditor details before closing this financial year.');
-      if (!readyToClose) throw new Error('Complete every account reconciliation line before closing this financial year.');
+      if (!readyToClose) throw new Error(hasUnsavedChanges ? 'Save your latest reconciliation edits before closing the financial year.' : 'Complete every account reconciliation line before closing this financial year.');
       const db: any = supabaseClient;
       const snapshot = {
         financial_year: fy, period: dates,
