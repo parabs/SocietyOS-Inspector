@@ -23,6 +23,7 @@ export const AnnualAuditAccountClosure: React.FC = () => {
   const [docs, setDocs] = useState<Row[]>([]);
   const [transactions, setTransactions] = useState<Row[]>([]);
   const [accountBalances, setAccountBalances] = useState<Row[]>([]);
+  const [partyBalances, setPartyBalances] = useState<Row[]>([]);
   const [auditForm, setAuditForm] = useState({ auditor_name: '', auditor_firm: '', audit_completion_date: '', agm_meeting_date: '' });
   const [audited, setAudited] = useState({ opening_balance: '', total_receipts: '', total_payments: '', closing_balance: '' });
   const [busy, setBusy] = useState(false);
@@ -35,14 +36,15 @@ export const AnnualAuditAccountClosure: React.FC = () => {
     setBusy(true); setError('');
     try {
       const db: any = supabaseClient;
-      const [r, d, t, b] = await Promise.all([
+      const [r, d, t, b, p] = await Promise.all([
         db.from('financial_year_audit_closures').select('*').eq('financial_year', fy).maybeSingle(),
         db.from('financial_year_audit_documents').select('*').eq('financial_year', fy).order('uploaded_at', { ascending: false }),
         db.from('transactions').select('transaction_date,transaction_type,amount').gte('transaction_date', dates.start).lt('transaction_date', dates.endExclusive).limit(10000),
-        db.from('v_account_financial_year_balance').select('account_id,opening_balance,current_fy_receipts,current_fy_payments,closing_book_balance').eq('financial_year', fy)
+        db.from('v_account_financial_year_balance').select('account_id,opening_balance,current_fy_receipts,current_fy_payments,closing_book_balance,verification_status').eq('financial_year', fy),
+        db.from('v_party_financial_year_balance').select('*').eq('financial_year', fy)
       ]);
-      for (const x of [r,d,t,b]) if (x.error) throw x.error;
-      setRecord(r.data || null); setDocs(d.data || []); setTransactions(t.data || []); setAccountBalances(b.data || []);
+      for (const x of [r,d,t,b,p]) if (x.error) throw x.error;
+      setRecord(r.data || null); setDocs(d.data || []); setTransactions(t.data || []); setAccountBalances(b.data || []); setPartyBalances(p.data || []);
       if (r.data) {
         setAuditForm({ auditor_name: r.data.auditor_name || '', auditor_firm: r.data.auditor_firm || '', audit_completion_date: r.data.audit_completion_date || '', agm_meeting_date: r.data.agm_meeting_date || '' });
         setAudited({
@@ -144,7 +146,9 @@ export const AnnualAuditAccountClosure: React.FC = () => {
         financial_year: fy, period: dates, audit: { auditor_name: record.auditor_name, auditor_firm: record.auditor_firm, audit_completion_date: record.audit_completion_date, agm_meeting_date: record.agm_meeting_date },
         documents: docs.map(d => ({ document_type: d.document_type, file_name: d.file_name, file_path: d.file_path, uploaded_at: d.uploaded_at })),
         system_figures: systemFigures, audited_figures: record.audited_figures, balance_comparison: comparisons,
-        source_counts: { transactions: transactions.length, account_balance_accounts: accountBalances.length }, closed_at: new Date().toISOString()
+        account_closing_balances: accountBalances.map(a => ({ account_id: a.account_id, opening_balance: a.opening_balance, current_fy_receipts: a.current_fy_receipts, current_fy_payments: a.current_fy_payments, closing_book_balance: a.closing_book_balance, verification_status: a.verification_status })),
+        party_closing_balances: partyBalances.map(p => ({ party_id: p.party_id, name: p.name, party_type: p.type, opening_balance: p.opening_balance, current_fy_demand: p.current_fy_demand, current_fy_receipts: p.current_fy_receipts, current_fy_payments: p.current_fy_payments, adjustments: p.adjustments, current_fy_contra_signed: p.current_fy_contra_signed, total_outstanding: p.total_outstanding, total_party_balance: p.total_party_balance, unallocated_receipts: p.unallocated_receipts, opening_balance_verified: p.opening_balance_verified })),
+        source_counts: { transactions: transactions.length, account_balance_accounts: accountBalances.length, party_balance_rows: partyBalances.length }, closed_at: new Date().toISOString()
       };
       const { data, error: e } = await db.from('financial_year_audit_closures').update({ status: 'Closed', closing_snapshot: snapshot, closed_at: new Date().toISOString(), closed_by: APP_CONFIG.currentReviewer.name }).eq('financial_year', fy).eq('balances_confirmed', true).select('*').single();
       if (e) throw e;
