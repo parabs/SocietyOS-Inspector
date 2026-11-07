@@ -9,8 +9,12 @@ type AuthState =
   | { status: 'authorized'; session: Session }
   | { status: 'error'; message: string };
 
-const isSocietyAdmin = (session: Session) =>
-  session.user.app_metadata?.role === 'society_admin';
+const isSocietyAdmin = (session: Session) => {
+  const metadata = session.user.app_metadata ?? {};
+  const roles = metadata.roles;
+  return metadata.role === 'society_admin' ||
+    (Array.isArray(roles) && roles.includes('society_admin'));
+};
 
 export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
