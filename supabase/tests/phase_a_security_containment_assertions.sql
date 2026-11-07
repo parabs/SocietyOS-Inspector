@@ -78,7 +78,7 @@ begin
      or not has_function_privilege('authenticated', v_oid, 'EXECUTE') then
     raise exception 'Legacy RLS helper must be authenticated-only';
   end if;
-end $;
+end $$;
 
 -- All current public base tables must continue to have RLS enabled.
 do $$
