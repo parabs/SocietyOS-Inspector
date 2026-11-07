@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabaseClient } from '../services/supabaseClient';
+import { supabaseClient } from '../../services/supabaseClient';
 
 type AuthState =
   | { status: 'loading' }
