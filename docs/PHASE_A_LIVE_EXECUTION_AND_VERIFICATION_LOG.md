@@ -14,6 +14,14 @@ Applied migration `20261107174146_phase_a_revoke_anon_financial_views_and_lock_t
 - Set an empty `search_path` on five trigger-only functions whose object references are schema-qualified.
 - Revoked direct `EXECUTE` from `PUBLIC`, `anon` and `authenticated` on those trigger functions. Database trigger invocation remains the intended execution path.
 
+## Additional production change completed
+
+Applied migration `20261107174331_phase_a_restrict_legacy_rpc_and_trigger_function_execution`.
+
+- Removed direct client execution from three trigger-only functions and set a fixed empty search path on the governance activity trigger.
+- Restricted the legacy missing-transaction correction RPC to authenticated callers. Its existing internal Society Admin check remains a legacy global-claim check and must be replaced before multi-society use.
+- Kept the `is_society_admin()` helper callable only by authenticated users because current RLS policies still depend on it.
+
 ## Verification
 
 The post-migration catalog query confirmed:
