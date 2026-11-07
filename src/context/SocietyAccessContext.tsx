@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { supabaseClient } from '../services/supabaseClient';
 
 export interface SocietyRole {
   role_code: string;
@@ -50,6 +51,12 @@ export const SocietyAccessProvider: React.FC<React.PropsWithChildren<{ societies
     (...permissionCodes: string[]) => permissionCodes.some((code) => activeSociety?.permissions.includes(code)),
     [activeSociety],
   );
+
+  // Every PostgREST request is pinned to the selected tenant. RLS independently
+  // verifies that the authenticated user has an active membership in this tenant.
+  const restClient = supabaseClient.rest as unknown as { headers: Record<string, string> };
+  if (activeSocietyId) restClient.headers['x-society-id'] = activeSocietyId;
+  else delete restClient.headers['x-society-id'];
 
   const value = useMemo(() => ({
     societies,
