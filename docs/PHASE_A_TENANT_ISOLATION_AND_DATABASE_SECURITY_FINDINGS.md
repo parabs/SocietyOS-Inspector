@@ -234,3 +234,30 @@ The current application shell does not establish an authenticated session before
 This is not a criticism of the public anon key itself. It means the application is currently a single-workspace UI with static reviewer presentation, not an authenticated multi-user workspace. Combined with anonymous SELECT on the 11 owner-context financial views, an unauthenticated visitor may be able to query financial view data through the Supabase API even if the UI is later hidden behind a login screen. A UI login screen alone would not fix the database exposure.
 
 **Required before any public multi-user release:** implement a real session gate, derive user identity from the verified Supabase session, enforce route/action permissions in the database, and independently remove anonymous access to private financial datasets. Do not rely on sidebar visibility, a hard-coded reviewer label, or client-supplied actor fields as security controls.
+
+
+## 13. Anonymous-role view access — direct database verification
+
+A follow-up read-only test explicitly switched the SQL session to the PostgreSQL `anon` role inside a transaction, queried row counts only, and rolled the transaction back. No row contents were selected or exported.
+
+The direct test returned the following visible row counts:
+
+| Public financial view | Rows visible to `anon` |
+|---|---:|
+| `balance_register` | 88 |
+| `v_account_financial_year_balance` | 16 |
+| `v_account_monthly_movement` | 33 |
+| `v_demand_transaction_reconciliation` | 729 |
+| `v_member_cumulative_outstanding` | 44 |
+| `v_member_financial_year_balance` | 88 |
+| `v_member_financial_year_balance_calculated` | 88 |
+| `v_opening_balance_register` | 44 |
+| `v_party_financial_year_balance` | 112 |
+| `v_transaction_cutoff_exceptions` | 4 |
+| `v_transaction_financial_year_movement` | 731 |
+
+A corresponding count query against `public.transactions` under the same `anon` role returned zero rows. This confirms that the underlying table's RLS boundary is not protecting the owner-context view results.
+
+**Severity update:** this is a verified anonymous financial-data exposure, not merely a static advisor warning. It should be treated as a priority incident for the current single-society deployment as well as a blocker to multi-society rollout.
+
+**No mitigation was applied.** Removing anonymous view grants or changing view execution mode is a production permission/schema change and could affect current report consumers. The safe next step is to prepare and test the least-disruptive view/grant correction, with a rollback plan, then obtain explicit approval before applying it to production.
