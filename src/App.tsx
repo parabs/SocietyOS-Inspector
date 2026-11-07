@@ -17,6 +17,7 @@ import { DataManagement } from './components/admin/DataManagement';
 import { DataManagementHub } from './components/admin/DataManagementHub';
 import { DataManagementControlCenter } from './components/admin/DataManagementControlCenter';
 import { FinancialYearGovernance } from './components/financial/FinancialYearGovernance';
+import { AnnualAuditAccountClosure } from './components/financial/AnnualAuditAccountClosure';
 import { ComplianceCommandCentre } from './components/compliance/ComplianceCommandCentre';
 
 const MainContent: React.FC = () => {
@@ -38,6 +39,8 @@ const MainContent: React.FC = () => {
       return <MonthlyReconciliation />;
 
     case 'annual-financial-review':
+      return <AnnualAuditAccountClosure />;
+
     case 'year-end-closure':
     case 'internal-audit':
     case 'statutory-audit-handover':
