@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { AuthGate } from './components/auth/AuthGate';
 import { VerificationProvider, useVerification } from './context/VerificationContext';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
@@ -87,7 +88,8 @@ const MainContent: React.FC = () => {
 
 export default function App() {
   return (
-    <VerificationProvider>
+    <AuthGate>
+      <VerificationProvider>
       <div className="h-dvh min-h-0 overflow-hidden bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
         <div className="shrink-0"><Header /></div>
         <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -97,6 +99,7 @@ export default function App() {
           </main>
         </div>
       </div>
-    </VerificationProvider>
+      </VerificationProvider>
+    </AuthGate>
   );
 }
