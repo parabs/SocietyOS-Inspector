@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { checkBatchProgress } from "./batchProgress.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -100,6 +101,14 @@ Deno.serve(async (req: Request) => {
         const ids = rows.map(r => String(r.transaction_id ?? ""));
         if (ids.some(id => !id) || new Set(ids).size !== ids.length) return json({ error: "Transaction_ID is blank or duplicated in this batch." }, 400);
       }
+      // Validate the planned row budget before touching the target table.
+      // A rejected over-sized chunk must never upsert financial records.
+      const nextProgress = checkBatchProgress(
+        progress[table]?.attempted,
+        progress[table]?.succeeded,
+        rows.length,
+      );
+      if (!nextProgress.ok) return json({ error: nextProgress.error }, 400);
       const group = rows.map(row => {
         if (table === "transactions") return { ...row, bank_verified: String(row.bank_verified ?? "Pending") };
         if (["society_dropdown_options", "society_correction_log", "party_category_rules"].includes(table)) return { ...row, import_batch_id: batchId };
@@ -107,9 +116,11 @@ Deno.serve(async (req: Request) => {
       });
       const { error: writeError } = await db.from(table).upsert(group, { onConflict: TABLES[table].conflict });
       if (writeError) return json({ error: `Write failed for ${table}: ${writeError.message}` }, 400);
-      const succeeded = Number(progress[table].succeeded ?? 0) + rows.length;
-      if (succeeded > Number(progress[table].attempted)) return json({ error: `Received more rows than planned for ${table}.` }, 400);
-      progress[table] = { ...progress[table], succeeded, status: succeeded === Number(progress[table].attempted) ? "Completed" : "Running" };
+      progress[table] = {
+        ...progress[table],
+        succeeded: nextProgress.succeeded,
+        status: nextProgress.completed ? "Completed" : "Running",
+      };
       const { error: updateError } = await db.from("society_import_batches").update({ row_counts: progress }).eq("id", batchId).eq("status", "Running");
       if (updateError) throw updateError;
       return json({ success: true, batchId, table, attempted: Number(progress[table].attempted), succeeded, status: progress[table].status });
