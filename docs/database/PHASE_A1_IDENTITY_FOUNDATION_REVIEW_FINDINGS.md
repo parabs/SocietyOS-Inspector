@@ -15,13 +15,13 @@ This is not yet a production-ready migration. The findings below should be resol
 
 | ID | Severity | Finding | Required treatment |
 |---|---|---|---|
-| A1-01 | High | `society_memberships` has no constraint preventing two simultaneous active memberships for the same user in the same society. | Add a partial unique index for the intended active/invited lifecycle, or explicitly document a supported multi-membership model. Preserve ended membership history. |
-| A1-02 | High | `society_membership_roles` can reference a valid membership and role in the same society, but its date window is not constrained to the membership's own active period/status. | Enforce membership/role grant validity in a controlled write path or trigger; test ended/suspended memberships and future-dated grants. |
-| A1-03 | High | `party_user_links` references `party_master` and carries `society_id`, but there is no database-level proof that the party belongs to that society. The current party master has no `society_id`. | Defer activation until the tenant mapping for party records exists. Then enforce the society/party relationship with a tenant-aware relation/FK or guarded write path. Do not infer a link from matching names. |
-| A1-04 | Medium | `society_membership_roles` has a composite PK beginning with `membership_id`; there is no index beginning with `society_id` for tenant-scoped lookup. | Add a `society_id`-leading index if RLS predicates and query plans use society filtering. Validate with EXPLAIN locally. |
-| A1-05 | Medium | Several tables carry `updated_at`, but the draft defines no update trigger. | Either add a consistent timestamp trigger or state that every write path must set `updated_at`; test both direct and RPC writes. |
-| A1-06 | Medium | `society_membership_audit.target_id` is UUID-only and not FK-bound to a target table. | Keep it polymorphic only if audit retention requires it; document allowed target types and validate target IDs in trusted write paths. |
-| A1-07 | Medium | Permission catalog is RLS-enabled with no policies. This is fail-closed, but client-side role/permission discovery will not be able to read it. | Keep permission evaluation server-side, or add a deliberately public read-only policy only if the catalog is confirmed non-sensitive. Do not open write access. |
+| A1-01 | Resolved in draft | `society_memberships` originally allowed duplicate live memberships. | Added a partial unique index on `(society_id, user_id)` for `invited` and `active` rows; ended history remains allowed. |
+| A1-02 | High — remains open | `society_membership_roles` can reference a valid membership and role in the same society, but its date window is not constrained to the membership's own active period/status. | Enforce membership/role grant validity in a controlled trusted write path before role grants are enabled; test ended/suspended memberships and future-dated grants. Do not add a broad SECURITY DEFINER trigger as a shortcut. |
+| A1-03 | High — remains open | `party_user_links` references `party_master` and carries `society_id`, but there is no database-level proof that the party belongs to that society. The current party master has no `society_id`. | Keep party-user link writes disabled until tenant mapping exists. Then enforce the society/party relationship with a tenant-aware relation/FK or guarded write path. Do not infer a link from matching names. |
+| A1-04 | Resolved in draft | `society_membership_roles` lacked a society-leading lookup index. | Added `(society_id, membership_id)` index; validate query plans locally once the tenant policies exist. |
+| A1-05 | Resolved by explicit draft contract | Several tables carry `updated_at`, but no shared repository trigger convention was found. | Draft now states that trusted application/RPC write paths must set `updated_at`. A database trigger is deferred until a shared convention can be selected and tested. |
+| A1-06 | Resolved in draft | `society_membership_audit.target_id` was UUID-only despite being polymorphic. | Changed `target_id` to text so it can record UUID and existing text-key targets. Allowed target types/IDs must still be validated by trusted write paths. |
+| A1-07 | Resolved by explicit design decision | Permission catalog is RLS-enabled with no policies. | Draft now explicitly treats the catalogue as trusted server-side authorization data. No client-facing read or write policy is added. |
 
 ## Deliberate safeguards — retain
 
@@ -42,9 +42,9 @@ This is not yet a production-ready migration. The findings below should be resol
 
 ## Next safe sequence
 
-1. Revise this draft for A1-01, A1-02, A1-04, A1-05 and A1-06.
-2. Keep A1-03 blocked until the tenant mapping relation is designed.
-3. Decide whether permission catalog access is server-only.
+1. A1-01, A1-04, A1-05, A1-06 and A1-07 have been addressed in the review draft.
+2. Keep A1-02 open until membership/role validity is enforced in a trusted write path.
+3. Keep A1-03 blocked until the tenant mapping relation is designed and validated.
 4. Recover canonical production migrations before any local replay that claims to represent production.
 5. Run SQL syntax, FK, index, RLS-deny, and membership lifecycle tests against a clean local stack with synthetic data.
 6. Only after local evidence, prepare separate production approval packages for additive identity tables, society/admin seed, tenant mapping/backfill, and RLS enforcement.
