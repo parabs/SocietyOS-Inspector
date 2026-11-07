@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Bell,
   ChevronDown,
@@ -7,10 +7,24 @@ import {
 } from 'lucide-react';
 import { APP_CONFIG } from '../../config';
 import { useVerification } from '../../context/VerificationContext';
+import { supabaseClient } from '../../services/supabaseClient';
 
 export const Header: React.FC = () => {
   const { resetAllData, supabaseSync, refetchFromSupabase } = useVerification();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [signedInUser, setSignedInUser] = useState<{ name: string; email: string; initials: string } | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    supabaseClient.auth.getUser().then(({ data }) => {
+      if (!mounted || !data.user) return;
+      const email = data.user.email ?? '';
+      const name = String(data.user.user_metadata?.full_name || data.user.user_metadata?.name || email || 'Society Admin');
+      const initials = name.split(/\\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'SA';
+      setSignedInUser({ name, email, initials });
+    });
+    return () => { mounted = false; };
+  }, []);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showNotificationToast, setShowNotificationToast] = useState(false);
 
@@ -141,11 +155,11 @@ export const Header: React.FC = () => {
               className="flex items-center gap-2 pl-2 pr-3 py-1 bg-slate-800 hover:bg-slate-700/80 rounded-full border border-slate-700/80 transition-colors cursor-pointer text-left"
             >
               <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-semibold text-xs flex items-center justify-center shrink-0">
-                {APP_CONFIG.currentReviewer.initials}
+                {signedInUser?.initials ?? 'SA'}
               </div>
               <div className="hidden sm:block text-xs leading-tight">
-                <div className="font-semibold text-white">{APP_CONFIG.currentReviewer.name}</div>
-                <div className="text-[10px] text-slate-400">{APP_CONFIG.currentReviewer.role}</div>
+                <div className="font-semibold text-white">{signedInUser?.name ?? 'Society Admin'}</div>
+                <div className="text-[10px] text-slate-400">Society Admin</div>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
             </button>
@@ -155,9 +169,19 @@ export const Header: React.FC = () => {
               <div className="absolute right-0 mt-2 w-56 bg-white text-slate-800 rounded-lg shadow-xl border border-slate-200 py-1.5 z-50 text-xs">
                 <div className="px-3 py-2 border-b border-slate-100">
                   <div className="font-semibold text-slate-900">{APP_CONFIG.currentReviewer.name}</div>
-                  <div className="text-[11px] text-slate-500">{APP_CONFIG.currentReviewer.email}</div>
+                  <div className="text-[11px] text-slate-500">{signedInUser?.email ?? ''}</div>
                   <div className="text-[10px] text-blue-600 font-medium mt-1">Authorized Reviewer</div>
                 </div>
+
+                <button
+                  onClick={async () => {
+                    setShowProfileMenu(false);
+                    await supabaseClient.auth.signOut();
+                  }}
+                  className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium"
+                >
+                  <span>Sign out</span>
+                </button>
 
                 <button
                   onClick={() => {
