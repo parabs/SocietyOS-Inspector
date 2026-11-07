@@ -82,3 +82,30 @@ The detailed no-cost procedure is in `PHASE_A_LOCAL_VALIDATION_AND_ZERO_COST_PLA
 No Supabase development branch or second paid project is authorised or to be created. If local Docker/Supabase is unavailable, continue static SQL review and read-only production inspection; do not substitute production writes for local validation.
 
 The user's confirmation that all current records belong to the named society establishes the intended mapping, but it does not waive dry-run validation or the separate production approval gates.
+
+
+## Follow-on review completed (2026-11-07)
+
+### A1 draft hardening
+The review draft was updated without executing it:
+- Prevent duplicate invited/active memberships for the same user and society while preserving ended membership history.
+- Add a society-leading index for membership-role lookup.
+- Change polymorphic audit `target_id` from UUID to text so it can identify existing text-key records as well.
+- Explicitly require trusted application/RPC write paths to maintain `updated_at`.
+- Declare permission catalogue access server-side only, with no client-facing policy.
+
+Still open:
+- Role grant dates/status must be enforced by a trusted write path before grants are enabled.
+- Party-user links must remain inactive until party-to-society tenant mapping can be enforced.
+- Canonical production migrations must be recovered before faithful local replay.
+
+Review artifacts:
+- `docs/database/PHASE_A1_IDENTITY_FOUNDATION_REVIEW_DRAFT.sql`
+- `docs/database/PHASE_A1_IDENTITY_FOUNDATION_REVIEW_FINDINGS.md`
+
+### Security advisor baseline
+A read-only Supabase advisor review found 11 SECURITY DEFINER views, 4 SECURITY DEFINER trigger functions executable by anon/authenticated, one mutable-search-path trigger function, and broad grants on all 11 views. These are P0 security gates before member access or multi-tenant rollout.
+
+See `docs/PHASE_A_SECURITY_ADVISOR_BASELINE.md` for the findings and staged remediation guidance.
+
+No production schema, grants, policies, views, functions, storage policies, rows, or migration history were changed during this follow-on review.
