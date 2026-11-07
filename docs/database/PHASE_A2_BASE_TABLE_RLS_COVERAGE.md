@@ -6,10 +6,10 @@
 
 ## Coverage snapshot
 
-- Public base tables inspected: **47**
-- RLS enabled: **47 of 47**
-- RLS forced: **0 of 47**
-- Tables with at least one policy: **41**
+- Public base tables inspected: **46**
+- RLS enabled: **46 of 46**
+- RLS forced: **0 of 46**
+- Tables with at least one policy: **40**
 - Tables with no policy: **6**
 
 RLS being enabled is not equivalent to tenant isolation. The existing policy predicates still need to be checked for active-society membership, and SECURITY DEFINER views/functions and service-role paths must be reviewed separately. The current global `is_society_admin()` predicate does not provide active-society tenant authorization.
