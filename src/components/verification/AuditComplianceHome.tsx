@@ -12,7 +12,7 @@ type DashboardData = {
   loading: boolean;
   error: string | null;
   sources: number;
-  transactions: { demand_id?: string | null; evidence_status?: string | null }[];
+  transactions: { demand_id?: string | null; evidence_status?: string | null }[] | null;
   openingBalances: { verification_status?: string | null }[];
   checklist: ChecklistRow[] | null;
   documents: number | null;
@@ -20,7 +20,7 @@ type DashboardData = {
 };
 
 const initialData: DashboardData = {
-  loading: true, error: null, sources: 0, transactions: [], openingBalances: [],
+  loading: true, error: null, sources: 0, transactions: null, openingBalances: [],
   checklist: null, documents: null, obligations: null,
 };
 
@@ -28,6 +28,14 @@ export const AuditComplianceHome: React.FC = () => {
   const { setCurrentScreen, reconciliations, supabaseSync, refetchFromSupabase } = useVerification();
   const { activeSociety } = useSocietyAccess();
   const [data, setData] = useState<DashboardData>(initialData);
+  const [selectedFinancialYear, setSelectedFinancialYear] = useState('FY 2018-19');
+  const [availableFinancialYears, setAvailableFinancialYears] = useState<string[]>(['FY 2018-19']);
+  const financialYearMonths = (fy: string) => {
+    const match = fy.match(/FY\s*(\d{4})-(\d{2,4})/i);
+    if (!match) return [];
+    const startYear = Number(match[1]);
+    return ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'].map((month, index) => month + '-' + (index < 9 ? startYear : startYear + 1));
+  };
 
   const loadDashboard = async () => {
     if (!activeSociety?.society_id) {
@@ -36,16 +44,24 @@ export const AuditComplianceHome: React.FC = () => {
     }
     setData(prev => ({ ...prev, loading: true, error: null }));
     const societyId = activeSociety.society_id;
-    const months = ['Apr-2018','May-2018','Jun-2018','Jul-2018','Aug-2018','Sep-2018','Oct-2018','Nov-2018','Dec-2018','Jan-2019','Feb-2019','Mar-2019'];
+    const months = financialYearMonths(selectedFinancialYear);
     try {
-      const [sources, transactions, opening, checklist, documents, obligations] = await Promise.all([
-        supabaseClient.from('source_register').select('source_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', 'FY 2018-19'),
+      const [sources, transactions, opening, checklist, documents, obligations, sourceYears, checklistYears, openingYears, demandYears] = await Promise.all([
+        supabaseClient.from('source_register').select('source_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', selectedFinancialYear),
         supabaseClient.from('transactions').select('transaction_id,demand_id,evidence_status').eq('society_id', societyId).in('reporting_month', months).limit(1000),
-        supabaseClient.from('member_opening_balances').select('verification_status').eq('society_id', societyId).eq('financial_year', 'FY 2018-19').limit(200),
-        supabaseClient.from('financial_year_checklist').select('status').eq('society_id', societyId).eq('financial_year', 'FY 2018-19').limit(100),
-        supabaseClient.from('financial_year_audit_documents').select('document_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', 'FY 2018-19'),
+        supabaseClient.from('member_opening_balances').select('verification_status').eq('society_id', societyId).eq('financial_year', selectedFinancialYear).limit(200),
+        supabaseClient.from('financial_year_checklist').select('status').eq('society_id', societyId).eq('financial_year', selectedFinancialYear).limit(100),
+        supabaseClient.from('financial_year_audit_documents').select('document_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', selectedFinancialYear),
         supabaseClient.from('compliance_obligations').select('applicability,legal_status').eq('society_id', societyId).eq('active', true).limit(100),
+        supabaseClient.from('source_register').select('financial_year').eq('society_id', societyId).limit(200),
+        supabaseClient.from('financial_year_checklist').select('financial_year').eq('society_id', societyId).limit(200),
+        supabaseClient.from('member_opening_balances').select('financial_year').eq('society_id', societyId).limit(200),
+        supabaseClient.from('demand_register').select('financial_year').eq('society_id', societyId).limit(1000),
+        supabaseClient.from('demand_register').select('financial_year').eq('society_id', societyId).limit(1000),
       ]);
+      const yearSet = new Set([...(sourceYears.data || []).map((row: any) => row.financial_year), ...(checklistYears.data || []).map((row: any) => row.financial_year), ...(openingYears.data || []).map((row: any) => row.financial_year), ...(demandYears.data || []).map((row: any) => row.financial_year)].filter(Boolean));
+      const years = Array.from(yearSet).sort((a, b) => String(b).localeCompare(String(a)));
+      if (years.length) setAvailableFinancialYears(years);
       const errors = [
         ['source register', sources.error],
         ['transactions', transactions.error],
@@ -58,7 +74,7 @@ export const AuditComplianceHome: React.FC = () => {
         loading: false,
         error: errors.length ? errors.map(([name, error]) => `${name}: ${(error as any).message}`).join(' · ') : null,
         sources: sources.error ? 0 : (sources.count || 0),
-        transactions: transactions.error ? [] : (transactions.data || []) as DashboardData['transactions'],
+        transactions: transactions.error ? null : (transactions.data || []) as NonNullable<DashboardData['transactions']>,
         openingBalances: opening.error ? [] : (opening.data || []) as DashboardData['openingBalances'],
         checklist: checklist.error ? null : (checklist.data || []) as ChecklistRow[],
         documents: documents.error ? null : (documents.count || 0),
@@ -69,37 +85,39 @@ export const AuditComplianceHome: React.FC = () => {
     }
   };
 
-  useEffect(() => { void loadDashboard(); }, [activeSociety?.society_id]);
+  useEffect(() => { void loadDashboard(); }, [activeSociety?.society_id, selectedFinancialYear]);
 
   const verifiedMembers = data.openingBalances.filter(row => String(row.verification_status || '').toLowerCase() === 'verified').length;
   const pendingMembers = data.openingBalances.length - verifiedMembers;
-  const evidenceComplete = data.transactions.filter(row => String(row.evidence_status || '').toLowerCase() === 'complete').length;
-  const evidencePending = data.transactions.length - evidenceComplete;
-  const unmapped = data.transactions.filter(row => !String(row.demand_id || '').trim()).length;
+  const transactionRows = data.transactions || [];
+  const transactionsLoaded = data.transactions !== null;
+  const evidenceComplete = transactionRows.filter(row => String(row.evidence_status || '').toLowerCase() === 'complete').length;
+  const evidencePending = transactionsLoaded ? transactionRows.length - evidenceComplete : 0;
+  const unmapped = transactionRows.filter(row => !String(row.demand_id || '').trim()).length;
   const checklistDone = (data.checklist || []).filter(row => ['completed', 'complete', 'done'].includes(String(row.status || '').toLowerCase())).length;
   const checklistProgress = (data.checklist || []).filter(row => String(row.status || '').toLowerCase() === 'in progress').length;
   const checklistPending = (data.checklist || []).filter(row => String(row.status || '').toLowerCase() === 'pending').length;
   const complianceToVerify = (data.obligations || []).filter(row => /draft|verify/i.test(String(row.legal_status || '') + ' ' + String(row.applicability || ''))).length;
   const reconciled = Object.values(reconciliations).reduce((sum, rows: any) => sum + rows.filter((row: any) => ['Reconciled', 'Matched'].includes(row.status)).length, 0);
-  const totalTransactions = data.transactions.length;
-  const loaded = !data.loading && !data.error;
+  const totalTransactions = transactionRows.length;
+  const loaded = !data.loading;
   const go = (screen: any) => setCurrentScreen(screen);
 
   const workstreams = [
     { title: 'Opening Balances', value: loaded ? `${verifiedMembers}/${data.openingBalances.length} verified` : 'Loading…', sub: 'Member opening balance register', pct: data.openingBalances.length ? verifiedMembers / data.openingBalances.length * 100 : 0, screen: 'opening-balances' },
-    { title: 'Transaction Verification', value: loaded ? `${evidenceComplete}/${totalTransactions} evidence complete` : 'Loading…', sub: 'Bills, receipts and supporting evidence', pct: totalTransactions ? evidenceComplete / totalTransactions * 100 : 0, screen: 'transaction-verification' },
-    { title: 'Demand Mapping & Allocation', value: loaded ? `${totalTransactions - unmapped}/${totalTransactions} mapped · ${unmapped} missing` : 'Loading…', sub: 'Link receipts and payments to demands', pct: totalTransactions ? (totalTransactions - unmapped) / totalTransactions * 100 : 0, screen: 'transactions' },
+    { title: 'Transaction Verification', value: !loaded ? 'Loading…' : transactionsLoaded ? `${evidenceComplete}/${totalTransactions} evidence complete` : 'Unavailable', sub: 'Bills, receipts and supporting evidence', pct: totalTransactions ? evidenceComplete / totalTransactions * 100 : 0, screen: 'transaction-verification' },
+    { title: 'Demand Mapping & Allocation', value: !loaded ? 'Loading…' : transactionsLoaded ? `${totalTransactions - unmapped}/${totalTransactions} mapped · ${unmapped} missing` : 'Unavailable', sub: 'Link receipts and payments to demands', pct: totalTransactions ? (totalTransactions - unmapped) / totalTransactions * 100 : 0, screen: 'transactions' },
     { title: 'Monthly Reconciliation', value: `${reconciled} entries reconciled`, sub: 'Bank and cash monthly balances', pct: 0, screen: 'monthly-reconciliation' },
     { title: 'Audit Documents & Evidence', value: data.documents === null ? 'Not assessed' : `${data.documents} uploaded`, sub: 'Audit schedules and supporting records', pct: 0, screen: 'audit-evidence' },
     { title: 'Compliance Obligations', value: data.obligations === null ? 'Not assessed' : `${complianceToVerify} require validation`, sub: 'Applicability and legal status review', pct: 0, screen: 'compliance-command-centre' },
-    { title: 'Annual Review & Closure', value: data.checklist === null ? 'Not assessed' : `${checklistDone} done · ${checklistProgress} in progress · ${checklistPending} pending`, sub: 'FY 2018–19 annual audit checklist', pct: 0, screen: 'annual-financial-review' },
+    { title: 'Annual Review & Closure', value: data.checklist === null ? 'Not assessed' : `${checklistDone} done · ${checklistProgress} in progress · ${checklistPending} pending`, sub: `${selectedFinancialYear} annual audit checklist`, pct: 0, screen: 'annual-financial-review' },
   ];
 
   const actions = [
     { title: 'Verify member opening balances', detail: loaded ? `${pendingMembers} of ${data.openingBalances.length} pending` : 'Opening balance data loading', screen: 'opening-balances', icon: Wallet },
-    { title: 'Review transaction evidence', detail: loaded ? `${evidencePending} transactions pending` : 'Transaction data loading', screen: 'transaction-verification', icon: FileCheck2 },
+    { title: 'Review transaction evidence', detail: !loaded ? 'Transaction data loading' : transactionsLoaded ? `${evidencePending} transactions pending` : 'Transaction summary unavailable', screen: 'transaction-verification', icon: FileCheck2 },
     { title: 'Complete monthly bank and cash reconciliation', detail: `${reconciled} reconciliation entries completed`, screen: 'monthly-reconciliation', icon: Landmark },
-    { title: 'Resolve transactions without Demand ID', detail: loaded ? `${unmapped} transactions need mapping` : 'Demand mapping data loading', screen: 'transactions', icon: Link2 },
+    { title: 'Resolve transactions without Demand ID', detail: !loaded ? 'Demand mapping data loading' : transactionsLoaded ? `${unmapped} transactions need mapping` : 'Demand mapping summary unavailable', screen: 'transactions', icon: Link2 },
     { title: 'Upload audit reports and supporting documents', detail: data.documents === null ? 'Document register not assessed' : `${data.documents} documents uploaded`, screen: 'audit-evidence', icon: FileText },
   ];
 
@@ -109,9 +127,10 @@ export const AuditComplianceHome: React.FC = () => {
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-600">Society OS / Audit & Compliance</div>
           <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900">Audit & Compliance Home</h1>
-          <p className="text-xs text-slate-500">Current financial and audit position, key status and next actions.</p>
+          <p className="text-xs text-slate-500">Current financial and audit position, key status and next actions · {selectedFinancialYear}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2 text-[11px] text-slate-500">
+          <label className="flex items-center gap-1.5 font-medium text-slate-600">Financial year <select value={selectedFinancialYear} onChange={event => setSelectedFinancialYear(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-blue-400">{availableFinancialYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label>
           <span className={`h-2 w-2 rounded-full ${data.loading || supabaseSync.isLoading ? 'bg-amber-500' : data.error ? 'bg-rose-500' : 'bg-emerald-500'}`} />
           {data.loading || supabaseSync.isLoading ? 'Refreshing live records' : data.error ? 'Data load issue' : 'Connected to database'}
           <button onClick={() => { void loadDashboard(); void refetchFromSupabase(); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-50"><RefreshCw className="h-3 w-3" /> Refresh</button>
@@ -123,7 +142,7 @@ export const AuditComplianceHome: React.FC = () => {
       <section className="grid grid-cols-1 gap-3 2xl:grid-cols-[1.35fr_1fr]">
         <div className="flex min-h-[178px] flex-col justify-between rounded-xl bg-gradient-to-r from-[#172e55] to-[#426b9f] p-5 text-white shadow-sm">
           <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-300/10 px-2.5 py-1 text-[10px] font-semibold text-amber-100"><Clock3 className="h-3 w-3" /> FY 2018–19 · Verification not yet completed</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-300/10 px-2.5 py-1 text-[10px] font-semibold text-amber-100"><Clock3 className="h-3 w-3" /> {selectedFinancialYear} · Verification not yet completed</span>
             <h2 className="mt-3 text-xl font-bold leading-tight sm:text-2xl">Financial records are loaded. Audit verification is still pending.</h2>
             <p className="mt-1.5 max-w-3xl text-xs leading-5 text-blue-100">Opening balances, transaction evidence, demand links, monthly reconciliations and audit documents need review before the annual audit position can be confirmed.</p>
           </div>
@@ -140,7 +159,7 @@ export const AuditComplianceHome: React.FC = () => {
               { label: 'Source Records', value: data.loading ? '—' : data.sources, icon: Database, tint: 'bg-emerald-50 text-emerald-700' },
               { label: 'Transactions', value: data.loading ? '—' : totalTransactions, icon: ClipboardList, tint: 'bg-blue-50 text-blue-700' },
               { label: 'Member Opening Balances', value: data.loading ? '—' : data.openingBalances.length, icon: Wallet, tint: 'bg-violet-50 text-violet-700' },
-              { label: 'Evidence Pending', value: data.loading ? '—' : evidencePending, icon: FileCheck2, tint: 'bg-amber-50 text-amber-700' },
+              { label: 'Evidence Pending', value: data.loading ? '—' : transactionsLoaded ? evidencePending : 'Unavailable', icon: FileCheck2, tint: 'bg-amber-50 text-amber-700' },
             ].map(item => { const Icon = item.icon; return <div key={item.label} className="flex items-center gap-2.5 rounded-lg border border-slate-100 p-3"><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.tint}`}><Icon className="h-4 w-4" /></span><span className="min-w-0"><span className="block text-[10px] text-slate-500">{item.label}</span><span className="block text-lg font-bold leading-tight text-slate-900 tabular-nums">{item.value}</span></span></div>; })}
           </div>
         </div>
@@ -162,8 +181,8 @@ export const AuditComplianceHome: React.FC = () => {
           <div className="mt-3 space-y-2">
             {[
               { label: 'Verify opening balances', value: data.loading ? '—' : pendingMembers, sub: 'Member records pending', screen: 'opening-balances' },
-              { label: 'Review transaction evidence', value: data.loading ? '—' : evidencePending, sub: 'Transactions awaiting review', screen: 'transaction-verification' },
-              { label: 'Map transactions to demands', value: data.loading ? '—' : unmapped, sub: 'Transactions without Demand ID', screen: 'transactions' },
+              { label: 'Review transaction evidence', value: data.loading ? '—' : transactionsLoaded ? evidencePending : 'Unavailable', sub: 'Transactions awaiting review', screen: 'transaction-verification' },
+              { label: 'Map transactions to demands', value: data.loading ? '—' : transactionsLoaded ? unmapped : 'Unavailable', sub: 'Transactions without Demand ID', screen: 'transactions' },
               { label: 'Complete monthly reconciliation', value: reconciled, sub: 'Reconciliation entries completed', screen: 'monthly-reconciliation' },
               { label: 'Validate compliance obligations', value: data.obligations === null ? '—' : complianceToVerify, sub: 'Applicability or legal status to verify', screen: 'compliance-command-centre' },
             ].map(item => <button key={item.label} onClick={() => go(item.screen)} className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-left hover:border-blue-200 hover:bg-blue-50"><span className="flex min-w-0 items-center gap-2"><AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600" /><span className="min-w-0"><span className="block text-[10px] font-semibold text-slate-700">{item.label}</span><span className="block text-[9px] text-slate-400">{item.sub}</span></span></span><span className="text-sm font-bold tabular-nums text-slate-900">{item.value}</span></button>)}
