@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React from 'react';
+import { PublicDemoMode } from './components/demo/PublicDemoMode';
 import { AuthGate } from './components/auth/AuthGate';
 import { VerificationProvider, useVerification } from './context/VerificationContext';
 import { Header } from './components/layout/Header';
@@ -89,6 +90,9 @@ const MainContent: React.FC = () => {
 };
 
 export default function App() {
+  const isLiveWorkspace = new URLSearchParams(window.location.search).get('mode') === 'live';
+  if (!isLiveWorkspace) return <PublicDemoMode />;
+
   return (
     <AuthGate>
       <VerificationProvider>
