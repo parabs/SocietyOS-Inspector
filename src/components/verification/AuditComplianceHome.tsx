@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowRight, AlertCircle, CheckCircle2, Clock3, FileCheck2, FileText,
   Landmark, RefreshCw, ShieldCheck, Wallet, ClipboardList, Database, Link2,
@@ -27,7 +27,7 @@ type DashboardData = { loading: boolean; error: string | null; summary: AuditSum
 const initialData: DashboardData = { loading: true, error: null, summary: null };
 
 export const AuditComplianceHome: React.FC = () => {
-  const { setCurrentScreen, reconciliations, supabaseSync } = useVerification();
+  const { setCurrentScreen, reconciliations } = useVerification();
   const { activeSociety } = useSocietyAccess();
   const [data, setData] = useState<DashboardData>(initialData);
   const [selectedFinancialYear, setSelectedFinancialYear] = useState('FY 2018-19');
@@ -105,8 +105,8 @@ export const AuditComplianceHome: React.FC = () => {
         </div>
         <div className="flex shrink-0 items-center gap-2 text-[11px] text-slate-500">
           <label className="flex items-center gap-1.5 font-medium text-slate-600">Financial year <select value={selectedFinancialYear} onChange={event => setSelectedFinancialYear(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-blue-400">{availableFinancialYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label>
-          <span className={`h-2 w-2 rounded-full ${data.loading || supabaseSync.isLoading ? 'bg-amber-500' : data.error ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-          {data.loading || supabaseSync.isLoading ? 'Refreshing live records' : data.error ? 'Data load issue' : 'Connected to database'}
+          <span className={`h-2 w-2 rounded-full ${data.loading ? 'bg-amber-500' : data.error ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+          {data.loading ? 'Loading audit summary' : data.error ? 'Audit summary unavailable' : 'Audit summary loaded'}
           <button onClick={() => { void loadDashboard(); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-50"><RefreshCw className="h-3 w-3" /> Refresh</button>
         </div>
       </div>
@@ -132,7 +132,7 @@ export const AuditComplianceHome: React.FC = () => {
             {[
               { label: 'Source Records', value: data.loading ? '—' : summary ? summary.source_records : 'Unavailable', icon: Database, tint: 'bg-emerald-50 text-emerald-700' },
               { label: 'Transactions', value: data.loading ? '—' : summary ? totalTransactions : 'Unavailable', icon: ClipboardList, tint: 'bg-blue-50 text-blue-700' },
-              { label: 'Member Opening Balances', value: data.loading ? '—' : (summary?.opening_balance_records ?? 0), icon: Wallet, tint: 'bg-violet-50 text-violet-700' },
+              { label: 'Member Opening Balances', value: data.loading ? '—' : summary ? summary.opening_balance_records : 'Unavailable', icon: Wallet, tint: 'bg-violet-50 text-violet-700' },
               { label: 'Evidence Pending', value: data.loading ? '—' : transactionsLoaded ? evidencePending : 'Unavailable', icon: FileCheck2, tint: 'bg-amber-50 text-amber-700' },
             ].map(item => { const Icon = item.icon; return <div key={item.label} className="flex items-center gap-2.5 rounded-lg border border-slate-100 p-3"><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.tint}`}><Icon className="h-4 w-4" /></span><span className="min-w-0"><span className="block text-[10px] text-slate-500">{item.label}</span><span className="block text-lg font-bold leading-tight text-slate-900 tabular-nums">{item.value}</span></span></div>; })}
           </div>
@@ -170,7 +170,7 @@ export const AuditComplianceHome: React.FC = () => {
             <p className="mt-1 text-[10px] text-slate-500">Stage-based position; no unverified readiness score.</p>
             <div className="mt-3 space-y-2">
               {[
-                ['Financial records', data.loading ? 'Loading' : data.sources ? 'Loaded' : 'Not available', data.sources > 0],
+                ['Financial records', data.loading ? 'Loading' : !summary ? 'Unavailable' : summary.source_records ? 'Loaded' : 'No source records', Boolean(summary && summary.source_records > 0)],
                 ['Verification results', data.loading ? 'Loading' : 'Pending review', false],
                 ['Monthly reconciliation', reconciled ? 'Partially recorded' : 'Not recorded', false],
                 ['Audit documents', !summary ? 'Unavailable' : summary.audit_documents ? 'Uploaded' : 'None uploaded', false],
