@@ -26,7 +26,7 @@ export const AuditComplianceHome: React.FC = () => {
       const [checklist, documents, obligations] = await Promise.all([
         supabaseClient.from('financial_year_checklist').select('status,stage').eq('financial_year', 'FY 2018-19'),
         supabaseClient.from('financial_year_audit_documents').select('*', { count: 'exact', head: true }).eq('financial_year', 'FY 2018-19'),
-        supabaseClient.from('compliance_obligations').select('applicability,legal_status').eq('is_active', true),
+        supabaseClient.from('compliance_obligations').select('applicability,legal_status').eq('active', true),
       ]);
       if (!active) return;
       setExtra({
@@ -42,7 +42,8 @@ export const AuditComplianceHome: React.FC = () => {
 
   const pendingMembers = memberOpeningBalances.filter((row: any) => String(row.verification_status || 'Pending').toLowerCase() !== 'verified').length;
   const verifiedMembers = memberOpeningBalances.length - pendingMembers;
-  const evidencePending = transactions.filter((row: any) => String(row.evidenceStatus || row.evidence_status || 'Pending').toLowerCase() === 'pending').length;
+  const evidenceComplete = transactions.filter((row: any) => String(row.evidenceStatus || row.evidence_status || 'Pending').toLowerCase() === 'complete').length;
+  const evidencePending = transactions.length - evidenceComplete;
   const unmappedTransactions = transactions.filter((row: any) => !String(row.demandId || row.demand_id || '').trim()).length;
   const checklistDone = (extra.checklist || []).filter(row => ['completed', 'complete', 'done'].includes(String(row.status || '').toLowerCase())).length;
   const checklistInProgress = (extra.checklist || []).filter(row => String(row.status || '').toLowerCase() === 'in progress').length;
@@ -63,7 +64,7 @@ export const AuditComplianceHome: React.FC = () => {
 
   const workstreams = [
     { name: 'Opening Balances', value: memberOpeningBalances.length ? `${verifiedMembers}/${memberOpeningBalances.length} verified` : 'Data unavailable', note: 'Member opening balance register', screen: 'opening-balances' as const, percent: memberOpeningBalances.length ? verifiedMembers / memberOpeningBalances.length * 100 : 0 },
-    { name: 'Transaction Verification', value: `${transactionCount - evidencePending}/${transactionCount} evidence complete`, note: 'Bills, receipts and supporting evidence', screen: 'transaction-verification' as const, percent: transactionCount ? (transactionCount - evidencePending) / transactionCount * 100 : 0 },
+    { name: 'Transaction Verification', value: \${evidenceComplete}/\${transactionCount} evidence complete, note: 'Bills, receipts and supporting evidence', screen: 'transaction-verification' as const, percent: transactionCount ? evidenceComplete / transactionCount * 100 : 0 },
     { name: 'Demand Mapping', value: `${unmappedTransactions} without Demand ID`, note: `${demandMapped} transactions currently have a Demand ID`, screen: 'transactions' as const, percent: transactionCount ? demandMapped / transactionCount * 100 : 0 },
     { name: 'Monthly Reconciliation', value: `${monthsReconciled} entries reconciled`, note: 'Bank and cash monthly balances', screen: 'monthly-reconciliation' as const, percent: 0 },
     { name: 'Audit Documents & Evidence', value: extra.documents === null ? 'Not assessed' : `${extra.documents} documents uploaded`, note: 'Audit schedules and supporting records', screen: 'audit-evidence' as const, percent: 0 },
