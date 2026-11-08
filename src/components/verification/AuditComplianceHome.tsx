@@ -12,7 +12,7 @@ type DashboardData = {
   loading: boolean;
   error: string | null;
   sources: number;
-  transactions: { demand_id?: string | null; evidence_status?: string | null }[];
+  transactions: { demand_id?: string | null; evidence_status?: string | null }[] | null;
   openingBalances: { verification_status?: string | null }[];
   checklist: ChecklistRow[] | null;
   documents: number | null;
@@ -20,7 +20,7 @@ type DashboardData = {
 };
 
 const initialData: DashboardData = {
-  loading: true, error: null, sources: 0, transactions: [], openingBalances: [],
+  loading: true, error: null, sources: 0, transactions: null, openingBalances: [],
   checklist: null, documents: null, obligations: null,
 };
 
@@ -72,7 +72,7 @@ export const AuditComplianceHome: React.FC = () => {
         loading: false,
         error: errors.length ? errors.map(([name, error]) => `${name}: ${(error as any).message}`).join(' · ') : null,
         sources: sources.error ? 0 : (sources.count || 0),
-        transactions: transactions.error ? [] : (transactions.data || []) as DashboardData['transactions'],
+        transactions: transactions.error ? null : (transactions.data || []) as NonNullable<DashboardData['transactions']>,
         openingBalances: opening.error ? [] : (opening.data || []) as DashboardData['openingBalances'],
         checklist: checklist.error ? null : (checklist.data || []) as ChecklistRow[],
         documents: documents.error ? null : (documents.count || 0),
@@ -87,9 +87,11 @@ export const AuditComplianceHome: React.FC = () => {
 
   const verifiedMembers = data.openingBalances.filter(row => String(row.verification_status || '').toLowerCase() === 'verified').length;
   const pendingMembers = data.openingBalances.length - verifiedMembers;
-  const evidenceComplete = data.transactions.filter(row => String(row.evidence_status || '').toLowerCase() === 'complete').length;
+  const transactionRows = data.transactions || [];
+  const transactionsLoaded = data.transactions !== null;
+  const evidenceComplete = transactionRows.filter(row => String(row.evidence_status || '').toLowerCase() === 'complete').length;
   const evidencePending = data.transactions.length - evidenceComplete;
-  const unmapped = data.transactions.filter(row => !String(row.demand_id || '').trim()).length;
+  const unmapped = transactionRows.filter(row => !String(row.demand_id || '').trim()).length;
   const checklistDone = (data.checklist || []).filter(row => ['completed', 'complete', 'done'].includes(String(row.status || '').toLowerCase())).length;
   const checklistProgress = (data.checklist || []).filter(row => String(row.status || '').toLowerCase() === 'in progress').length;
   const checklistPending = (data.checklist || []).filter(row => String(row.status || '').toLowerCase() === 'pending').length;
@@ -101,8 +103,8 @@ export const AuditComplianceHome: React.FC = () => {
 
   const workstreams = [
     { title: 'Opening Balances', value: loaded ? `${verifiedMembers}/${data.openingBalances.length} verified` : 'Loading…', sub: 'Member opening balance register', pct: data.openingBalances.length ? verifiedMembers / data.openingBalances.length * 100 : 0, screen: 'opening-balances' },
-    { title: 'Transaction Verification', value: loaded ? `${evidenceComplete}/${totalTransactions} evidence complete` : 'Loading…', sub: 'Bills, receipts and supporting evidence', pct: totalTransactions ? evidenceComplete / totalTransactions * 100 : 0, screen: 'transaction-verification' },
-    { title: 'Demand Mapping & Allocation', value: loaded ? `${totalTransactions - unmapped}/${totalTransactions} mapped · ${unmapped} missing` : 'Loading…', sub: 'Link receipts and payments to demands', pct: totalTransactions ? (totalTransactions - unmapped) / totalTransactions * 100 : 0, screen: 'transactions' },
+    { title: 'Transaction Verification', value: !loaded ? 'Loading…' : transactionsLoaded ? `${evidenceComplete}/${totalTransactions} evidence complete` : 'Unavailable', sub: 'Bills, receipts and supporting evidence', pct: totalTransactions ? evidenceComplete / totalTransactions * 100 : 0, screen: 'transaction-verification' },
+    { title: 'Demand Mapping & Allocation', value: !loaded ? 'Loading…' : transactionsLoaded ? `${totalTransactions - unmapped}/${totalTransactions} mapped · ${unmapped} missing` : 'Unavailable', sub: 'Link receipts and payments to demands', pct: totalTransactions ? (totalTransactions - unmapped) / totalTransactions * 100 : 0, screen: 'transactions' },
     { title: 'Monthly Reconciliation', value: `${reconciled} entries reconciled`, sub: 'Bank and cash monthly balances', pct: 0, screen: 'monthly-reconciliation' },
     { title: 'Audit Documents & Evidence', value: data.documents === null ? 'Not assessed' : `${data.documents} uploaded`, sub: 'Audit schedules and supporting records', pct: 0, screen: 'audit-evidence' },
     { title: 'Compliance Obligations', value: data.obligations === null ? 'Not assessed' : `${complianceToVerify} require validation`, sub: 'Applicability and legal status review', pct: 0, screen: 'compliance-command-centre' },
@@ -111,9 +113,9 @@ export const AuditComplianceHome: React.FC = () => {
 
   const actions = [
     { title: 'Verify member opening balances', detail: loaded ? `${pendingMembers} of ${data.openingBalances.length} pending` : 'Opening balance data loading', screen: 'opening-balances', icon: Wallet },
-    { title: 'Review transaction evidence', detail: loaded ? `${evidencePending} transactions pending` : 'Transaction data loading', screen: 'transaction-verification', icon: FileCheck2 },
+    { title: 'Review transaction evidence', detail: !loaded ? 'Transaction data loading' : transactionsLoaded ? `${evidencePending} transactions pending` : 'Transaction summary unavailable', screen: 'transaction-verification', icon: FileCheck2 },
     { title: 'Complete monthly bank and cash reconciliation', detail: `${reconciled} reconciliation entries completed`, screen: 'monthly-reconciliation', icon: Landmark },
-    { title: 'Resolve transactions without Demand ID', detail: loaded ? `${unmapped} transactions need mapping` : 'Demand mapping data loading', screen: 'transactions', icon: Link2 },
+    { title: 'Resolve transactions without Demand ID', detail: !loaded ? 'Demand mapping data loading' : transactionsLoaded ? `${unmapped} transactions need mapping` : 'Demand mapping summary unavailable', screen: 'transactions', icon: Link2 },
     { title: 'Upload audit reports and supporting documents', detail: data.documents === null ? 'Document register not assessed' : `${data.documents} documents uploaded`, screen: 'audit-evidence', icon: FileText },
   ];
 
@@ -155,7 +157,7 @@ export const AuditComplianceHome: React.FC = () => {
               { label: 'Source Records', value: data.loading ? '—' : data.sources, icon: Database, tint: 'bg-emerald-50 text-emerald-700' },
               { label: 'Transactions', value: data.loading ? '—' : totalTransactions, icon: ClipboardList, tint: 'bg-blue-50 text-blue-700' },
               { label: 'Member Opening Balances', value: data.loading ? '—' : data.openingBalances.length, icon: Wallet, tint: 'bg-violet-50 text-violet-700' },
-              { label: 'Evidence Pending', value: data.loading ? '—' : evidencePending, icon: FileCheck2, tint: 'bg-amber-50 text-amber-700' },
+              { label: 'Evidence Pending', value: data.loading ? '—' : transactionsLoaded ? evidencePending : 'Unavailable', icon: FileCheck2, tint: 'bg-amber-50 text-amber-700' },
             ].map(item => { const Icon = item.icon; return <div key={item.label} className="flex items-center gap-2.5 rounded-lg border border-slate-100 p-3"><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.tint}`}><Icon className="h-4 w-4" /></span><span className="min-w-0"><span className="block text-[10px] text-slate-500">{item.label}</span><span className="block text-lg font-bold leading-tight text-slate-900 tabular-nums">{item.value}</span></span></div>; })}
           </div>
         </div>
@@ -178,7 +180,7 @@ export const AuditComplianceHome: React.FC = () => {
             {[
               { label: 'Verify opening balances', value: data.loading ? '—' : pendingMembers, sub: 'Member records pending', screen: 'opening-balances' },
               { label: 'Review transaction evidence', value: data.loading ? '—' : evidencePending, sub: 'Transactions awaiting review', screen: 'transaction-verification' },
-              { label: 'Map transactions to demands', value: data.loading ? '—' : unmapped, sub: 'Transactions without Demand ID', screen: 'transactions' },
+              { label: 'Map transactions to demands', value: data.loading ? '—' : transactionsLoaded ? unmapped : 'Unavailable', sub: 'Transactions without Demand ID', screen: 'transactions' },
               { label: 'Complete monthly reconciliation', value: reconciled, sub: 'Reconciliation entries completed', screen: 'monthly-reconciliation' },
               { label: 'Validate compliance obligations', value: data.obligations === null ? '—' : complianceToVerify, sub: 'Applicability or legal status to verify', screen: 'compliance-command-centre' },
             ].map(item => <button key={item.label} onClick={() => go(item.screen)} className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-left hover:border-blue-200 hover:bg-blue-50"><span className="flex min-w-0 items-center gap-2"><AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600" /><span className="min-w-0"><span className="block text-[10px] font-semibold text-slate-700">{item.label}</span><span className="block text-[9px] text-slate-400">{item.sub}</span></span></span><span className="text-sm font-bold tabular-nums text-slate-900">{item.value}</span></button>)}
