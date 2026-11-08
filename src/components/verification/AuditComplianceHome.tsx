@@ -12,7 +12,7 @@ type DashboardData = {
   loading: boolean;
   error: string | null;
   sources: number;
-  transactions: { demand_id?: string | null; evidence_status?: string | null }[] | null;
+  transactions: { total: number; evidenceComplete: number; unmapped: number } | null;
   openingBalances: { verification_status?: string | null }[];
   checklist: ChecklistRow[] | null;
   documents: number | null;
@@ -46,9 +46,12 @@ export const AuditComplianceHome: React.FC = () => {
     const societyId = activeSociety.society_id;
     const months = financialYearMonths(selectedFinancialYear);
     try {
-      const [sources, transactions, opening, checklist, documents, obligations, sourceYears, checklistYears, openingYears, demandYears] = await Promise.all([
+      const [sources, transactionTotal, transactionEvidence, transactionUnmappedNull, transactionUnmappedBlank, opening, checklist, documents, obligations, sourceYears, checklistYears, openingYears, demandYears] = await Promise.all([
         supabaseClient.from('source_register').select('source_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', selectedFinancialYear),
-        supabaseClient.from('transactions').select('transaction_id,demand_id,evidence_status').eq('society_id', societyId).in('reporting_month', months).limit(1000),
+        supabaseClient.from('transactions').select('transaction_id', { count: 'exact', head: true }).eq('society_id', societyId).in('reporting_month', months),
+        supabaseClient.from('transactions').select('transaction_id', { count: 'exact', head: true }).eq('society_id', societyId).in('reporting_month', months).ilike('evidence_status', 'complete'),
+        supabaseClient.from('transactions').select('transaction_id', { count: 'exact', head: true }).eq('society_id', societyId).in('reporting_month', months).is('demand_id', null),
+        supabaseClient.from('transactions').select('transaction_id', { count: 'exact', head: true }).eq('society_id', societyId).in('reporting_month', months).eq('demand_id', ''),
         supabaseClient.from('member_opening_balances').select('verification_status').eq('society_id', societyId).eq('financial_year', selectedFinancialYear).limit(200),
         supabaseClient.from('financial_year_checklist').select('status').eq('society_id', societyId).eq('financial_year', selectedFinancialYear).limit(100),
         supabaseClient.from('financial_year_audit_documents').select('document_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', selectedFinancialYear),
@@ -57,14 +60,13 @@ export const AuditComplianceHome: React.FC = () => {
         supabaseClient.from('financial_year_checklist').select('financial_year').eq('society_id', societyId).limit(200),
         supabaseClient.from('member_opening_balances').select('financial_year').eq('society_id', societyId).limit(200),
         supabaseClient.from('demand_register').select('financial_year').eq('society_id', societyId).limit(1000),
-        supabaseClient.from('demand_register').select('financial_year').eq('society_id', societyId).limit(1000),
       ]);
       const yearSet = new Set([...(sourceYears.data || []).map((row: any) => row.financial_year), ...(checklistYears.data || []).map((row: any) => row.financial_year), ...(openingYears.data || []).map((row: any) => row.financial_year), ...(demandYears.data || []).map((row: any) => row.financial_year)].filter(Boolean));
       const years = Array.from(yearSet).sort((a, b) => String(b).localeCompare(String(a)));
       if (years.length) setAvailableFinancialYears(years);
       const errors = [
         ['source register', sources.error],
-        ['transactions', transactions.error],
+        ['transactions', transactionTotal.error || transactionEvidence.error || transactionUnmappedNull.error || transactionUnmappedBlank.error],
         ['opening balances', opening.error],
         ['annual checklist', checklist.error],
         ['audit documents', documents.error],
@@ -74,7 +76,7 @@ export const AuditComplianceHome: React.FC = () => {
         loading: false,
         error: errors.length ? errors.map(([name, error]) => `${name}: ${(error as any).message}`).join(' · ') : null,
         sources: sources.error ? 0 : (sources.count || 0),
-        transactions: transactions.error ? null : (transactions.data || []) as NonNullable<DashboardData['transactions']>,
+        transactions: transactionTotal.error || transactionEvidence.error || transactionUnmappedNull.error || transactionUnmappedBlank.error ? null : { total: transactionTotal.count || 0, evidenceComplete: transactionEvidence.count || 0, unmapped: (transactionUnmappedNull.count || 0) + (transactionUnmappedBlank.count || 0) },
         openingBalances: opening.error ? [] : (opening.data || []) as DashboardData['openingBalances'],
         checklist: checklist.error ? null : (checklist.data || []) as ChecklistRow[],
         documents: documents.error ? null : (documents.count || 0),
@@ -89,17 +91,16 @@ export const AuditComplianceHome: React.FC = () => {
 
   const verifiedMembers = data.openingBalances.filter(row => String(row.verification_status || '').toLowerCase() === 'verified').length;
   const pendingMembers = data.openingBalances.length - verifiedMembers;
-  const transactionRows = data.transactions || [];
   const transactionsLoaded = data.transactions !== null;
-  const evidenceComplete = transactionRows.filter(row => String(row.evidence_status || '').toLowerCase() === 'complete').length;
-  const evidencePending = transactionsLoaded ? transactionRows.length - evidenceComplete : 0;
-  const unmapped = transactionRows.filter(row => !String(row.demand_id || '').trim()).length;
+  const evidenceComplete = data.transactions?.evidenceComplete || 0;
+  const evidencePending = transactionsLoaded ? (data.transactions?.total || 0) - evidenceComplete : 0;
+  const unmapped = data.transactions?.unmapped || 0;
   const checklistDone = (data.checklist || []).filter(row => ['completed', 'complete', 'done'].includes(String(row.status || '').toLowerCase())).length;
   const checklistProgress = (data.checklist || []).filter(row => String(row.status || '').toLowerCase() === 'in progress').length;
   const checklistPending = (data.checklist || []).filter(row => String(row.status || '').toLowerCase() === 'pending').length;
   const complianceToVerify = (data.obligations || []).filter(row => /draft|verify/i.test(String(row.legal_status || '') + ' ' + String(row.applicability || ''))).length;
   const reconciled = Object.values(reconciliations).reduce((sum, rows: any) => sum + rows.filter((row: any) => ['Reconciled', 'Matched'].includes(row.status)).length, 0);
-  const totalTransactions = transactionRows.length;
+  const totalTransactions = data.transactions?.total || 0;
   const loaded = !data.loading;
   const go = (screen: any) => setCurrentScreen(screen);
 
