@@ -41,7 +41,7 @@ export const AuditComplianceHome: React.FC = () => {
     }
     setData(prev => ({ ...prev, loading: true, error: null }));
     try {
-      const { data: result, error } = await supabaseClient.rpc('get_audit_home_summary', {
+      const { data: result, error } = await (supabaseClient as any).rpc('get_audit_home_summary', {
         p_society_id: societyId,
         p_financial_year: selectedFinancialYear,
       });
