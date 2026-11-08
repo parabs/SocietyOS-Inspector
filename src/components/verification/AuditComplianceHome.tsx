@@ -99,8 +99,6 @@ export const AuditComplianceHome: React.FC = () => {
   const checklistPending = (data.checklist || []).filter(row => String(row.status || '').toLowerCase() === 'pending').length;
   const complianceToVerify = (data.obligations || []).filter(row => /draft|verify/i.test(String(row.legal_status || '') + ' ' + String(row.applicability || ''))).length;
   const reconciled = Object.values(reconciliations).reduce((sum, rows: any) => sum + rows.filter((row: any) => ['Reconciled', 'Matched'].includes(row.status)).length, 0);
-  const transactionRows = data.transactions || [];
-  const transactionsLoaded = data.transactions !== null;
   const totalTransactions = transactionRows.length;
   const loaded = !data.loading;
   const go = (screen: any) => setCurrentScreen(screen);
