@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useVerification } from '../../context/VerificationContext';
 import { supabaseClient } from '../../services/supabaseClient';
+import { useSocietyAccess } from '../../context/SocietyAccessContext';
 
 type ChecklistRow = { status?: string };
 type DashboardData = {
@@ -25,29 +26,47 @@ const initialData: DashboardData = {
 
 export const AuditComplianceHome: React.FC = () => {
   const { setCurrentScreen, reconciliations, supabaseSync, refetchFromSupabase } = useVerification();
+  const { activeSociety } = useSocietyAccess();
   const [data, setData] = useState<DashboardData>(initialData);
 
   const loadDashboard = async () => {
+    if (!activeSociety?.society_id) {
+      setData(prev => ({ ...prev, loading: false, error: 'No active society is selected.' }));
+      return;
+    }
     setData(prev => ({ ...prev, loading: true, error: null }));
-    const [sources, transactions, opening, checklist, documents, obligations] = await Promise.all([
-      supabaseClient.from('source_register').select('source_id', { count: 'exact', head: true }),
-      supabaseClient.from('transactions').select('transaction_id,demand_id,evidence_status').gte('transaction_date', '2018-04-01').lt('transaction_date', '2019-04-01'),
-      supabaseClient.from('member_opening_balances').select('verification_status').eq('financial_year', 'FY 2018-19'),
-      supabaseClient.from('financial_year_checklist').select('status').eq('financial_year', 'FY 2018-19'),
-      supabaseClient.from('financial_year_audit_documents').select('*', { count: 'exact', head: true }).eq('financial_year', 'FY 2018-19'),
-      supabaseClient.from('compliance_obligations').select('applicability,legal_status').eq('active', true),
-    ]);
-    const failed = [sources, transactions, opening].find(result => result.error);
-    setData({
-      loading: false,
-      error: failed?.error?.message || null,
-      sources: sources.error ? 0 : (sources.count || 0),
-      transactions: transactions.error ? [] : (transactions.data || []) as DashboardData['transactions'],
-      openingBalances: opening.error ? [] : (opening.data || []) as DashboardData['openingBalances'],
-      checklist: checklist.error ? null : (checklist.data || []) as ChecklistRow[],
-      documents: documents.error ? null : (documents.count || 0),
-      obligations: obligations.error ? null : (obligations.data || []) as DashboardData['obligations'],
-    });
+    const societyId = activeSociety.society_id;
+    const months = ['Apr-2018','May-2018','Jun-2018','Jul-2018','Aug-2018','Sep-2018','Oct-2018','Nov-2018','Dec-2018','Jan-2019','Feb-2019','Mar-2019'];
+    try {
+      const [sources, transactions, opening, checklist, documents, obligations] = await Promise.all([
+        supabaseClient.from('source_register').select('source_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', 'FY 2018-19'),
+        supabaseClient.from('transactions').select('transaction_id,demand_id,evidence_status').eq('society_id', societyId).in('reporting_month', months).limit(1000),
+        supabaseClient.from('member_opening_balances').select('verification_status').eq('society_id', societyId).eq('financial_year', 'FY 2018-19').limit(200),
+        supabaseClient.from('financial_year_checklist').select('status').eq('society_id', societyId).eq('financial_year', 'FY 2018-19').limit(100),
+        supabaseClient.from('financial_year_audit_documents').select('document_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', 'FY 2018-19'),
+        supabaseClient.from('compliance_obligations').select('applicability,legal_status').eq('society_id', societyId).eq('active', true).limit(100),
+      ]);
+      const errors = [
+        ['source register', sources.error],
+        ['transactions', transactions.error],
+        ['opening balances', opening.error],
+        ['annual checklist', checklist.error],
+        ['audit documents', documents.error],
+        ['compliance obligations', obligations.error],
+      ].filter(([, error]) => Boolean(error));
+      setData({
+        loading: false,
+        error: errors.length ? errors.map(([name, error]) => `${name}: ${(error as any).message}`).join(' · ') : null,
+        sources: sources.error ? 0 : (sources.count || 0),
+        transactions: transactions.error ? [] : (transactions.data || []) as DashboardData['transactions'],
+        openingBalances: opening.error ? [] : (opening.data || []) as DashboardData['openingBalances'],
+        checklist: checklist.error ? null : (checklist.data || []) as ChecklistRow[],
+        documents: documents.error ? null : (documents.count || 0),
+        obligations: obligations.error ? null : (obligations.data || []) as DashboardData['obligations'],
+      });
+    } catch (error) {
+      setData(prev => ({ ...prev, loading: false, error: error instanceof Error ? error.message : 'Unexpected database error.' }));
+    }
   };
 
   useEffect(() => { void loadDashboard(); }, []);
