@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowRight, AlertCircle, CheckCircle2, Clock3, FileCheck2, FileText,
   Landmark, RefreshCw, ShieldCheck, Wallet, ClipboardList, Database,
@@ -15,8 +15,8 @@ const Count = ({ value, suffix = '' }: { value: number | string; suffix?: string
 
 export const AuditComplianceHome: React.FC = () => {
   const {
-    setCurrentScreen, openingBalances, memberOpeningBalances, transactions,
-    reconciliations, demandRegister, sourceRegister, supabaseSync, refetchFromSupabase,
+    setCurrentScreen, memberOpeningBalances, transactions,
+    reconciliations, sourceRegister, supabaseSync, refetchFromSupabase,
   } = useVerification();
   const [extra, setExtra] = useState<CountState>({ checklist: null, documents: null, obligations: null, loading: true });
 
@@ -25,7 +25,7 @@ export const AuditComplianceHome: React.FC = () => {
     const load = async () => {
       const [checklist, documents, obligations] = await Promise.all([
         supabaseClient.from('financial_year_checklist').select('status,stage').eq('financial_year', 'FY 2018-19'),
-        supabaseClient.from('financial_year_audit_documents').select('document_id', { count: 'exact', head: true }).eq('financial_year', 'FY 2018-19'),
+        supabaseClient.from('financial_year_audit_documents').select('*', { count: 'exact', head: true }).eq('financial_year', 'FY 2018-19'),
         supabaseClient.from('compliance_obligations').select('applicability,legal_status').eq('is_active', true),
       ]);
       if (!active) return;
