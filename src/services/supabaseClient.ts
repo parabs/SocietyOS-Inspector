@@ -685,6 +685,7 @@ export interface Database {
       };
     };
     Functions: {
+      get_audit_home_summary: { Args: { p_society_id: string; p_financial_year: string }; Returns: Json };
       get_my_society_access: { Args: Record<PropertyKey, never>; Returns: Json };
       get_my_society_invitations: { Args: Record<PropertyKey, never>; Returns: Json };
       get_society_members_directory: { Args: { p_society_id: string }; Returns: Json };
