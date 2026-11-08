@@ -25,17 +25,14 @@ jobs:
         with:
           node-version: 22
 
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: npm install --no-package-lock
 
       - name: Run production build
-        run: bun run build
+        run: npm run build
 
       - name: Run TypeScript typecheck
-        run: bun run lint
+        run: npm run lint
 
       - name: Test FY2018 import batch validation
         run: node --experimental-strip-types --test supabase/functions/import-fy2018-workbook/batchProgress.test.mjs
