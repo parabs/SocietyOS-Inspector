@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { PublicDemoMode } from './components/demo/PublicDemoMode';
+import { SocietyOperationsDemo } from './components/operations/SocietyOperationsDemo';
 import { AuthGate } from './components/auth/AuthGate';
 import { VerificationProvider, useVerification } from './context/VerificationContext';
 import { Header } from './components/layout/Header';
@@ -90,22 +91,24 @@ const MainContent: React.FC = () => {
 };
 
 export default function App() {
-  const isLiveWorkspace = new URLSearchParams(window.location.search).get('mode') === 'live';
-  if (!isLiveWorkspace) return <PublicDemoMode />;
-
-  return (
-    <AuthGate>
-      <VerificationProvider>
-        <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-slate-50 font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
-          <div className="shrink-0"><Header /></div>
-          <div className="flex min-h-0 flex-1 overflow-hidden">
-            <Sidebar />
-            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-6 sm:px-6 lg:px-8">
-              <MainContent />
-            </main>
+  const mode = new URLSearchParams(window.location.search).get('mode');
+  if (mode === 'live') {
+    return (
+      <AuthGate>
+        <VerificationProvider>
+          <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-slate-50 font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
+            <div className="shrink-0"><Header /></div>
+            <div className="flex min-h-0 flex-1 overflow-hidden">
+              <Sidebar />
+              <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-6 sm:px-6 lg:px-8">
+                <MainContent />
+              </main>
+            </div>
           </div>
-        </div>
-      </VerificationProvider>
-    </AuthGate>
-  );
+        </VerificationProvider>
+      </AuthGate>
+    );
+  }
+  if (mode === 'legacy-demo') return <PublicDemoMode />;
+  return <SocietyOperationsDemo />;
 }
