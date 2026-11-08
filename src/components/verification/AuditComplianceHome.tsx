@@ -69,7 +69,7 @@ export const AuditComplianceHome: React.FC = () => {
     }
   };
 
-  useEffect(() => { void loadDashboard(); }, []);
+  useEffect(() => { void loadDashboard(); }, [activeSociety?.society_id]);
 
   const verifiedMembers = data.openingBalances.filter(row => String(row.verification_status || '').toLowerCase() === 'verified').length;
   const pendingMembers = data.openingBalances.length - verifiedMembers;
