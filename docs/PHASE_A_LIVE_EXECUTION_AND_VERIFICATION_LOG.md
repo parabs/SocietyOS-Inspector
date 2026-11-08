@@ -8,7 +8,7 @@
 
 ## Executive status
 
-Phase A's production tenant boundary, membership/role model, RLS, financial view protection, evidence-storage policy boundary and corresponding frontend access gate have been implemented. Production database migrations are applied and their exact SQL files are retained in `supabase/migrations/` on this branch. The frontend has not yet been merged/deployed.
+Phase A's production tenant boundary, membership/role model, RLS, financial view protection, evidence-storage policy boundary and corresponding frontend access gate have been implemented. Production database migrations are applied and their exact SQL files are retained in `supabase/migrations/` on this branch. The frontend was merged to `main` in commit `e85a0ddb69afa4c5c4ed06beb0b4dae659e0661d`. GitHub Actions run #679 passed build/typecheck and the GitHub Pages deployment run #42401999353 completed successfully, including build, artifact upload and deploy.
 
 The existing Google-linked account with trusted `app_metadata.role = society_admin` was retained and mapped to the Society Admin membership. No Auth metadata was edited. Google sign-in alone does not grant application access: an active society membership and assigned role are required. Users without a role remain outside the app. Requester and Caretaker roles are also held outside the current UI because their dedicated workspaces are not yet implemented.
 
@@ -124,7 +124,7 @@ Supabase security advisor no longer reports anonymous financial view exposure, p
 2. Verify Auth Site URL/redirect allow-list includes `https://parabs.github.io/SocietyOS-Inspector/`.
 3. Complete a real Google invitation/acceptance test with a second account and verify role-specific access. No second account was created or invited during this pass.
 4. Complete a real Storage API upload/read and cross-society denial test. SQL policy tests passed; no evidence file was created.
-5. Merge/deploy the frontend as one coordinated cutover. Production RLS now requires `x-society-id`; the older deployed frontend does not send it, so it must not remain live against the new policies.
+5. Confirm the deployed GitHub Pages site is reachable and complete a signed-in smoke test against the new frontend. The main-branch deployment completed successfully, but this tool session could not access the public Pages URL to verify browser rendering and sign-in end-to-end.
 
 ## Explicitly not done
 
