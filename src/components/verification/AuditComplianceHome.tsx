@@ -28,6 +28,14 @@ export const AuditComplianceHome: React.FC = () => {
   const { setCurrentScreen, reconciliations, supabaseSync, refetchFromSupabase } = useVerification();
   const { activeSociety } = useSocietyAccess();
   const [data, setData] = useState<DashboardData>(initialData);
+  const [selectedFinancialYear, setSelectedFinancialYear] = useState('FY 2018-19');
+  const [availableFinancialYears, setAvailableFinancialYears] = useState<string[]>(['FY 2018-19']);
+  const financialYearMonths = (fy: string) => {
+    const match = fy.match(/FY\\s*(\\d{4})-(\\d{2,4})/i);
+    if (!match) return [];
+    const startYear = Number(match[1]);
+    return ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'].map((month, index) => month + '-' + (index < 9 ? startYear : startYear + 1));
+  };
 
   const loadDashboard = async () => {
     if (!activeSociety?.society_id) {
@@ -36,16 +44,22 @@ export const AuditComplianceHome: React.FC = () => {
     }
     setData(prev => ({ ...prev, loading: true, error: null }));
     const societyId = activeSociety.society_id;
-    const months = ['Apr-2018','May-2018','Jun-2018','Jul-2018','Aug-2018','Sep-2018','Oct-2018','Nov-2018','Dec-2018','Jan-2019','Feb-2019','Mar-2019'];
+    const months = financialYearMonths(selectedFinancialYear);
     try {
-      const [sources, transactions, opening, checklist, documents, obligations] = await Promise.all([
-        supabaseClient.from('source_register').select('source_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', 'FY 2018-19'),
+      const [sources, transactions, opening, checklist, documents, obligations, sourceYears, checklistYears, openingYears] = await Promise.all([
+        supabaseClient.from('source_register').select('source_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', selectedFinancialYear),
         supabaseClient.from('transactions').select('transaction_id,demand_id,evidence_status').eq('society_id', societyId).in('reporting_month', months).limit(1000),
         supabaseClient.from('member_opening_balances').select('verification_status').eq('society_id', societyId).eq('financial_year', 'FY 2018-19').limit(200),
         supabaseClient.from('financial_year_checklist').select('status').eq('society_id', societyId).eq('financial_year', 'FY 2018-19').limit(100),
         supabaseClient.from('financial_year_audit_documents').select('document_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', 'FY 2018-19'),
         supabaseClient.from('compliance_obligations').select('applicability,legal_status').eq('society_id', societyId).eq('active', true).limit(100),
+        supabaseClient.from('source_register').select('financial_year').eq('society_id', societyId).limit(200),
+        supabaseClient.from('financial_year_checklist').select('financial_year').eq('society_id', societyId).limit(200),
+        supabaseClient.from('member_opening_balances').select('financial_year').eq('society_id', societyId).limit(200),
       ]);
+      const yearSet = new Set([...(sourceYears.data || []).map((row: any) => row.financial_year), ...(checklistYears.data || []).map((row: any) => row.financial_year), ...(openingYears.data || []).map((row: any) => row.financial_year)].filter(Boolean));
+      const years = Array.from(yearSet).sort((a, b) => String(b).localeCompare(String(a)));
+      if (years.length) setAvailableFinancialYears(years);
       const errors = [
         ['source register', sources.error],
         ['transactions', transactions.error],
@@ -69,7 +83,7 @@ export const AuditComplianceHome: React.FC = () => {
     }
   };
 
-  useEffect(() => { void loadDashboard(); }, [activeSociety?.society_id]);
+  useEffect(() => { void loadDashboard(); }, [activeSociety?.society_id, selectedFinancialYear]);
 
   const verifiedMembers = data.openingBalances.filter(row => String(row.verification_status || '').toLowerCase() === 'verified').length;
   const pendingMembers = data.openingBalances.length - verifiedMembers;
@@ -92,7 +106,7 @@ export const AuditComplianceHome: React.FC = () => {
     { title: 'Monthly Reconciliation', value: `${reconciled} entries reconciled`, sub: 'Bank and cash monthly balances', pct: 0, screen: 'monthly-reconciliation' },
     { title: 'Audit Documents & Evidence', value: data.documents === null ? 'Not assessed' : `${data.documents} uploaded`, sub: 'Audit schedules and supporting records', pct: 0, screen: 'audit-evidence' },
     { title: 'Compliance Obligations', value: data.obligations === null ? 'Not assessed' : `${complianceToVerify} require validation`, sub: 'Applicability and legal status review', pct: 0, screen: 'compliance-command-centre' },
-    { title: 'Annual Review & Closure', value: data.checklist === null ? 'Not assessed' : `${checklistDone} done · ${checklistProgress} in progress · ${checklistPending} pending`, sub: 'FY 2018–19 annual audit checklist', pct: 0, screen: 'annual-financial-review' },
+    { title: 'Annual Review & Closure', value: data.checklist === null ? 'Not assessed' : `${checklistDone} done · ${checklistProgress} in progress · ${checklistPending} pending`, sub: '{selectedFinancialYear} annual audit checklist', pct: 0, screen: 'annual-financial-review' },
   ];
 
   const actions = [
@@ -109,9 +123,10 @@ export const AuditComplianceHome: React.FC = () => {
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-600">Society OS / Audit & Compliance</div>
           <h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900">Audit & Compliance Home</h1>
-          <p className="text-xs text-slate-500">Current financial and audit position, key status and next actions.</p>
+          <p className="text-xs text-slate-500">Current financial and audit position, key status and next actions · {selectedFinancialYear}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2 text-[11px] text-slate-500">
+          <label className="flex items-center gap-1.5 font-medium text-slate-600">Financial year <select value={selectedFinancialYear} onChange={event => setSelectedFinancialYear(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-blue-400">{availableFinancialYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label>
           <span className={`h-2 w-2 rounded-full ${data.loading || supabaseSync.isLoading ? 'bg-amber-500' : data.error ? 'bg-rose-500' : 'bg-emerald-500'}`} />
           {data.loading || supabaseSync.isLoading ? 'Refreshing live records' : data.error ? 'Data load issue' : 'Connected to database'}
           <button onClick={() => { void loadDashboard(); void refetchFromSupabase(); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-50"><RefreshCw className="h-3 w-3" /> Refresh</button>
@@ -123,7 +138,7 @@ export const AuditComplianceHome: React.FC = () => {
       <section className="grid grid-cols-1 gap-3 2xl:grid-cols-[1.35fr_1fr]">
         <div className="flex min-h-[178px] flex-col justify-between rounded-xl bg-gradient-to-r from-[#172e55] to-[#426b9f] p-5 text-white shadow-sm">
           <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-300/10 px-2.5 py-1 text-[10px] font-semibold text-amber-100"><Clock3 className="h-3 w-3" /> FY 2018–19 · Verification not yet completed</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-300/10 px-2.5 py-1 text-[10px] font-semibold text-amber-100"><Clock3 className="h-3 w-3" /> {selectedFinancialYear} · Verification not yet completed</span>
             <h2 className="mt-3 text-xl font-bold leading-tight sm:text-2xl">Financial records are loaded. Audit verification is still pending.</h2>
             <p className="mt-1.5 max-w-3xl text-xs leading-5 text-blue-100">Opening balances, transaction evidence, demand links, monthly reconciliations and audit documents need review before the annual audit position can be confirmed.</p>
           </div>
