@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowRight, AlertCircle, CheckCircle2, Clock3, FileCheck2, FileText,
   Landmark, RefreshCw, ShieldCheck, Wallet, ClipboardList, Database, Link2,
@@ -7,118 +7,92 @@ import { useVerification } from '../../context/VerificationContext';
 import { supabaseClient } from '../../services/supabaseClient';
 import { useSocietyAccess } from '../../context/SocietyAccessContext';
 
-type ChecklistRow = { status?: string };
-type DashboardData = {
-  loading: boolean;
-  error: string | null;
-  sources: number;
-  transactions: { demand_id?: string | null; evidence_status?: string | null }[] | null;
-  openingBalances: { verification_status?: string | null }[];
-  checklist: ChecklistRow[] | null;
-  documents: number | null;
-  obligations: { applicability?: string; legal_status?: string }[] | null;
+type AuditSummary = {
+  source_records: number;
+  transactions: number;
+  evidence_complete: number;
+  transactions_unmapped: number;
+  opening_balance_records: number;
+  opening_balances_verified: number;
+  checklist_total: number;
+  checklist_done: number;
+  checklist_in_progress: number;
+  checklist_pending: number;
+  audit_documents: number;
+  compliance_to_verify: number;
+  available_financial_years: string[];
 };
 
-const initialData: DashboardData = {
-  loading: true, error: null, sources: 0, transactions: null, openingBalances: [],
-  checklist: null, documents: null, obligations: null,
-};
+type DashboardData = { loading: boolean; error: string | null; summary: AuditSummary | null };
+const initialData: DashboardData = { loading: true, error: null, summary: null };
 
 export const AuditComplianceHome: React.FC = () => {
-  const { setCurrentScreen, reconciliations, supabaseSync, refetchFromSupabase } = useVerification();
+  const { setCurrentScreen, reconciliations } = useVerification();
   const { activeSociety } = useSocietyAccess();
   const [data, setData] = useState<DashboardData>(initialData);
   const [selectedFinancialYear, setSelectedFinancialYear] = useState('FY 2018-19');
   const [availableFinancialYears, setAvailableFinancialYears] = useState<string[]>(['FY 2018-19']);
-  const financialYearMonths = (fy: string) => {
-    const match = fy.match(/FY\s*(\d{4})-(\d{2,4})/i);
-    if (!match) return [];
-    const startYear = Number(match[1]);
-    return ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'].map((month, index) => month + '-' + (index < 9 ? startYear : startYear + 1));
-  };
 
   const loadDashboard = async () => {
-    if (!activeSociety?.society_id) {
-      setData(prev => ({ ...prev, loading: false, error: 'No active society is selected.' }));
+    const societyId = activeSociety?.society_id;
+    if (!societyId) {
+      setData({ loading: false, error: 'No active society is selected.', summary: null });
       return;
     }
     setData(prev => ({ ...prev, loading: true, error: null }));
-    const societyId = activeSociety.society_id;
-    const months = financialYearMonths(selectedFinancialYear);
     try {
-      const [sources, transactions, opening, checklist, documents, obligations, sourceYears, checklistYears, openingYears, demandYears] = await Promise.all([
-        supabaseClient.from('source_register').select('source_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', selectedFinancialYear),
-        supabaseClient.from('transactions').select('transaction_id,demand_id,evidence_status').eq('society_id', societyId).in('reporting_month', months).limit(1000),
-        supabaseClient.from('member_opening_balances').select('verification_status').eq('society_id', societyId).eq('financial_year', selectedFinancialYear).limit(200),
-        supabaseClient.from('financial_year_checklist').select('status').eq('society_id', societyId).eq('financial_year', selectedFinancialYear).limit(100),
-        supabaseClient.from('financial_year_audit_documents').select('document_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', selectedFinancialYear),
-        supabaseClient.from('compliance_obligations').select('applicability,legal_status').eq('society_id', societyId).eq('active', true).limit(100),
-        supabaseClient.from('source_register').select('financial_year').eq('society_id', societyId).limit(200),
-        supabaseClient.from('financial_year_checklist').select('financial_year').eq('society_id', societyId).limit(200),
-        supabaseClient.from('member_opening_balances').select('financial_year').eq('society_id', societyId).limit(200),
-        supabaseClient.from('demand_register').select('financial_year').eq('society_id', societyId).limit(1000),
-        supabaseClient.from('demand_register').select('financial_year').eq('society_id', societyId).limit(1000),
-      ]);
-      const yearSet = new Set([...(sourceYears.data || []).map((row: any) => row.financial_year), ...(checklistYears.data || []).map((row: any) => row.financial_year), ...(openingYears.data || []).map((row: any) => row.financial_year), ...(demandYears.data || []).map((row: any) => row.financial_year)].filter(Boolean));
-      const years = Array.from(yearSet).sort((a, b) => String(b).localeCompare(String(a)));
-      if (years.length) setAvailableFinancialYears(years);
-      const errors = [
-        ['source register', sources.error],
-        ['transactions', transactions.error],
-        ['opening balances', opening.error],
-        ['annual checklist', checklist.error],
-        ['audit documents', documents.error],
-        ['compliance obligations', obligations.error],
-      ].filter(([, error]) => Boolean(error));
-      setData({
-        loading: false,
-        error: errors.length ? errors.map(([name, error]) => `${name}: ${(error as any).message}`).join(' · ') : null,
-        sources: sources.error ? 0 : (sources.count || 0),
-        transactions: transactions.error ? null : (transactions.data || []) as NonNullable<DashboardData['transactions']>,
-        openingBalances: opening.error ? [] : (opening.data || []) as DashboardData['openingBalances'],
-        checklist: checklist.error ? null : (checklist.data || []) as ChecklistRow[],
-        documents: documents.error ? null : (documents.count || 0),
-        obligations: obligations.error ? null : (obligations.data || []) as DashboardData['obligations'],
+      const { data: result, error } = await (supabaseClient as any).rpc('get_audit_home_summary', {
+        p_society_id: societyId,
+        p_financial_year: selectedFinancialYear,
       });
+      if (error) throw error;
+      const summary = result as unknown as AuditSummary;
+      if (!summary || typeof summary.transactions !== 'number') throw new Error('The audit summary returned an invalid response.');
+      setData({ loading: false, error: null, summary });
+      const years = Array.isArray(summary.available_financial_years) ? summary.available_financial_years : [];
+      if (years.length) {
+        setAvailableFinancialYears(years);
+        if (!years.includes(selectedFinancialYear) && years.includes('FY 2018-19')) setSelectedFinancialYear('FY 2018-19');
+      }
     } catch (error) {
-      setData(prev => ({ ...prev, loading: false, error: error instanceof Error ? error.message : 'Unexpected database error.' }));
+      setData({ loading: false, error: error instanceof Error ? error.message : 'Unable to load audit summary.', summary: null });
     }
   };
 
   useEffect(() => { void loadDashboard(); }, [activeSociety?.society_id, selectedFinancialYear]);
 
-  const verifiedMembers = data.openingBalances.filter(row => String(row.verification_status || '').toLowerCase() === 'verified').length;
-  const pendingMembers = data.openingBalances.length - verifiedMembers;
-  const transactionRows = data.transactions || [];
-  const transactionsLoaded = data.transactions !== null;
-  const evidenceComplete = transactionRows.filter(row => String(row.evidence_status || '').toLowerCase() === 'complete').length;
-  const evidencePending = transactionsLoaded ? transactionRows.length - evidenceComplete : 0;
-  const unmapped = transactionRows.filter(row => !String(row.demand_id || '').trim()).length;
-  const checklistDone = (data.checklist || []).filter(row => ['completed', 'complete', 'done'].includes(String(row.status || '').toLowerCase())).length;
-  const checklistProgress = (data.checklist || []).filter(row => String(row.status || '').toLowerCase() === 'in progress').length;
-  const checklistPending = (data.checklist || []).filter(row => String(row.status || '').toLowerCase() === 'pending').length;
-  const complianceToVerify = (data.obligations || []).filter(row => /draft|verify/i.test(String(row.legal_status || '') + ' ' + String(row.applicability || ''))).length;
+  const summary = data.summary;
+  const verifiedMembers = summary?.opening_balances_verified ?? 0;
+  const pendingMembers = summary ? summary.opening_balance_records - summary.opening_balances_verified : 0;
+  const transactionsLoaded = summary !== null;
+  const evidenceComplete = summary?.evidence_complete ?? 0;
+  const evidencePending = summary ? summary.transactions - summary.evidence_complete : 0;
+  const unmapped = summary?.transactions_unmapped ?? 0;
+  const checklistDone = summary?.checklist_done ?? 0;
+  const checklistProgress = summary?.checklist_in_progress ?? 0;
+  const checklistPending = summary?.checklist_pending ?? 0;
+  const complianceToVerify = summary?.compliance_to_verify ?? 0;
   const reconciled = Object.values(reconciliations).reduce((sum, rows: any) => sum + rows.filter((row: any) => ['Reconciled', 'Matched'].includes(row.status)).length, 0);
-  const totalTransactions = transactionRows.length;
+  const totalTransactions = summary?.transactions ?? 0;
   const loaded = !data.loading;
   const go = (screen: any) => setCurrentScreen(screen);
 
   const workstreams = [
-    { title: 'Opening Balances', value: loaded ? `${verifiedMembers}/${data.openingBalances.length} verified` : 'Loading…', sub: 'Member opening balance register', pct: data.openingBalances.length ? verifiedMembers / data.openingBalances.length * 100 : 0, screen: 'opening-balances' },
+    { title: 'Opening Balances', value: !loaded ? 'Loading…' : summary ? `${verifiedMembers}/${summary.opening_balance_records} verified` : 'Unavailable', sub: 'Member opening balance register', pct: summary?.opening_balance_records ? verifiedMembers / summary.opening_balance_records * 100 : 0, screen: 'opening-balances' },
     { title: 'Transaction Verification', value: !loaded ? 'Loading…' : transactionsLoaded ? `${evidenceComplete}/${totalTransactions} evidence complete` : 'Unavailable', sub: 'Bills, receipts and supporting evidence', pct: totalTransactions ? evidenceComplete / totalTransactions * 100 : 0, screen: 'transaction-verification' },
     { title: 'Demand Mapping & Allocation', value: !loaded ? 'Loading…' : transactionsLoaded ? `${totalTransactions - unmapped}/${totalTransactions} mapped · ${unmapped} missing` : 'Unavailable', sub: 'Link receipts and payments to demands', pct: totalTransactions ? (totalTransactions - unmapped) / totalTransactions * 100 : 0, screen: 'transactions' },
     { title: 'Monthly Reconciliation', value: `${reconciled} entries reconciled`, sub: 'Bank and cash monthly balances', pct: 0, screen: 'monthly-reconciliation' },
-    { title: 'Audit Documents & Evidence', value: data.documents === null ? 'Not assessed' : `${data.documents} uploaded`, sub: 'Audit schedules and supporting records', pct: 0, screen: 'audit-evidence' },
-    { title: 'Compliance Obligations', value: data.obligations === null ? 'Not assessed' : `${complianceToVerify} require validation`, sub: 'Applicability and legal status review', pct: 0, screen: 'compliance-command-centre' },
-    { title: 'Annual Review & Closure', value: data.checklist === null ? 'Not assessed' : `${checklistDone} done · ${checklistProgress} in progress · ${checklistPending} pending`, sub: `${selectedFinancialYear} annual audit checklist`, pct: 0, screen: 'annual-financial-review' },
+    { title: 'Audit Documents & Evidence', value: !loaded ? 'Loading…' : summary ? `${summary.audit_documents} uploaded` : 'Unavailable', sub: 'Audit schedules and supporting records', pct: 0, screen: 'audit-evidence' },
+    { title: 'Compliance Obligations', value: !loaded ? 'Loading…' : summary ? `${complianceToVerify} require validation` : 'Unavailable', sub: 'Applicability and legal status require review', pct: 0, screen: 'compliance-command-centre' },
+    { title: 'Annual Review & Closure', value: !loaded ? 'Loading…' : summary ? `${checklistDone} done · ${checklistProgress} in progress · ${checklistPending} pending` : 'Unavailable', sub: `${selectedFinancialYear} annual audit checklist`, pct: 0, screen: 'annual-financial-review' },
   ];
 
   const actions = [
-    { title: 'Verify member opening balances', detail: loaded ? `${pendingMembers} of ${data.openingBalances.length} pending` : 'Opening balance data loading', screen: 'opening-balances', icon: Wallet },
+    { title: 'Verify member opening balances', detail: loaded ? (summary ? `${pendingMembers} of ${summary.opening_balance_records} pending` : 'Opening balance summary unavailable') : 'Opening balance data loading', screen: 'opening-balances', icon: Wallet },
     { title: 'Review transaction evidence', detail: !loaded ? 'Transaction data loading' : transactionsLoaded ? `${evidencePending} transactions pending` : 'Transaction summary unavailable', screen: 'transaction-verification', icon: FileCheck2 },
     { title: 'Complete monthly bank and cash reconciliation', detail: `${reconciled} reconciliation entries completed`, screen: 'monthly-reconciliation', icon: Landmark },
     { title: 'Resolve transactions without Demand ID', detail: !loaded ? 'Demand mapping data loading' : transactionsLoaded ? `${unmapped} transactions need mapping` : 'Demand mapping summary unavailable', screen: 'transactions', icon: Link2 },
-    { title: 'Upload audit reports and supporting documents', detail: data.documents === null ? 'Document register not assessed' : `${data.documents} documents uploaded`, screen: 'audit-evidence', icon: FileText },
+    { title: 'Upload audit reports and supporting documents', detail: !loaded ? 'Document register loading' : summary ? `${summary.audit_documents} documents uploaded` : 'Document summary unavailable', screen: 'audit-evidence', icon: FileText },
   ];
 
   return (
@@ -131,9 +105,9 @@ export const AuditComplianceHome: React.FC = () => {
         </div>
         <div className="flex shrink-0 items-center gap-2 text-[11px] text-slate-500">
           <label className="flex items-center gap-1.5 font-medium text-slate-600">Financial year <select value={selectedFinancialYear} onChange={event => setSelectedFinancialYear(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-blue-400">{availableFinancialYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label>
-          <span className={`h-2 w-2 rounded-full ${data.loading || supabaseSync.isLoading ? 'bg-amber-500' : data.error ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-          {data.loading || supabaseSync.isLoading ? 'Refreshing live records' : data.error ? 'Data load issue' : 'Connected to database'}
-          <button onClick={() => { void loadDashboard(); void refetchFromSupabase(); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-50"><RefreshCw className="h-3 w-3" /> Refresh</button>
+          <span className={`h-2 w-2 rounded-full ${data.loading ? 'bg-amber-500' : data.error ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+          {data.loading ? 'Loading audit summary' : data.error ? 'Audit summary unavailable' : 'Audit summary loaded'}
+          <button onClick={() => { void loadDashboard(); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-50"><RefreshCw className="h-3 w-3" /> Refresh</button>
         </div>
       </div>
 
@@ -148,17 +122,17 @@ export const AuditComplianceHome: React.FC = () => {
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px]">
             <span className="rounded-md bg-white/10 px-2.5 py-1.5">Current stage: Verification & Reconciliation</span>
-            <span className="rounded-md bg-white/10 px-2.5 py-1.5">{data.loading ? '…' : data.sources} source records loaded</span>
-            <span className="rounded-md bg-white/10 px-2.5 py-1.5">{data.loading ? '…' : totalTransactions} transactions in workspace</span>
+            <span className="rounded-md bg-white/10 px-2.5 py-1.5">{data.loading ? '…' : summary ? summary.source_records : 'Unavailable'} source records loaded</span>
+            <span className="rounded-md bg-white/10 px-2.5 py-1.5">{data.loading ? '…' : summary ? totalTransactions : 'Unavailable'} transactions in workspace</span>
           </div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-bold text-slate-900">Financial Snapshot</h3><span className="text-[10px] text-slate-400">From loaded records</span></div>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: 'Source Records', value: data.loading ? '—' : data.sources, icon: Database, tint: 'bg-emerald-50 text-emerald-700' },
-              { label: 'Transactions', value: data.loading ? '—' : totalTransactions, icon: ClipboardList, tint: 'bg-blue-50 text-blue-700' },
-              { label: 'Member Opening Balances', value: data.loading ? '—' : data.openingBalances.length, icon: Wallet, tint: 'bg-violet-50 text-violet-700' },
+              { label: 'Source Records', value: data.loading ? '—' : summary ? summary.source_records : 'Unavailable', icon: Database, tint: 'bg-emerald-50 text-emerald-700' },
+              { label: 'Transactions', value: data.loading ? '—' : summary ? totalTransactions : 'Unavailable', icon: ClipboardList, tint: 'bg-blue-50 text-blue-700' },
+              { label: 'Member Opening Balances', value: data.loading ? '—' : summary ? summary.opening_balance_records : 'Unavailable', icon: Wallet, tint: 'bg-violet-50 text-violet-700' },
               { label: 'Evidence Pending', value: data.loading ? '—' : transactionsLoaded ? evidencePending : 'Unavailable', icon: FileCheck2, tint: 'bg-amber-50 text-amber-700' },
             ].map(item => { const Icon = item.icon; return <div key={item.label} className="flex items-center gap-2.5 rounded-lg border border-slate-100 p-3"><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.tint}`}><Icon className="h-4 w-4" /></span><span className="min-w-0"><span className="block text-[10px] text-slate-500">{item.label}</span><span className="block text-lg font-bold leading-tight text-slate-900 tabular-nums">{item.value}</span></span></div>; })}
           </div>
@@ -184,7 +158,7 @@ export const AuditComplianceHome: React.FC = () => {
               { label: 'Review transaction evidence', value: data.loading ? '—' : transactionsLoaded ? evidencePending : 'Unavailable', sub: 'Transactions awaiting review', screen: 'transaction-verification' },
               { label: 'Map transactions to demands', value: data.loading ? '—' : transactionsLoaded ? unmapped : 'Unavailable', sub: 'Transactions without Demand ID', screen: 'transactions' },
               { label: 'Complete monthly reconciliation', value: reconciled, sub: 'Reconciliation entries completed', screen: 'monthly-reconciliation' },
-              { label: 'Validate compliance obligations', value: data.obligations === null ? '—' : complianceToVerify, sub: 'Applicability or legal status to verify', screen: 'compliance-command-centre' },
+              { label: 'Validate compliance obligations', value: !summary ? 'Unavailable' : complianceToVerify, sub: 'Applicability or legal status to verify', screen: 'compliance-command-centre' },
             ].map(item => <button key={item.label} onClick={() => go(item.screen)} className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-left hover:border-blue-200 hover:bg-blue-50"><span className="flex min-w-0 items-center gap-2"><AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600" /><span className="min-w-0"><span className="block text-[10px] font-semibold text-slate-700">{item.label}</span><span className="block text-[9px] text-slate-400">{item.sub}</span></span></span><span className="text-sm font-bold tabular-nums text-slate-900">{item.value}</span></button>)}
           </div>
           <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50 p-2.5 text-[10px] leading-4 text-amber-900"><strong>Readiness is not scored.</strong> The exception register and annual review snapshot are not populated; empty registers do not prove there are no discrepancies.</div>
@@ -196,11 +170,11 @@ export const AuditComplianceHome: React.FC = () => {
             <p className="mt-1 text-[10px] text-slate-500">Stage-based position; no unverified readiness score.</p>
             <div className="mt-3 space-y-2">
               {[
-                ['Financial records', data.loading ? 'Loading' : data.sources ? 'Loaded' : 'Not available', data.sources > 0],
+                ['Financial records', data.loading ? 'Loading' : !summary ? 'Unavailable' : summary.source_records ? 'Loaded' : 'No source records', Boolean(summary && summary.source_records > 0)],
                 ['Verification results', data.loading ? 'Loading' : 'Pending review', false],
                 ['Monthly reconciliation', reconciled ? 'Partially recorded' : 'Not recorded', false],
-                ['Audit documents', data.documents === null ? 'Not assessed' : data.documents ? 'Uploaded' : 'None uploaded', false],
-                ['Compliance validation', data.obligations === null ? 'Not assessed' : `${complianceToVerify} to verify`, false],
+                ['Audit documents', !summary ? 'Unavailable' : summary.audit_documents ? 'Uploaded' : 'None uploaded', false],
+                ['Compliance validation', !summary ? 'Unavailable' : `${complianceToVerify} to verify`, false],
               ].map(([label, value, ok]) => <div key={String(label)} className="flex items-center justify-between gap-2 border-b border-slate-100 pb-1.5 text-[10px]"><span className="text-slate-600">{label}</span><span className={`shrink-0 font-semibold ${ok ? 'text-emerald-700' : 'text-amber-700'}`}>{ok ? <CheckCircle2 className="inline h-3 w-3" /> : <Clock3 className="inline h-3 w-3" />} {String(value)}</span></div>)}
             </div>
             <button onClick={() => go('compliance-command-centre')} className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-blue-700">Review compliance obligations <ArrowRight className="h-3 w-3" /></button>
