@@ -8,7 +8,6 @@ import { AuthGate } from './components/auth/AuthGate';
 import { VerificationProvider, useVerification } from './context/VerificationContext';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
-import { VerificationDashboard } from './components/verification/VerificationDashboard';
 import { AuditComplianceHome } from './components/verification/AuditComplianceHome';
 import { OpeningBalanceVerification } from './components/verification/OpeningBalanceVerification';
 import { TransactionVerification } from './components/verification/TransactionVerification';
