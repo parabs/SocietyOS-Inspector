@@ -896,35 +896,10 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     fetchMasters,
   ]);
 
-  // ==========================================
-  // Automatic live-data refresh
-  // Load every database-backed collection on startup, when the
-  // user returns to the tab, and periodically while the app is open.
-  // ==========================================
+  // Load database collections once when the verification workspace mounts.
+  // Society records are not streaming/live data: subsequent refreshes are user initiated.
   useEffect(() => {
     void refetchAll();
-
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') {
-        void refetchAll();
-      }
-    };
-
-    window.addEventListener('focus', refreshWhenVisible);
-    document.addEventListener('visibilitychange', refreshWhenVisible);
-
-    // Keep dashboards and registers current without requiring manual refresh.
-    const refreshTimer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        void refetchAll();
-      }
-    }, 60_000);
-
-    return () => {
-      window.removeEventListener('focus', refreshWhenVisible);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
-      window.clearInterval(refreshTimer);
-    };
   }, [refetchAll]);
 
   // Persist locally for session resumption
