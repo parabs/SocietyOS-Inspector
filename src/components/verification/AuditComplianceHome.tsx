@@ -31,7 +31,7 @@ export const AuditComplianceHome: React.FC = () => {
   const [selectedFinancialYear, setSelectedFinancialYear] = useState('FY 2018-19');
   const [availableFinancialYears, setAvailableFinancialYears] = useState<string[]>(['FY 2018-19']);
   const financialYearMonths = (fy: string) => {
-    const match = fy.match(/FY\\s*(\\d{4})-(\\d{2,4})/i);
+    const match = fy.match(/FY\s*(\d{4})-(\d{2,4})/i);
     if (!match) return [];
     const startYear = Number(match[1]);
     return ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'].map((month, index) => month + '-' + (index < 9 ? startYear : startYear + 1));
@@ -49,9 +49,9 @@ export const AuditComplianceHome: React.FC = () => {
       const [sources, transactions, opening, checklist, documents, obligations, sourceYears, checklistYears, openingYears] = await Promise.all([
         supabaseClient.from('source_register').select('source_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', selectedFinancialYear),
         supabaseClient.from('transactions').select('transaction_id,demand_id,evidence_status').eq('society_id', societyId).in('reporting_month', months).limit(1000),
-        supabaseClient.from('member_opening_balances').select('verification_status').eq('society_id', societyId).eq('financial_year', 'FY 2018-19').limit(200),
-        supabaseClient.from('financial_year_checklist').select('status').eq('society_id', societyId).eq('financial_year', 'FY 2018-19').limit(100),
-        supabaseClient.from('financial_year_audit_documents').select('document_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', 'FY 2018-19'),
+        supabaseClient.from('member_opening_balances').select('verification_status').eq('society_id', societyId).eq('financial_year', selectedFinancialYear).limit(200),
+        supabaseClient.from('financial_year_checklist').select('status').eq('society_id', societyId).eq('financial_year', selectedFinancialYear).limit(100),
+        supabaseClient.from('financial_year_audit_documents').select('document_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', selectedFinancialYear),
         supabaseClient.from('compliance_obligations').select('applicability,legal_status').eq('society_id', societyId).eq('active', true).limit(100),
         supabaseClient.from('source_register').select('financial_year').eq('society_id', societyId).limit(200),
         supabaseClient.from('financial_year_checklist').select('financial_year').eq('society_id', societyId).limit(200),
@@ -106,7 +106,7 @@ export const AuditComplianceHome: React.FC = () => {
     { title: 'Monthly Reconciliation', value: `${reconciled} entries reconciled`, sub: 'Bank and cash monthly balances', pct: 0, screen: 'monthly-reconciliation' },
     { title: 'Audit Documents & Evidence', value: data.documents === null ? 'Not assessed' : `${data.documents} uploaded`, sub: 'Audit schedules and supporting records', pct: 0, screen: 'audit-evidence' },
     { title: 'Compliance Obligations', value: data.obligations === null ? 'Not assessed' : `${complianceToVerify} require validation`, sub: 'Applicability and legal status review', pct: 0, screen: 'compliance-command-centre' },
-    { title: 'Annual Review & Closure', value: data.checklist === null ? 'Not assessed' : `${checklistDone} done · ${checklistProgress} in progress · ${checklistPending} pending`, sub: '{selectedFinancialYear} annual audit checklist', pct: 0, screen: 'annual-financial-review' },
+    { title: 'Annual Review & Closure', value: data.checklist === null ? 'Not assessed' : `${checklistDone} done · ${checklistProgress} in progress · ${checklistPending} pending`, sub: `${selectedFinancialYear} annual audit checklist`, pct: 0, screen: 'annual-financial-review' },
   ];
 
   const actions = [
