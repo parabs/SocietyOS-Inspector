@@ -46,7 +46,7 @@ export const AuditComplianceHome: React.FC = () => {
     const societyId = activeSociety.society_id;
     const months = financialYearMonths(selectedFinancialYear);
     try {
-      const [sources, transactions, opening, checklist, documents, obligations, sourceYears, checklistYears, openingYears] = await Promise.all([
+      const [sources, transactions, opening, checklist, documents, obligations, sourceYears, checklistYears, openingYears, demandYears] = await Promise.all([
         supabaseClient.from('source_register').select('source_id', { count: 'exact', head: true }).eq('society_id', societyId).eq('financial_year', selectedFinancialYear),
         supabaseClient.from('transactions').select('transaction_id,demand_id,evidence_status').eq('society_id', societyId).in('reporting_month', months).limit(1000),
         supabaseClient.from('member_opening_balances').select('verification_status').eq('society_id', societyId).eq('financial_year', selectedFinancialYear).limit(200),
@@ -56,8 +56,9 @@ export const AuditComplianceHome: React.FC = () => {
         supabaseClient.from('source_register').select('financial_year').eq('society_id', societyId).limit(200),
         supabaseClient.from('financial_year_checklist').select('financial_year').eq('society_id', societyId).limit(200),
         supabaseClient.from('member_opening_balances').select('financial_year').eq('society_id', societyId).limit(200),
+        supabaseClient.from('demand_register').select('financial_year').eq('society_id', societyId).limit(1000),
       ]);
-      const yearSet = new Set([...(sourceYears.data || []).map((row: any) => row.financial_year), ...(checklistYears.data || []).map((row: any) => row.financial_year), ...(openingYears.data || []).map((row: any) => row.financial_year)].filter(Boolean));
+      const yearSet = new Set([...(sourceYears.data || []).map((row: any) => row.financial_year), ...(checklistYears.data || []).map((row: any) => row.financial_year), ...(openingYears.data || []).map((row: any) => row.financial_year), ...(demandYears.data || []).map((row: any) => row.financial_year)].filter(Boolean));
       const years = Array.from(yearSet).sort((a, b) => String(b).localeCompare(String(a)));
       if (years.length) setAvailableFinancialYears(years);
       const errors = [
@@ -97,8 +98,10 @@ export const AuditComplianceHome: React.FC = () => {
   const checklistPending = (data.checklist || []).filter(row => String(row.status || '').toLowerCase() === 'pending').length;
   const complianceToVerify = (data.obligations || []).filter(row => /draft|verify/i.test(String(row.legal_status || '') + ' ' + String(row.applicability || ''))).length;
   const reconciled = Object.values(reconciliations).reduce((sum, rows: any) => sum + rows.filter((row: any) => ['Reconciled', 'Matched'].includes(row.status)).length, 0);
-  const totalTransactions = data.transactions.length;
-  const loaded = !data.loading && !data.error;
+  const transactionRows = data.transactions || [];
+  const transactionsLoaded = data.transactions !== null;
+  const totalTransactions = transactionRows.length;
+  const loaded = !data.loading;
   const go = (screen: any) => setCurrentScreen(screen);
 
   const workstreams = [
@@ -179,7 +182,7 @@ export const AuditComplianceHome: React.FC = () => {
           <div className="mt-3 space-y-2">
             {[
               { label: 'Verify opening balances', value: data.loading ? '—' : pendingMembers, sub: 'Member records pending', screen: 'opening-balances' },
-              { label: 'Review transaction evidence', value: data.loading ? '—' : evidencePending, sub: 'Transactions awaiting review', screen: 'transaction-verification' },
+              { label: 'Review transaction evidence', value: data.loading ? '—' : transactionsLoaded ? evidencePending : 'Unavailable', sub: 'Transactions awaiting review', screen: 'transaction-verification' },
               { label: 'Map transactions to demands', value: data.loading ? '—' : transactionsLoaded ? unmapped : 'Unavailable', sub: 'Transactions without Demand ID', screen: 'transactions' },
               { label: 'Complete monthly reconciliation', value: reconciled, sub: 'Reconciliation entries completed', screen: 'monthly-reconciliation' },
               { label: 'Validate compliance obligations', value: data.obligations === null ? '—' : complianceToVerify, sub: 'Applicability or legal status to verify', screen: 'compliance-command-centre' },
