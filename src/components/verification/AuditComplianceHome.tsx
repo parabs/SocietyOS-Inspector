@@ -64,7 +64,7 @@ export const AuditComplianceHome: React.FC = () => {
 
   const workstreams = [
     { name: 'Opening Balances', value: memberOpeningBalances.length ? `${verifiedMembers}/${memberOpeningBalances.length} verified` : 'Data unavailable', note: 'Member opening balance register', screen: 'opening-balances' as const, percent: memberOpeningBalances.length ? verifiedMembers / memberOpeningBalances.length * 100 : 0 },
-    { name: 'Transaction Verification', value: \${evidenceComplete}/\${transactionCount} evidence complete, note: 'Bills, receipts and supporting evidence', screen: 'transaction-verification' as const, percent: transactionCount ? evidenceComplete / transactionCount * 100 : 0 },
+    { name: 'Transaction Verification', value: `${evidenceComplete}/${transactionCount} evidence complete`, note: 'Bills, receipts and supporting evidence', screen: 'transaction-verification' as const, percent: transactionCount ? evidenceComplete / transactionCount * 100 : 0 },
     { name: 'Demand Mapping', value: `${unmappedTransactions} without Demand ID`, note: `${demandMapped} transactions currently have a Demand ID`, screen: 'transactions' as const, percent: transactionCount ? demandMapped / transactionCount * 100 : 0 },
     { name: 'Monthly Reconciliation', value: `${monthsReconciled} entries reconciled`, note: 'Bank and cash monthly balances', screen: 'monthly-reconciliation' as const, percent: 0 },
     { name: 'Audit Documents & Evidence', value: extra.documents === null ? 'Not assessed' : `${extra.documents} documents uploaded`, note: 'Audit schedules and supporting records', screen: 'audit-evidence' as const, percent: 0 },
