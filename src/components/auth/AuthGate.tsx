@@ -107,7 +107,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   const signIn = async () => {
     setBusy(true);
-    const redirectTo = `${window.location.origin}${window.location.pathname}`;
+    const redirectTo = `${window.location.origin}${window.location.pathname}${window.location.search}`;
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },
