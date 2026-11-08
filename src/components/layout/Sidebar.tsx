@@ -98,7 +98,7 @@ export const Sidebar: React.FC = () => {
               {item('demand-collections', 'Demand & Collections', <Receipt className="h-4 w-4" />)}
               {item('payments-expenses', 'Payments & Expenses', <CreditCard className="h-4 w-4" />)}
               {item('party-ledger', 'Party-wise Ledger', <Users className="h-4 w-4" />)}
-              {item('verification-dashboard', 'Verification Dashboard', <LayoutDashboard className="h-4 w-4" />)}
+              {item('verification-dashboard', 'Home', <LayoutDashboard className="h-4 w-4" />)}
               {item('bank-reconciliation', 'Reconciliation Dashboard', <Landmark className="h-4 w-4" />)}
             </div>}
 
