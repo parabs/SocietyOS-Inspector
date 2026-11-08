@@ -57,6 +57,7 @@ export const AuditComplianceHome: React.FC = () => {
         supabaseClient.from('financial_year_checklist').select('financial_year').eq('society_id', societyId).limit(200),
         supabaseClient.from('member_opening_balances').select('financial_year').eq('society_id', societyId).limit(200),
         supabaseClient.from('demand_register').select('financial_year').eq('society_id', societyId).limit(1000),
+        supabaseClient.from('demand_register').select('financial_year').eq('society_id', societyId).limit(1000),
       ]);
       const yearSet = new Set([...(sourceYears.data || []).map((row: any) => row.financial_year), ...(checklistYears.data || []).map((row: any) => row.financial_year), ...(openingYears.data || []).map((row: any) => row.financial_year), ...(demandYears.data || []).map((row: any) => row.financial_year)].filter(Boolean));
       const years = Array.from(yearSet).sort((a, b) => String(b).localeCompare(String(a)));
@@ -91,7 +92,7 @@ export const AuditComplianceHome: React.FC = () => {
   const transactionRows = data.transactions || [];
   const transactionsLoaded = data.transactions !== null;
   const evidenceComplete = transactionRows.filter(row => String(row.evidence_status || '').toLowerCase() === 'complete').length;
-  const evidencePending = data.transactions.length - evidenceComplete;
+  const evidencePending = transactionsLoaded ? transactionRows.length - evidenceComplete : 0;
   const unmapped = transactionRows.filter(row => !String(row.demand_id || '').trim()).length;
   const checklistDone = (data.checklist || []).filter(row => ['completed', 'complete', 'done'].includes(String(row.status || '').toLowerCase())).length;
   const checklistProgress = (data.checklist || []).filter(row => String(row.status || '').toLowerCase() === 'in progress').length;
