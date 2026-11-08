@@ -8,7 +8,7 @@
 
 ## Executive status
 
-Phase A's production tenant boundary, membership/role model, RLS, financial view protection, evidence-storage policy boundary and corresponding frontend access gate have been implemented. Production database migrations are applied and their exact SQL files are retained in `supabase/migrations/` on this branch. The frontend was merged to `main` in commit `e85a0ddb69afa4c5c4ed06beb0b4dae659e0661d`. GitHub Actions run #679 passed build/typecheck and the GitHub Pages deployment run #42401999353 completed successfully, including build, artifact upload and deploy.
+Phase A's production tenant boundary, membership/role model, RLS, financial view protection, evidence-storage policy boundary and corresponding frontend access gate have been implemented. Production database migrations are applied and their exact SQL files are retained in `supabase/migrations/` on this branch. The frontend was merged to `main` in commit `e85a0ddb69afa4c5c4ed06beb0b4dae659e0661d`. The latest main commit at verification was `3b97895d05a392e89d0253aa42752f27ff98ba7c`; build/typecheck run #42466491110 and GitHub Pages deployment run #42466491116 both completed successfully.
 
 The existing Google-linked account with trusted `app_metadata.role = society_admin` was retained and mapped to the Society Admin membership. No Auth metadata was edited. Google sign-in alone does not grant application access: an active society membership and assigned role are required. Users without a role remain outside the app. Requester and Caretaker roles are also held outside the current UI because their dedicated workspaces are not yet implemented.
 
@@ -116,15 +116,15 @@ These rollback-only SQL assertion scripts were run successfully against producti
 
 Coverage: Society Admin financial row-count regression; missing/wrong tenant header denial; unassigned user denial; member linked-party-only scope; self-role and last-admin protections; party-user verification; per-society import guard; blocked direct import writes; private evidence bucket, path validation and no update/delete policy.
 
-Supabase security advisor no longer reports anonymous financial view exposure, public SECURITY DEFINER RPC exposure, broad public RLS policies or mutable-search-path trigger functions. Remaining security warning: leaked-password protection disabled in Supabase Auth. Performance advisor no longer reports unindexed foreign keys or duplicate indexes; the two archived backup tables intentionally have no primary key.
+Supabase security advisor no longer reports anonymous financial view exposure, public SECURITY DEFINER RPC exposure, broad public RLS policies or mutable-search-path trigger functions. The current security advisor still reports leaked-password protection disabled in Supabase Auth and four INFO-only deny-by-default RLS tables (`demand_register_backup_20261030`, `permission_catalog`, `society_os_execution_test`, `transaction_demand_mapping_backup_20261030`). Performance advisor has no active findings requiring a change; unused-index notices are expected immediately after creating tenant indexes on a newly migrated workload.
 
 ## Remaining release gates
 
-1. Enable Supabase Auth leaked-password protection in project Auth security settings. The connected Supabase tools do not expose this setting.
+1. Enable Supabase Auth leaked-password protection in project Auth security settings. The current security advisor confirms it remains disabled; the connected Supabase tools do not expose this setting.
 2. Verify Auth Site URL/redirect allow-list includes `https://parabs.github.io/SocietyOS-Inspector/`.
-3. Complete a real Google invitation/acceptance test with a second account and verify role-specific access. No second account was created or invited during this pass.
+3. Complete a real Google invitation/acceptance test with `senior.tech.circle@gmail.com` using the least-privilege `Member` role, then verify linked-party-only financial access and denial of other members' records. The target and role are confirmed, but the invitation has NOT been sent: the connected tools expose Edge Function deployment/read operations but no authenticated function-invocation action. Send it from the deployed app's User & Role Access screen while signed in as Society Admin.
 4. Complete a real Storage API upload/read and cross-society denial test. SQL policy tests passed; no evidence file was created.
-5. Confirm the deployed GitHub Pages site is reachable and complete a signed-in smoke test against the new frontend. The main-branch deployment completed successfully, but this tool session could not access the public Pages URL to verify browser rendering and sign-in end-to-end.
+5. Confirm the deployed GitHub Pages site is reachable and complete a signed-in smoke test against the new frontend. The main-branch build and deployment workflows succeeded on commit `3b97895d05a392e89d0253aa42752f27ff98ba7c`, but this tool session could not fetch the Pages URL or operate a browser session, so rendered UI and Google sign-in remain unverified.
 
 ## Explicitly not done
 
