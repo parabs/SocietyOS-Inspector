@@ -744,21 +744,23 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         supabaseClient.from('v_demand_transaction_reconciliation').select('*'),
         supabaseClient.from('demand_adjustments').select('*'),
         supabaseClient.from('demand_payment_allocations').select('*'),
-        supabaseClient.from('party_master').select('party_id, party_name'),
+        supabaseClient.from('party_master').select('party_id, party_name, party_type'),
         supabaseClient.from('flat_owner_master').select('flat_number_source_value, owner_name'),
       ]);
 
       if (demRes.error) throw new Error(`demand_register: ${demRes.error.message}`);
       if (reconRes.error) throw new Error(`v_demand_transaction_reconciliation: ${reconRes.error.message}`);
 
-      const partyNames=new Map(((partyRes.data||[]) as any[]).map((p:any)=>[String(p.party_id||''),String(p.party_name||'')]));
+      const partyNames=new Map(((partyRes.data||[]) as any[]).map((p:any)=>[String(p.party_id||''),{name:String(p.party_name||''),type:String(p.party_type||'Unclassified')} ]));
       const reconciliationById=new Map(((reconRes.data||[]) as any[]).map((r:any)=>[String(r.demand_id||''),r]));
       const flatRows=(flatRes.data||[]) as any[];
       const demandRows=(demRes.data||[] as any[]).map((row:any)=>{
-        const partyName=String(partyNames.get(String(row.party_id||''))||'');
+        const partyRecord:any=partyNames.get(String(row.party_id||''))||{};
+        const partyName=String(partyRecord.name||'');
+        const partyType=String(partyRecord.type||'Unclassified');
         const flat=String(flatRows.find((f:any)=>String(f.owner_name||'').trim().toLowerCase()===partyName.trim().toLowerCase())?.flat_number_source_value||partyName||'');
         const reconciliation:any=reconciliationById.get(String(row.demand_id||''))||{};
-        return {...row,...reconciliation,id:row.demand_id,bill_no:row.demand_id,flat_no:flat,member_id:flat||partyName||row.party_id,member_name:partyName,party_name:partyName,
+        return {...row,...reconciliation,party_type:partyType,id:row.demand_id,bill_no:row.demand_id,flat_no:flat,member_id:flat||partyName||row.party_id,member_name:partyName,party_name:partyName,
           bill_date:row.demand_date,month:row.demand_month,total_demand:Number(row.total_demand??row.demand_amount)||0,
           receipt_amount:Number(reconciliation.receipt_amount)||0,bounce_reversal_amount:Number(reconciliation.bounce_reversal_amount)||0,
           net_collection_amount:Number(reconciliation.net_collection_amount)||0,approved_adjustment_amount:Number(reconciliation.approved_adjustment_amount)||0};
