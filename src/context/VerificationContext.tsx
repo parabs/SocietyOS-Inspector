@@ -668,31 +668,46 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const fetchMemberBalances = useCallback(async () => {
     setIsLoadingMemberBalances(true);
     setMemberBalancesError(null);
+    const societyId = '3cd459f5-2b6c-4104-86e1-b305f94ee0a7';
     try {
-      const [opRes, balRes, finRes, partyFinRes, cumRes, partyRes, flatRes] = await Promise.all([
-        supabaseClient.from('member_opening_balances').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
-        supabaseClient.from('balance_register').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
-        supabaseClient.from('v_member_financial_year_balance').select('*'),
-        supabaseClient.from('v_party_financial_year_balance').select('*'),
-        supabaseClient.from('v_member_cumulative_outstanding').select('*'),
-        supabaseClient.from('party_master').select('party_id, party_name, party_type').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
-        supabaseClient.from('flat_owner_master').select('flat_number_source_value, owner_name, owner_type, asset_type'),
+      // Load the authoritative tenant-scoped source registers first. Report
+      // screens must not wait on optional, expensive aggregate views.
+      const sourceTimeout = AbortSignal.timeout(20000);
+      const [opRes, balRes, partyRes, flatRes] = await Promise.all([
+        supabaseClient.from('member_opening_balances').select('*').eq('society_id', societyId).abortSignal(sourceTimeout),
+        supabaseClient.from('balance_register').select('*').eq('society_id', societyId).abortSignal(sourceTimeout),
+        supabaseClient.from('party_master').select('party_id, party_name, party_type').eq('society_id', societyId).abortSignal(sourceTimeout),
+        supabaseClient.from('flat_owner_master').select('flat_number_source_value, owner_name, owner_type, asset_type').eq('society_id', societyId).abortSignal(sourceTimeout),
       ]);
-
       if (opRes.error) throw new Error(`member_opening_balances: ${opRes.error.message}`);
       if (balRes.error) throw new Error(`balance_register: ${balRes.error.message}`);
+      if (partyRes.error) throw new Error(`party_master: ${partyRes.error.message}`);
 
-      // Keep the tenant-scoped source registers available even if an optional
-      // derived financial view is slow or unavailable. Reports can calculate
-      // from these source rows without failing the entire member-balance load.
       setMemberOpeningBalances((opRes.data as DbMemberOpeningBalance[]) || []);
       setBalanceRegister((balRes.data as DbBalanceRegister[]) || []);
-      setPartyFinancialBalances((partyFinRes.error ? [] : (partyFinRes.data as DbPartyFinancialYearBalance[]) || []));
       const partyRows=(partyRes.data||[]) as any[];
       const flatRows=(flatRes.data||[]) as any[];
       const partyNames=new Map(partyRows.map((p:any)=>[String(p.party_id||''),String(p.party_name||'')]));
       const flatFor=(name:string)=>flatRows.find((f:any)=>String(f.owner_name||'').trim().toLowerCase()===String(name||'').trim().toLowerCase());
       const displayFlat=(name:string,partyId:string)=>String(flatFor(name)?.flat_number_source_value||name||partyNames.get(partyId)||'Unmapped party');
+      setSupabaseSync((prev) => ({
+        ...prev,
+        tablesLoaded: {
+          ...prev.tablesLoaded,
+          member_opening_balances: opRes.data?.length || 0,
+          balance_register: balRes.data?.length || 0,
+        },
+      }));
+      // Source registers are now ready for reports. Do not block them on views.
+      setIsLoadingMemberBalances(false);
+
+      const viewTimeout = AbortSignal.timeout(20000);
+      const [finRes, partyFinRes, cumRes] = await Promise.all([
+        supabaseClient.from('v_member_financial_year_balance').select('*').eq('financial_year','FY 2018-19').abortSignal(viewTimeout),
+        supabaseClient.from('v_party_financial_year_balance').select('*').eq('financial_year','FY 2018-19').abortSignal(viewTimeout),
+        supabaseClient.from('v_member_cumulative_outstanding').select('*').eq('as_of_financial_year','FY 2018-19').abortSignal(viewTimeout),
+      ]);
+      setPartyFinancialBalances(partyFinRes.error ? [] : (partyFinRes.data as DbPartyFinancialYearBalance[]) || []);
       if (!finRes.error && finRes.data) {
         const normalized=(finRes.data as any[]).map(row=>{
           const name=String(row.member_name||row.name||partyNames.get(String(row.party_id||''))||'Unmapped party');
@@ -725,9 +740,9 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         ...prev,
         tablesLoaded: {
           ...prev.tablesLoaded,
-          member_opening_balances: opRes.data?.length || 0,
-          balance_register: balRes.data?.length || 0,
+          v_member_financial_year_balance: finRes.data?.length || 0,
           v_party_financial_year_balance: partyFinRes.data?.length || 0,
+          v_member_cumulative_outstanding: cumRes.data?.length || 0,
         },
       }));
     } catch (err: any) {
@@ -741,7 +756,6 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setIsLoadingMemberBalances(false);
     }
   }, []);
-
   /**
    * 5. Fetch Demand Register, Adjustments & Payment Allocations
    */
