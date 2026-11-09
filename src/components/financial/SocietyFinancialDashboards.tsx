@@ -219,7 +219,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   if(accountFilter!=='ALL'){
    const start=openingFor(accountFilter);
    if(start==null)return [];
-   let running=start;
+   let running=Number(start);
    return rows.sort((a:any,b:any)=>monthNames.indexOf(normalizeMonth(String(a.reporting_month||'')).slice(0,3))-monthNames.indexOf(normalizeMonth(String(b.reporting_month||'')).slice(0,3))).map((row:any,index:number)=>{
     const opening=running,credits=Number(row.receipt_amount)||0,debits=Number(row.payment_amount)||0,contra=Number(row.contra_signed)||0,adjustments=0;
     running=opening+credits-debits+contra+adjustments;
@@ -231,7 +231,8 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   if(starts.some(value=>value==null))return [];
   const byMonth=new Map<string,any[]>();
   rows.forEach((row:any)=>{const month=normalizeMonth(String(row.reporting_month||''));byMonth.set(month,[...(byMonth.get(month)||[]),row]);});
-  let running=starts.reduce((sum,value)=>sum+Number(value||0),0);
+  const validStarts=starts.filter((value):value is number=>value!==null);
+  let running=validStarts.reduce<number>((sum,value)=>sum+value,0);
   return Array.from(byMonth.entries()).sort((a,b)=>monthNames.indexOf(a[0].slice(0,3))-monthNames.indexOf(b[0].slice(0,3))).map(([month,items],index)=>{
    const opening=running,credits=items.reduce((sum,row)=>sum+(Number(row.receipt_amount)||0),0),debits=items.reduce((sum,row)=>sum+(Number(row.payment_amount)||0),0),contra=items.reduce((sum,row)=>sum+(Number(row.contra_signed)||0),0),adjustments=0;
    running=opening+credits-debits+contra;
