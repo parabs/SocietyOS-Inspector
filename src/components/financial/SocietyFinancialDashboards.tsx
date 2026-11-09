@@ -54,6 +54,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const [statusFilter,setStatusFilter]=useState('All statuses');
  const [accountFilter,setAccountFilter]=useState<'TDCC'|'BOM'|'CASH'|'ALL'>('TDCC');
  const [monthlyAccountMovements,setMonthlyAccountMovements]=useState<any[]>([]);
+ const [monthlyAccountOpeningBalances,setMonthlyAccountOpeningBalances]=useState<any[]>([]);
  const [monthlyAccountMovementsLoading,setMonthlyAccountMovementsLoading]=useState(false);
  const [monthlyAccountMovementsError,setMonthlyAccountMovementsError]=useState<string|null>(null);
  const [activeTab,setActiveTab]=useState('Members');
@@ -131,10 +132,18 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   let active=true;
   const loadAccountMovements=async()=>{
    setMonthlyAccountMovementsLoading(true);setMonthlyAccountMovementsError(null);
-   const {data,error}=await supabaseClient.from('v_account_monthly_movement').select('*').eq('financial_year','FY 2018-19').order('month_start',{ascending:true});
+   const [movementRes,openingRes]=await Promise.all([
+    supabaseClient.from('v_account_monthly_movement').select('*').eq('financial_year','FY 2018-19').order('month_start',{ascending:true}),
+    supabaseClient.from('v_account_financial_year_balance').select('account_id,account_name,opening_balance,source_opening_balance,closing_book_balance').eq('financial_year','FY 2018-19')
+   ]);
    if(!active)return;
-   if(error){setMonthlyAccountMovementsError(error.message);setMonthlyAccountMovements([]);}
-   else setMonthlyAccountMovements((data||[]) as any[]);
+   if(movementRes.error||openingRes.error){
+    setMonthlyAccountMovementsError(movementRes.error?.message||openingRes.error?.message||'Unable to load account balances');
+    setMonthlyAccountMovements([]);setMonthlyAccountOpeningBalances([]);
+   }else{
+    setMonthlyAccountMovements((movementRes.data||[]) as any[]);
+    setMonthlyAccountOpeningBalances((openingRes.data||[]) as any[]);
+   }
    setMonthlyAccountMovementsLoading(false);
   };
   void loadAccountMovements();
@@ -197,28 +206,38 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const transactionReconFallback=useMemo<MonthlyReconciliationRecord[]>(()=>{
   const accountIds:('TDCC'|'BOM'|'CASH')[]=accountFilter==='ALL'?['TDCC','BOM','CASH']:[accountFilter];
   const rawIdFor=(id:string)=>id==='TDCC'?'ACC-0001':id==='BOM'?'ACC-0002':'ACC-0003';
-  const accountOpening=(id:'TDCC'|'BOM'|'CASH')=>{const account=openingBalances.find((x:any)=>x.accountId===id);return Number(account?.calculatedOpeningBalance??account?.recordedOpeningBalance??0);};
+  const openingFor=(id:string)=>{
+   const rawId=rawIdFor(id);
+   const viewRow=monthlyAccountOpeningBalances.find((r:any)=>String(r.account_id||'').toUpperCase()===rawId);
+   const contextRow=openingBalances.find((r:any)=>r.accountId===id);
+   const value=viewRow?.opening_balance??viewRow?.source_opening_balance??contextRow?.calculatedOpeningBalance??contextRow?.recordedOpeningBalance;
+   return value==null?null:Number(value);
+  };
   const rows=monthlyAccountMovements.filter((r:any)=>accountIds.some(id=>rawIdFor(id)===String(r.account_id||'').toUpperCase()));
   const monthNames=['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
   const normalizeMonth=(value:string)=>{const m=value.match(/^([A-Za-z]{3,})[- ](\d{4})$/);return m?m[1].slice(0,3)+' '+m[2]:value;};
   if(accountFilter!=='ALL'){
-   let running=accountOpening(accountFilter);
+   const start=openingFor(accountFilter);
+   if(start==null)return [];
+   let running=start;
    return rows.sort((a:any,b:any)=>monthNames.indexOf(normalizeMonth(String(a.reporting_month||'')).slice(0,3))-monthNames.indexOf(normalizeMonth(String(b.reporting_month||'')).slice(0,3))).map((row:any,index:number)=>{
     const opening=running,credits=Number(row.receipt_amount)||0,debits=Number(row.payment_amount)||0,contra=Number(row.contra_signed)||0,adjustments=0;
     running=opening+credits-debits+contra+adjustments;
     const month=normalizeMonth(String(row.reporting_month||''));
-    return {id:'view-'+accountFilter+'-'+index,accountId:accountFilter,month,monthIndex:Math.max(0,monthNames.indexOf(month.slice(0,3))),sourceOpeningBalance:opening,calculatedOpeningBalance:opening,openingDifference:0,credits,debits,contra,adjustments,calculatedClosingBalance:running,sourceClosingBalance:null,closingDifference:0,status:'Pending' as const,remarks:'Calculated from v_account_monthly_movement and Account Master opening balance. Statement balance has not been supplied.'};
+    return {id:'view-'+accountFilter+'-'+index,accountId:accountFilter,month,monthIndex:Math.max(0,monthNames.indexOf(month.slice(0,3))),sourceOpeningBalance:opening,calculatedOpeningBalance:opening,openingDifference:0,credits,debits,contra,adjustments,calculatedClosingBalance:running,sourceClosingBalance:null,closingDifference:0,status:'Pending' as const,remarks:'Opening balance and monthly movement loaded from the financial-year account view. Statement balance has not been supplied.'};
    });
   }
+  const starts=accountIds.map(openingFor);
+  if(starts.some(value=>value==null))return [];
   const byMonth=new Map<string,any[]>();
   rows.forEach((row:any)=>{const month=normalizeMonth(String(row.reporting_month||''));byMonth.set(month,[...(byMonth.get(month)||[]),row]);});
-  let running=accountOpening('TDCC')+accountOpening('BOM')+accountOpening('CASH');
+  let running=starts.reduce((sum,value)=>sum+Number(value||0),0);
   return Array.from(byMonth.entries()).sort((a,b)=>monthNames.indexOf(a[0].slice(0,3))-monthNames.indexOf(b[0].slice(0,3))).map(([month,items],index)=>{
    const opening=running,credits=items.reduce((sum,row)=>sum+(Number(row.receipt_amount)||0),0),debits=items.reduce((sum,row)=>sum+(Number(row.payment_amount)||0),0),contra=items.reduce((sum,row)=>sum+(Number(row.contra_signed)||0),0),adjustments=0;
    running=opening+credits-debits+contra;
-   return {id:'view-ALL-'+index,accountId:'TDCC' as const,month,monthIndex:Math.max(0,monthNames.indexOf(month.slice(0,3))),sourceOpeningBalance:opening,calculatedOpeningBalance:opening,openingDifference:0,credits,debits,contra,adjustments,calculatedClosingBalance:running,sourceClosingBalance:null,closingDifference:0,status:'Pending' as const,remarks:'Consolidated book movement across TDCC, BOM and Cash. Statement balances have not been supplied.'};
+   return {id:'view-ALL-'+index,accountId:'TDCC' as const,month,monthIndex:Math.max(0,monthNames.indexOf(month.slice(0,3))),sourceOpeningBalance:opening,calculatedOpeningBalance:opening,openingDifference:0,credits,debits,contra,adjustments,calculatedClosingBalance:running,sourceClosingBalance:null,closingDifference:0,status:'Pending' as const,remarks:'Consolidated opening balances and monthly movements across TDCC, BOM and Cash. Statement balances have not been supplied.'};
   });
- },[monthlyAccountMovements,openingBalances,accountFilter]);
+ },[monthlyAccountMovements,monthlyAccountOpeningBalances,openingBalances,accountFilter]);
  const totalRecon=transactionReconFallback;
  const matched=totalRecon.filter(r=>r.status==='Matched'||r.status==='Reconciled'||r.status==='Mismatch Accepted').length;
  const unmatched=totalRecon.filter(r=>r.status==='Mismatch'||r.status==='Difference').length;
@@ -1598,7 +1617,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
   </>}
   {screen==='bank-reconciliation'&&<>
    <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-2"><Landmark className="h-4 w-4 text-blue-700"/><span className="text-xs font-semibold">Account</span>{(['TDCC','BOM','CASH','ALL'] as const).map(a=><button key={a} onClick={()=>setAccountFilter(a)} className={'rounded-lg px-3 py-2 text-xs font-semibold '+(accountFilter===a?'bg-blue-600 text-white':'border border-slate-200 text-slate-600')}>{a==='ALL'?'All accounts':a==='TDCC'?'TDCC (Main)':a==='BOM'?'BOM (Secondary)':'Cash'}</button>)}</div>
-   {monthlyAccountMovementsLoading&&<div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">Loading account movements…</div>}{monthlyAccountMovementsError&&<div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">Account movement data could not be loaded: {monthlyAccountMovementsError}</div>}{!monthlyAccountMovementsLoading&&!monthlyAccountMovementsError&&monthlyAccountMovements.length===0&&<div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">No monthly account movement records were returned for FY 2018–19.</div>}<div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5"><Card label="Opening Balance" value={fmt(totalRecon[0]?.calculatedOpeningBalance||0)} detail="First loaded account-month" icon={Landmark} compact/><Card label="Receipts / Credits" value={fmt(totalRecon.reduce((s,r)=>s+Number(r.credits||0),0))} detail="From reconciliation records" icon={ArrowDownRight} tone="green" compact/><Card label="Payments / Debits" value={fmt(totalRecon.reduce((s,r)=>s+Number(r.debits||0),0))} detail="From reconciliation records" icon={ArrowUpRight} tone="red" compact/><Card label="Reconciled Periods" value={num(matched)} detail={num(totalRecon.length)+' account-months loaded'} icon={CheckCircle2} tone="green" compact/><Card label="Unresolved Differences" value={num(unmatched)} detail="Requires statement evidence" icon={AlertTriangle} tone="amber" compact/></div>
+   {monthlyAccountMovementsLoading&&<div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">Loading account movements…</div>}{monthlyAccountMovementsError&&<div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">Account movement data could not be loaded: {monthlyAccountMovementsError}</div>}{!monthlyAccountMovementsLoading&&!monthlyAccountMovementsError&&monthlyAccountMovements.length===0&&<div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">No monthly account movement records were returned for FY 2018–19.</div>}<div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5"><Card label="Opening Balance" value={fmt(accountFilter==="ALL"?monthlyAccountOpeningBalances.filter((r:any)=>["ACC-0001","ACC-0002","ACC-0003"].includes(String(r.account_id||"").toUpperCase())).reduce((sum:number,r:any)=>sum+Number(r.opening_balance??r.source_opening_balance??0),0):Number(monthlyAccountOpeningBalances.find((r:any)=>String(r.account_id||"").toUpperCase()===(accountFilter==="TDCC"?"ACC-0001":accountFilter==="BOM"?"ACC-0002":"ACC-0003"))?.opening_balance??monthlyAccountOpeningBalances.find((r:any)=>String(r.account_id||"").toUpperCase()===(accountFilter==="TDCC"?"ACC-0001":accountFilter==="BOM"?"ACC-0002":"ACC-0003"))?.source_opening_balance??0))} detail="Verified FY opening balance" icon={Landmark} compact/><Card label="Receipts / Credits" value={fmt(totalRecon.reduce((s,r)=>s+Number(r.credits||0),0))} detail="From reconciliation records" icon={ArrowDownRight} tone="green" compact/><Card label="Payments / Debits" value={fmt(totalRecon.reduce((s,r)=>s+Number(r.debits||0),0))} detail="From reconciliation records" icon={ArrowUpRight} tone="red" compact/><Card label="Reconciled Periods" value={num(matched)} detail={num(totalRecon.length)+' account-months loaded'} icon={CheckCircle2} tone="green" compact/><Card label="Unresolved Differences" value={num(unmatched)} detail="Requires statement evidence" icon={AlertTriangle} tone="amber" compact/></div>
    <div className="grid grid-cols-1 gap-2 xl:grid-cols-2"><Panel title="Bank Balance Trend (Bank vs Books)" action={<ReportLink id="bank-recon" category="Financial Statements" label="RPT-18 · Bank / UPI Reconciliation"/>}><div className="h-[175px]"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={totalRecon}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:9,fill:"#334155",fontWeight:600}}/><YAxis tick={{fontSize:9,fill:"#334155",fontWeight:600}} tickFormatter={(v:any)=>new Intl.NumberFormat("en-IN",{notation:"compact",maximumFractionDigits:1}).format(Number(v)||0)}/><Tooltip formatter={(v:any)=>fmt(Number(v))} contentStyle={{fontSize:11,color:"#0f172a",background:"#fff",border:"1px solid #cbd5e1",borderRadius:8}} labelStyle={{color:"#0f172a",fontWeight:700}}/><Legend/><Bar dataKey="calculatedClosingBalance" name="Book closing balance" fill="#2563eb" radius={[4,4,0,0]}><LabelList dataKey="calculatedClosingBalance" position="top" formatter={(v:any)=>new Intl.NumberFormat("en-IN",{notation:"compact",maximumFractionDigits:1}).format(Number(v)||0)} style={{fontSize:9,fill:"#0f172a",fontWeight:700}}/></Bar><Line dataKey="sourceClosingBalance" name="Statement closing balance" stroke="#16a34a" strokeWidth={2} dot={{r:2}} connectNulls/></ComposedChart></ResponsiveContainer></div></Panel><Panel title="Reconciliation Summary" action={<ReportLink id="cashbook" category="Operational Registers" label="Cash & Bank Books"/>}><Table headers={['Month','Opening','Credits','Debits','Book closing','Statement closing','Status']} rows={totalRecon.map(r=>[r.month,fmt(Number(r.calculatedOpeningBalance)||0),fmt(Number(r.credits)||0),fmt(Number(r.debits)||0),fmt(Number(r.calculatedClosingBalance)||0),r.sourceClosingBalance==null?'Not supplied':fmt(Number(r.sourceClosingBalance)),statusPill(r.status)])}/></Panel></div>
    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2"><Panel title="Monthly Reconciliation Position" action={<ReportLink id="bank-recon" category="Financial Statements" label="RPT-18 · Account-wise Register"/>}><Table headers={['Month','Account','Credits','Debits','Difference','Status']} rows={totalRecon.map(r=>[r.month,r.accountId,fmt(Number(r.credits)||0),fmt(Number(r.debits)||0),r.sourceClosingBalance==null?'—':fmt(Number(r.calculatedClosingBalance||0)-Number(r.sourceClosingBalance||0)),statusPill(r.status)])}/></Panel><Panel title="Unmatched / Needs Review" action={<ReportLink id="opening-balance-review" category="Audit & Governance" label="Opening Balance Exceptions"/>}><Table headers={['Month','Account','Possible issue','Action']} rows={totalRecon.filter(r=>r.status!=='Reconciled'&&r.status!=='Matched').map(r=>[r.month,r.accountId,r.sourceClosingBalance==null?'Statement closing balance missing':'Book-to-bank variance','Open monthly reconciliation'])}/></Panel></div>
   </>}
