@@ -739,20 +739,40 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsLoadingDemandRegister(true);
     setDemandRegisterError(null);
     try {
-      const [demRes, reconRes, adjRes, allocRes, partyRes, flatRes] = await Promise.all([
-        supabaseClient.from('demand_register').select('*'),
-        supabaseClient.from('v_demand_transaction_reconciliation').select('*'),
-        supabaseClient.from('demand_adjustments').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
-        supabaseClient.from('demand_payment_allocations').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
-        supabaseClient.from('party_master').select('party_id, party_name, party_type'),
-        supabaseClient.from('flat_owner_master').select('flat_number_source_value, owner_name').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+      const societyId = '3cd459f5-2b6c-4104-86e1-b305f94ee0a7';
+      const requestTimeout = AbortSignal.timeout(20000);
+      const [demRes, txnRes, adjRes, allocRes, partyRes, flatRes] = await Promise.all([
+        supabaseClient.from('demand_register').select('*').eq('society_id', societyId).abortSignal(requestTimeout),
+        supabaseClient.from('transactions').select('transaction_id, demand_id, transaction_type, amount, description').eq('society_id', societyId).abortSignal(requestTimeout),
+        supabaseClient.from('demand_adjustments').select('*').eq('society_id', societyId).abortSignal(requestTimeout),
+        supabaseClient.from('demand_payment_allocations').select('*').eq('society_id', societyId).abortSignal(requestTimeout),
+        supabaseClient.from('party_master').select('party_id, party_name, party_type').eq('society_id', societyId).abortSignal(requestTimeout),
+        supabaseClient.from('flat_owner_master').select('flat_number_source_value, owner_name').eq('society_id', societyId).abortSignal(requestTimeout),
       ]);
 
       if (demRes.error) throw new Error(`demand_register: ${demRes.error.message}`);
-      if (reconRes.error) throw new Error(`v_demand_transaction_reconciliation: ${reconRes.error.message}`);
+      if (txnRes.error) throw new Error(`transactions for demand mapping: ${txnRes.error.message}`);
 
       const partyNames=new Map(((partyRes.data||[]) as any[]).map((p:any)=>[String(p.party_id||''),{name:String(p.party_name||''),type:String(p.party_type||'Unclassified')} ]));
-      const reconciliationById=new Map(((reconRes.data||[]) as any[]).map((r:any)=>[String(r.demand_id||''),r]));
+      // Build demand reconciliation from the actual transaction-to-demand links instead of
+      // querying the expensive aggregate view that was timing out in the browser.
+      const reconciliationById=new Map<string,any>();
+      const addLinked=(demandId:string,type:string,amount:number,description:string)=>{
+        if(!demandId)return;
+        const row=reconciliationById.get(demandId)||{demand_id:demandId,receipt_count:0,receipt_amount:0,bounce_reversal_count:0,bounce_reversal_amount:0,contra_count:0,contra_signed_amount:0,linked_payment_count:0,linked_payment_signed_amount:0,net_collection_amount:0,approved_adjustment_amount:0};
+        if(type==='Receipt'){row.receipt_count++;row.receipt_amount+=Math.abs(amount);row.net_collection_amount+=Math.abs(amount);}
+        else if(type==='Contra'){row.contra_count++;row.contra_signed_amount+=amount;if(amount<0&&/bounce/i.test(description)&&!/bank charge/i.test(description)){row.bounce_reversal_count++;row.bounce_reversal_amount+=amount;row.net_collection_amount+=amount;}}
+        else if(type==='Payment'){row.linked_payment_count++;row.linked_payment_signed_amount+=amount;}
+        reconciliationById.set(demandId,row);
+      };
+      const transactionsById=new Map<string,any>();
+      ((txnRes.data||[]) as any[]).forEach((t:any)=>{transactionsById.set(String(t.transaction_id||''),t);if(String(t.demand_id||'').trim())addLinked(String(t.demand_id),String(t.transaction_type||''),Number(t.amount)||0,String(t.description||''));});
+      ((allocRes.data||[]) as any[]).forEach((allocation:any)=>{
+        const transaction=transactionsById.get(String(allocation.transaction_id||''));if(!transaction||String(transaction.demand_id||'').trim())return;
+        const allocated=Number(allocation.allocated_amount)||0;
+        const signed=transaction.transaction_type==='Receipt'?Math.abs(allocated):transaction.transaction_type==='Contra'?-Math.abs(allocated):allocated;
+        addLinked(String(allocation.demand_id||''),String(transaction.transaction_type||''),signed,String(transaction.description||''));
+      });
       const flatRows=(flatRes.data||[]) as any[];
       const demandRows=(demRes.data||[] as any[]).map((row:any)=>{
         const partyRecord:any=partyNames.get(String(row.party_id||''))||{};
@@ -778,7 +798,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           demand_register: demRes.data?.length || 0,
           demand_adjustments: adjRes.data?.length || 0,
           demand_payment_allocations: allocRes.data?.length || 0,
-          v_demand_transaction_reconciliation: reconRes.data?.length || 0,
+          transactions_used_for_demand_mapping: txnRes.data?.length || 0,
         },
       }));
     } catch (err: any) {
@@ -864,14 +884,14 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return;
       }
 
-      await Promise.allSettled([
-        fetchOpeningBalances(),
-        fetchTransactions(),
-        fetchMonthlyReconciliation(),
-        fetchMemberBalances(),
-        fetchDemandRegister(),
-        fetchMasters(),
-      ]);
+      // Load the shared dashboard sources in a controlled sequence. The previous
+      // six-way fan-out repeatedly timed out on the aggregate views under RLS.
+      await fetchMasters();
+      await fetchTransactions();
+      await fetchDemandRegister();
+      await fetchOpeningBalances();
+      await fetchMemberBalances();
+      await fetchMonthlyReconciliation();
 
       setSupabaseSync((prev) => ({
         ...prev,
