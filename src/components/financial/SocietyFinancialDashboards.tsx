@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useVerification, ScreenId } from '../../context/VerificationContext';
 import { supabaseClient } from '../../services/supabaseClient';
+import { MonthlyReconciliationRecord } from '../../types';
 
 type Props = { screen: ScreenId };
 type ReportTransaction = { demandId?: string; [key: string]: any };
@@ -176,7 +177,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const categoryData=cats.map(([name,v])=>({name,amount:v.amount,count:v.count}));
  const evidenceData=[{name:'Complete',value:evidenceComplete},{name:'Missing',value:evidenceMissing},{name:'Other / pending',value:Math.max(0,filtered.length-evidenceComplete-evidenceMissing)}];
  const storedRecon=Object.entries(reconciliations).filter(([key])=>accountFilter==='ALL'||key===accountFilter).flatMap(([,rows])=>rows);
- const transactionReconFallback=useMemo(()=>{
+ const transactionReconFallback=useMemo<MonthlyReconciliationRecord[]>(()=>{
   if(storedRecon.length||!transactions.length)return [];
   const accountIds:('TDCC'|'BOM'|'CASH')[]=accountFilter==='ALL'?['TDCC','BOM','CASH']:[accountFilter];
   const monthIndex=(label:string)=>{const m=label.trim().replace(/-/g,' ').match(/^([A-Za-z]{3,})\s+(\d{4})$/);if(!m)return -1;const names=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];const ix=names.indexOf(m[1].slice(0,3).toLowerCase());return ix<0?-1:Number(m[2])*12+ix;};
@@ -192,7 +193,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
     const debits=movement.filter(t=>t.transactionClass!=='Contra'&&t.type==='Payment').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
     const contra=movement.filter(t=>t.transactionClass==='Contra').reduce((s,t)=>s+Number(t.amount||0),0);
     const opening=running;running=opening+credits-debits+contra;
-    return {id:'derived-'+accountId+'-'+index,accountId,month,monthIndex:index,calculatedOpeningBalance:opening,credits,debits,contra,calculatedClosingBalance:running,sourceClosingBalance:null,closingDifference:0,status:'Statement not loaded',remarks:'Book movement calculated from transaction records; no matching bank/cash statement balance is available.'};
+    return {id:'derived-'+accountId+'-'+index,accountId,month,monthIndex:index,sourceOpeningBalance:opening,calculatedOpeningBalance:opening,openingDifference:0,credits,debits,contra,adjustments:0,calculatedClosingBalance:running,sourceClosingBalance:null,closingDifference:0,status:'Pending',remarks:'Book movement calculated from transaction records; no matching bank/cash statement balance is available.'};
    });
   });
  },[storedRecon,transactions,openingBalances,accountFilter]);
