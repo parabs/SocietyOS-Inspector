@@ -457,11 +457,13 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setTransactionsError(null);
 
     try {
+      const queryTimeout = AbortSignal.timeout(20000);
+      const societyId = '3cd459f5-2b6c-4104-86e1-b305f94ee0a7';
       const [txnRes, accountRes, partyRes, categoryRes] = await Promise.all([
-        supabaseClient.from('transactions').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
-        supabaseClient.from('account_master').select('account_id, account_name').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
-        supabaseClient.from('party_master').select('party_id, party_name').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
-        supabaseClient.from('category_master').select('category_id, category_name, category_group').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+        supabaseClient.from('transactions').select('*').eq('society_id', societyId).abortSignal(queryTimeout),
+        supabaseClient.from('account_master').select('account_id, account_name').eq('society_id', societyId).abortSignal(queryTimeout),
+        supabaseClient.from('party_master').select('party_id, party_name').eq('society_id', societyId).abortSignal(queryTimeout),
+        supabaseClient.from('category_master').select('category_id, category_name, category_group').eq('society_id', societyId).abortSignal(queryTimeout),
       ]);
       if (txnRes.error) throw new Error(`transactions query failed: ${txnRes.error.message}`);
       if (accountRes.error) throw new Error(`account_master query failed: ${accountRes.error.message}`);
@@ -820,12 +822,14 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsLoadingMasters(true);
     setMastersError(null);
     try {
+      const queryTimeout = AbortSignal.timeout(20000);
+      const societyId = '3cd459f5-2b6c-4104-86e1-b305f94ee0a7';
       const [partyRes, flatRes, catRes, rulesRes, srcRes] = await Promise.all([
-        supabaseClient.from('party_master').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
-        supabaseClient.from('flat_owner_master').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
-        supabaseClient.from('category_master').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
-        supabaseClient.from('rules_master').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
-        supabaseClient.from('source_register').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+        supabaseClient.from('party_master').select('*').eq('society_id', societyId).abortSignal(queryTimeout),
+        supabaseClient.from('flat_owner_master').select('*').eq('society_id', societyId).abortSignal(queryTimeout),
+        supabaseClient.from('category_master').select('*').eq('society_id', societyId).abortSignal(queryTimeout),
+        supabaseClient.from('rules_master').select('*').eq('society_id', societyId).abortSignal(queryTimeout),
+        supabaseClient.from('source_register').select('*').eq('society_id', societyId).abortSignal(queryTimeout),
       ]);
 
       if (partyRes.error) throw new Error(`party_master: ${partyRes.error.message}`);
