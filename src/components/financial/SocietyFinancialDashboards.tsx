@@ -33,9 +33,9 @@ const downloadCsv = (name:string, rows:(any[])[]) => {
 
 export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const {
-  transactions, openingBalances, memberOpeningBalances, reconciliations, demandRegister, demandAdjustments, demandAllocations, memberFinancialBalances, partyFinancialBalances,
+  transactions, transactionsError, openingBalances, memberOpeningBalances, reconciliations, demandRegister, demandRegisterError, demandAdjustments, demandAllocations, memberFinancialBalances, partyFinancialBalances,
   cumulativeOutstanding, balanceRegister, partyMaster, flatOwnerMaster, categoryMaster, sourceRegister, stats,
-  auditNotes, isLoadingTransactions, isLoadingDemandRegister, isLoadingMasters, refetchAll, setCurrentScreen,
+  auditNotes, isLoadingTransactions, isLoadingDemandRegister, isLoadingMasters, mastersError, refetchAll, setCurrentScreen,
   selectedAccountId, setSelectedAccountId, selectedMonthFilter, setSelectedMonthFilter, supabaseSync
  } = useVerification();
  const [period,setPeriod]=useState('All months');
@@ -1172,7 +1172,8 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    </div>
    {!["party-ledger","payments-expenses","demand-collections","financial-summary","bank-reconciliation"].includes(screen)&&<div className="relative mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-[9px] text-slate-400"><span>FINANCIAL CONTROL · MEMBER & VENDOR ACCOUNTABILITY</span><span className="hidden sm:inline">PRELIMINARY REPORTING VIEW</span></div>}
   </header>}
-  {loading&&<div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800"><span className="mr-2 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-600"/>Loading the latest society records…</div>}
+  {loading&&<div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800"><span className="mr-2 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-600"/>Loading society records…</div>}
+  {[transactionsError&&`Transactions: ${transactionsError}`,demandRegisterError&&`Demand register: ${demandRegisterError}`,mastersError&&`Master data: ${mastersError}`].filter(Boolean).length>0&&<div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800"><strong>Some dashboard data could not be loaded.</strong><ul className="mt-1 list-disc pl-4">{[transactionsError&&`Transactions: ${transactionsError}`,demandRegisterError&&`Demand register: ${demandRegisterError}`,mastersError&&`Master data: ${mastersError}`].filter(Boolean).map((message:any,index:number)=><li key={index}>{message}</li>)}</ul></div>}
   {!["party-ledger","payments-expenses","demand-collections","financial-summary","bank-reconciliation"].includes(screen)&&<div className="flex items-start gap-2 rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-[10px] leading-4 text-amber-950 shadow-sm"><span className="mt-0.5 font-black text-amber-700">!</span><div><strong className="font-bold uppercase tracking-wide">Preliminary · Not an audit opinion.</strong> Values reflect currently available connected records and must not be treated as certified statutory figures.</div></div>}
    {screen==='financial-summary'&&(()=>{
    const memberDemandRows=demandRegister.filter((d:any)=>String(d.party_type||'')==='Member');
