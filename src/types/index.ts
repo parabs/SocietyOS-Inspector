@@ -32,6 +32,8 @@ export interface TransactionSourceRecord {
   date: string; // YYYY-MM-DD
   month: string; // 'Apr 2018', etc.
   accountId: AccountId;
+  partyId?: string;
+  demandId?: string;
   type: TransactionType;
   party: string;
   description: string;
