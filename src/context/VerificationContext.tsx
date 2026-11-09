@@ -679,11 +679,13 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (opRes.error) throw new Error(`member_opening_balances: ${opRes.error.message}`);
       if (balRes.error) throw new Error(`balance_register: ${balRes.error.message}`);
-      if (partyFinRes.error) throw new Error(`v_party_financial_year_balance: ${partyFinRes.error.message}`);
 
+      // Keep the tenant-scoped source registers available even if an optional
+      // derived financial view is slow or unavailable. Reports can calculate
+      // from these source rows without failing the entire member-balance load.
       setMemberOpeningBalances((opRes.data as DbMemberOpeningBalance[]) || []);
       setBalanceRegister((balRes.data as DbBalanceRegister[]) || []);
-      setPartyFinancialBalances((partyFinRes.data as DbPartyFinancialYearBalance[]) || []);
+      setPartyFinancialBalances((partyFinRes.error ? [] : (partyFinRes.data as DbPartyFinancialYearBalance[]) || []));
       const partyRows=(partyRes.data||[]) as any[];
       const flatRows=(flatRes.data||[]) as any[];
       const partyNames=new Map(partyRows.map((p:any)=>[String(p.party_id||''),String(p.party_name||'')]));
@@ -699,6 +701,8 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             closing_balance:Number(row.closing_balance??row.total_outstanding)||0};
         });
         setMemberFinancialBalances(normalized as DbMemberFinancialYearBalance[]);
+      } else {
+        setMemberFinancialBalances([]);
       }
       if (!cumRes.error && cumRes.data) {
         const normalized=(cumRes.data as any[]).map(row=>{
@@ -712,6 +716,8 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             status:(Number(row.net_outstanding??row.cumulative_outstanding??row.total_outstanding)||0)<0?'Outstanding':(Number(row.net_outstanding??row.cumulative_outstanding??row.total_outstanding)||0)>0?'Credit balance':'Cleared'};
         });
         setCumulativeOutstanding(normalized as DbMemberCumulativeOutstanding[]);
+      } else {
+        setCumulativeOutstanding([]);
       }
       setSupabaseSync((prev) => ({
         ...prev,
