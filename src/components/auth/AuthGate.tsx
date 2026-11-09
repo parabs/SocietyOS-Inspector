@@ -38,7 +38,11 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
       return;
     }
 
-    setAuth({ status: 'loading' });
+    // Keep an authorized workspace mounted while the same user session is revalidated.
+    // Unmounting children resets the active screen and causes financial data to reload.
+    setAuth((current) => current.status === 'authorized' && current.session.user.id === session.user.id
+      ? current
+      : { status: 'loading' });
     try {
       const { data: accessData, error: accessError } = await supabaseClient.rpc('get_my_society_access');
       if (accessError) throw accessError;
@@ -94,8 +98,16 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
         });
       });
 
-    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((_event, session) => {
-      if (mounted) void applySession(session);
+    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      // Returning to a tab can trigger token refresh. It must not remount the workspace.
+      if (event === 'TOKEN_REFRESHED' && session) {
+        setAuth((current) => current.status === 'authorized' && current.session.user.id === session.user.id
+          ? { ...current, session }
+          : current);
+        return;
+      }
+      void applySession(session);
     });
 
     return () => {
