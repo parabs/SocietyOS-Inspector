@@ -35,7 +35,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const {
   transactions, transactionsError, openingBalances, memberOpeningBalances, reconciliations, demandRegister, demandRegisterError, demandAdjustments, demandAllocations, memberFinancialBalances, partyFinancialBalances,
   cumulativeOutstanding, balanceRegister, partyMaster, flatOwnerMaster, categoryMaster, sourceRegister, stats,
-  auditNotes, isLoadingTransactions, isLoadingDemandRegister, isLoadingMasters, mastersError, refetchAll, setCurrentScreen,
+  auditNotes, isLoadingTransactions, isLoadingDemandRegister, isLoadingMasters, isLoadingMemberBalances, memberBalancesError, mastersError, refetchAll, setCurrentScreen,
   selectedAccountId, setSelectedAccountId, selectedMonthFilter, setSelectedMonthFilter, supabaseSync
  } = useVerification();
  const [period,setPeriod]=useState('All months');
@@ -336,26 +336,41 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    .sort((a:any,b:any)=>String(a.party_type||'').localeCompare(String(b.party_type||''))||String(a.party_name||'').localeCompare(String(b.party_name||''))),[openingRegisterRows,openingRegisterSearch,openingRegisterClassification]);
  useEffect(()=>{
   if(screen!=='reports'||selectedReport!=='member-opening-balance-register') return;
-  let active=true;
-  const load=async()=>{
-   setOpeningRegisterLoading(true);setOpeningRegisterError(null);
-   const [registerRes,partyRes]=await Promise.all([
-    supabaseClient.from('v_opening_balance_register').select('*').order('party_id').abortSignal(AbortSignal.timeout(20000)),
-    supabaseClient.from('party_master').select('party_id,party_name,party_type').eq('society_id','3cd459f5-2b6c-4104-86e1-b305f94ee0a7').abortSignal(AbortSignal.timeout(20000))
-   ]);
-   if(!active)return;
-   if(registerRes.error){setOpeningRegisterError(registerRes.error.message);setOpeningRegisterRows([]);setOpeningRegisterLoading(false);return;}
-   if(partyRes.error){setOpeningRegisterError('Member names could not be loaded: '+partyRes.error.message);setOpeningRegisterRows([]);setOpeningRegisterLoading(false);return;}
-   const partyMap=new Map((partyRes.data||[]).map((p:any)=>[String(p.party_id||''),p]));
-   setOpeningRegisterRows((registerRes.data||[]).map((r:any)=>{
-    const p:any=partyMap.get(String(r.party_id||''))||{};
-    return {...r,party_name:p.party_name||'Name not available',party_type:p.party_type||'Unclassified'};
-   }));
-   setOpeningRegisterLoading(false);
-  };
-  load().catch((e:any)=>{if(active){setOpeningRegisterError(e?.message||'Unable to load opening balance register.');setOpeningRegisterLoading(false);}});
-  return ()=>{active=false;};
- },[screen,selectedReport,reportRefreshKey]);
+  if(isLoadingMemberBalances||isLoadingDemandRegister||isLoadingMasters){
+   setOpeningRegisterLoading(true);setOpeningRegisterError(null);return;
+  }
+  setOpeningRegisterLoading(true);setOpeningRegisterError(null);
+  if(memberBalancesError||demandRegisterError||mastersError){
+   setOpeningRegisterRows([]);
+   setOpeningRegisterError(memberBalancesError||demandRegisterError||mastersError||'Required source registers could not be loaded.');
+   setOpeningRegisterLoading(false);return;
+  }
+  const fy='FY 2018-19';
+  const members=(partyMaster||[]).filter((p:any)=>/^members?$/i.test(String(p.party_type||p.party_type_name||'').trim()));
+  const openings=new Map<string,number>();
+  (memberOpeningBalances||[]).filter((r:any)=>String(r.financial_year||'')===fy).forEach((r:any)=>{
+   const id=String(r.party_id||'');if(id)openings.set(id,(openings.get(id)||0)+(Number(r.opening_balance)||0));
+  });
+  const demands=new Map<string,number>(),receipts=new Map<string,number>(),adjustments=new Map<string,number>();
+  const demandParty=new Map<string,string>();
+  (demandRegister||[]).filter((d:any)=>String(d.financial_year||'')===fy).forEach((d:any)=>{
+   const partyId=String(d.party_id||''),demandId=String(d.demand_id||d.id||'');
+   if(!partyId||!members.some((p:any)=>String(p.party_id)===partyId))return;
+   demands.set(partyId,(demands.get(partyId)||0)+(Number(d.demand_amount??d.total_demand)||0));
+   receipts.set(partyId,(receipts.get(partyId)||0)+(Number(d.net_collection_amount)||0));
+   if(demandId)demandParty.set(demandId,partyId);
+  });
+  (demandAdjustments||[]).filter((a:any)=>a.is_approved===true).forEach((a:any)=>{
+   const partyId=demandParty.get(String(a.demand_id||''));if(partyId)adjustments.set(partyId,(adjustments.get(partyId)||0)+(Number(a.amount??a.adjustment_amount)||0));
+  });
+  const rows=members.map((p:any)=>{
+   const id=String(p.party_id||''),opening=Number(openings.get(id)||0),demand=Number(demands.get(id)||0),received=Number(receipts.get(id)||0),adjustment=Number(adjustments.get(id)||0);
+   return {party_id:id,party_name:p.party_name||'Name not available',party_type:p.party_type||'Unclassified',financial_year:fy,
+    opening_balance:opening,current_fy_demand:demand,current_fy_receipts:received,adjustments:adjustment,
+    total_outstanding:opening-demand+received+adjustment,opening_balance_recorded:openings.has(id)};
+  }).sort((a:any,b:any)=>String(a.party_name).localeCompare(String(b.party_name),'en',{numeric:true}));
+  setOpeningRegisterRows(rows);setOpeningRegisterLoading(false);
+ },[screen,selectedReport,reportRefreshKey,isLoadingMemberBalances,isLoadingDemandRegister,isLoadingMasters,memberBalancesError,demandRegisterError,mastersError,memberOpeningBalances,demandRegister,demandAdjustments,partyMaster]);
  const openingRegisterTotals=useMemo(()=>openingRegisterFiltered.reduce((a:any,r:any)=>({
   opening:a.opening+Number(r.opening_balance||0),
   demand:a.demand+Number(r.current_fy_demand||0),
