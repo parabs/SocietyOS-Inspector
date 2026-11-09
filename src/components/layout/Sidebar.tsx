@@ -94,12 +94,12 @@ export const Sidebar: React.FC = () => {
           <div className="pt-3">
             {sectionButton('dashboard', 'Dashboard', <LayoutDashboard className="h-5 w-5" />)}
             {expanded === 'dashboard' && <div className="mt-1 space-y-1 pl-2">
+              {item('verification-dashboard', 'Home', <LayoutDashboard className="h-4 w-4" />)}
               {item('financial-summary', 'Financial Summary', <PieChart className="h-4 w-4" />)}
               {item('demand-collections', 'Demand & Collections', <Receipt className="h-4 w-4" />)}
               {item('payments-expenses', 'Payments & Expenses', <CreditCard className="h-4 w-4" />)}
               {item('party-ledger', 'Party-wise Ledger', <Users className="h-4 w-4" />)}
-              {item('verification-dashboard', 'Home', <LayoutDashboard className="h-4 w-4" />)}
-              {item('bank-reconciliation', 'Reconciliation Dashboard', <Landmark className="h-4 w-4" />)}
+              {item('bank-reconciliation', 'Bank Reconciliation', <Landmark className="h-4 w-4" />)}
             </div>}
 
             {sectionButton('verification', 'Verification', <ClipboardCheck className="h-5 w-5" />)}
