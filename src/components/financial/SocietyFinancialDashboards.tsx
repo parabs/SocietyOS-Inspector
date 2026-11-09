@@ -385,7 +385,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     total_outstanding:opening-demand+received+adjustment,opening_balance_recorded:openings.has(id)};
   }).sort((a:any,b:any)=>String(a.party_name).localeCompare(String(b.party_name),'en',{numeric:true}));
   setOpeningRegisterRows(rows);setOpeningRegisterLoading(false);
- },[screen,selectedReport,reportRefreshKey,isLoadingMemberBalances,isLoadingDemandRegister,isLoadingMasters,memberBalancesError,demandRegisterError,mastersError,memberOpeningBalances,demandRegister,demandAdjustments,partyMaster]);
+ },[screen,selectedReport,reportRefreshKey,isLoadingMemberBalances,isLoadingDemandRegister,isLoadingMasters,memberBalancesError,demandRegisterError,mastersError,memberOpeningBalances,demandRegister,demandAdjustments,demandAllocations,transactions,partyMaster]);
  const openingRegisterTotals=useMemo(()=>openingRegisterFiltered.reduce((a:any,r:any)=>({
   opening:a.opening+Number(r.opening_balance||0),
   demand:a.demand+Number(r.current_fy_demand||0),
