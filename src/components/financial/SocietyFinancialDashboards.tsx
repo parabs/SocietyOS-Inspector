@@ -57,6 +57,16 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const [monthlyAccountOpeningBalances,setMonthlyAccountOpeningBalances]=useState<any[]>([]);
  const [monthlyAccountMovementsLoading,setMonthlyAccountMovementsLoading]=useState(false);
  const [monthlyAccountMovementsError,setMonthlyAccountMovementsError]=useState<string|null>(null);
+ const [reportRefreshKey,setReportRefreshKey]=useState(0);
+ const [isRefreshingReports,setIsRefreshingReports]=useState(false);
+ const refreshReports=async()=>{
+  if(isRefreshingReports)return;
+  setIsRefreshingReports(true);
+  try{await refetchAll();}finally{
+   setReportRefreshKey(value=>value+1);
+   setIsRefreshingReports(false);
+  }
+ };
  const [activeTab,setActiveTab]=useState('Members');
  const [partySelection,setPartySelection]=useState('');
  const [selectedReport,setSelectedReport]=useState('member-opening-balance-register');
@@ -148,7 +158,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   };
   void loadAccountMovements();
   return ()=>{active=false;};
- },[screen]);
+ },[screen,reportRefreshKey]);
  const loading=isLoadingTransactions||isLoadingDemandRegister||isLoadingMasters;
  const titles:Record<string,{title:string;sub:string}> = {
   'financial-summary':{title:'Financial Summary',sub:'Consolidated financial position, collections, payments, demand and control exceptions.'},
@@ -330,8 +340,8 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
   const load=async()=>{
    setOpeningRegisterLoading(true);setOpeningRegisterError(null);
    const [registerRes,partyRes]=await Promise.all([
-    supabaseClient.from('v_opening_balance_register').select('*').order('party_id'),
-    supabaseClient.from('party_master').select('party_id,party_name,party_type')
+    supabaseClient.from('v_opening_balance_register').select('*').order('party_id').abortSignal(AbortSignal.timeout(20000)),
+    supabaseClient.from('party_master').select('party_id,party_name,party_type').eq('society_id','3cd459f5-2b6c-4104-86e1-b305f94ee0a7').abortSignal(AbortSignal.timeout(20000))
    ]);
    if(!active)return;
    if(registerRes.error){setOpeningRegisterError(registerRes.error.message);setOpeningRegisterRows([]);setOpeningRegisterLoading(false);return;}
@@ -345,7 +355,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
   };
   load().catch((e:any)=>{if(active){setOpeningRegisterError(e?.message||'Unable to load opening balance register.');setOpeningRegisterLoading(false);}});
   return ()=>{active=false;};
- },[screen,selectedReport]);
+ },[screen,selectedReport,reportRefreshKey]);
  const openingRegisterTotals=useMemo(()=>openingRegisterFiltered.reduce((a:any,r:any)=>({
   opening:a.opening+Number(r.opening_balance||0),
   demand:a.demand+Number(r.current_fy_demand||0),
@@ -1166,7 +1176,7 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
     </div>
     <div className="relative flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] p-1.5 backdrop-blur-sm">
      <label className="px-2 text-[9px] font-semibold uppercase tracking-wide text-slate-300">Financial year <select className="ml-1.5 rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1.5 text-[11px] font-semibold normal-case text-white outline-none focus:border-cyan-300"><option>FY 2018–19</option></select></label>
-     <button onClick={()=>void refetchAll()} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2.5 py-2 text-[11px] font-semibold transition hover:bg-white/20"><RefreshCw className="h-3.5 w-3.5"/>Refresh</button>
+     <button onClick={()=>void refreshReports()} disabled={isRefreshingReports} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2.5 py-2 text-[11px] font-semibold transition hover:bg-white/20"><RefreshCw className={'h-3.5 w-3.5 '+(isRefreshingReports?'animate-spin':'')}/> {isRefreshingReports?'Refreshing…':'Refresh'}</button>
      <div className="flex items-center gap-1 border-l border-white/10 pl-1"><button onClick={exportRows} className="inline-flex items-center gap-1 rounded-lg bg-cyan-400 px-2.5 py-2 text-[11px] font-bold text-slate-950 transition hover:bg-cyan-300"><Download className="h-3.5 w-3.5"/>CSV</button><button onClick={exportTxt} className="rounded-lg border border-white/15 px-2.5 py-2 text-[11px] font-semibold hover:bg-white/10">TXT</button><button onClick={exportPdf} className="rounded-lg border border-white/15 px-2.5 py-2 text-[11px] font-semibold hover:bg-white/10">PDF</button></div>
     </div>
    </div>
