@@ -53,6 +53,9 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const [partyTypeFilter,setPartyTypeFilter]=useState('All party types');
  const [statusFilter,setStatusFilter]=useState('All statuses');
  const [accountFilter,setAccountFilter]=useState<'TDCC'|'BOM'|'CASH'|'ALL'>('TDCC');
+ const [monthlyAccountMovements,setMonthlyAccountMovements]=useState<any[]>([]);
+ const [monthlyAccountMovementsLoading,setMonthlyAccountMovementsLoading]=useState(false);
+ const [monthlyAccountMovementsError,setMonthlyAccountMovementsError]=useState<string|null>(null);
  const [activeTab,setActiveTab]=useState('Members');
  const [partySelection,setPartySelection]=useState('');
  const [selectedReport,setSelectedReport]=useState('member-opening-balance-register');
@@ -123,6 +126,20 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const visibleReportCategories=reportCategories.slice(1).filter(cat=>!normalizedReportSearch||filteredReportCatalog.some(r=>r.category===cat));
  const visibleReports=filteredReportCatalog.filter(r=>normalizedReportSearch||reportCategory==='All Reports'||r.category===reportCategory);
  const reportCounts=reportCategories.map(cat=>({name:cat,count:cat==='All Reports'?reportCatalog.length:reportCatalog.filter(r=>r.category===cat).length}));
+ useEffect(()=>{
+  if(screen!=='bank-reconciliation')return;
+  let active=true;
+  const loadAccountMovements=async()=>{
+   setMonthlyAccountMovementsLoading(true);setMonthlyAccountMovementsError(null);
+   const {data,error}=await supabaseClient.from('v_account_monthly_movement').select('*').eq('financial_year','FY 2018-19').order('month_start',{ascending:true});
+   if(!active)return;
+   if(error){setMonthlyAccountMovementsError(error.message);setMonthlyAccountMovements([]);}
+   else setMonthlyAccountMovements((data||[]) as any[]);
+   setMonthlyAccountMovementsLoading(false);
+  };
+  void loadAccountMovements();
+  return ()=>{active=false;};
+ },[screen]);
  const loading=isLoadingTransactions||isLoadingDemandRegister||isLoadingMasters;
  const titles:Record<string,{title:string;sub:string}> = {
   'financial-summary':{title:'Financial Summary',sub:'Consolidated financial position, collections, payments, demand and control exceptions.'},
@@ -178,26 +195,29 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const evidenceData=[{name:'Complete',value:evidenceComplete},{name:'Missing',value:evidenceMissing},{name:'Other / pending',value:Math.max(0,filtered.length-evidenceComplete-evidenceMissing)}];
  const storedRecon=Object.entries(reconciliations).filter(([key])=>accountFilter==='ALL'||key===accountFilter).flatMap(([,rows])=>rows);
  const transactionReconFallback=useMemo<MonthlyReconciliationRecord[]>(()=>{
-  if(storedRecon.length||!transactions.length)return [];
   const accountIds:('TDCC'|'BOM'|'CASH')[]=accountFilter==='ALL'?['TDCC','BOM','CASH']:[accountFilter];
-  const monthIndex=(label:string)=>{const m=label.trim().replace(/-/g,' ').match(/^([A-Za-z]{3,})\s+(\d{4})$/);if(!m)return -1;const names=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];const ix=names.indexOf(m[1].slice(0,3).toLowerCase());return ix<0?-1:Number(m[2])*12+ix;};
-  const monthLabel=(t:any)=>{const raw=String(t.reportingMonth||t.month||'').trim();if(raw)return raw.replace(/-/g,' ');const d=String(t.date||'');const parsed=new Date(d+'T00:00:00');return Number.isNaN(parsed.getTime())?'':parsed.toLocaleString('en-US',{month:'short',year:'numeric'});};
   return accountIds.flatMap(accountId=>{
-   const rows=transactions.filter(t=>t.accountId===accountId);
-   const labels=Array.from(new Set(rows.map(monthLabel).filter(Boolean))).sort((a,b)=>monthIndex(a)-monthIndex(b));
+   const rawAccountId=accountId==='TDCC'?'ACC-0001':accountId==='BOM'?'ACC-0002':'ACC-0003';
+   const rows=monthlyAccountMovements.filter((r:any)=>String(r.account_id||'').toUpperCase()===rawAccountId);
    const account=openingBalances.find((a:any)=>a.accountId===accountId);
-   let running=account?.calculatedOpeningBalance==null?Number(account?.recordedOpeningBalance||0):Number(account.calculatedOpeningBalance);
-   return labels.map((month,index)=>{
-    const movement=rows.filter(t=>monthLabel(t)===month);
-    const credits=movement.filter(t=>t.transactionClass!=='Contra'&&t.type==='Receipt').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
-    const debits=movement.filter(t=>t.transactionClass!=='Contra'&&t.type==='Payment').reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
-    const contra=movement.filter(t=>t.transactionClass==='Contra').reduce((s,t)=>s+Number(t.amount||0),0);
-    const opening=running;running=opening+credits-debits+contra;
-    return {id:'derived-'+accountId+'-'+index,accountId,month,monthIndex:index,sourceOpeningBalance:opening,calculatedOpeningBalance:opening,openingDifference:0,credits,debits,contra,adjustments:0,calculatedClosingBalance:running,sourceClosingBalance:null,closingDifference:0,status:'Pending',remarks:'Book movement calculated from transaction records; no matching bank/cash statement balance is available.'};
+   let running=Number(account?.calculatedOpeningBalance??account?.recordedOpeningBalance??0);
+   return rows.map((row:any,index:number)=>{
+    const opening=running;
+    const credits=Number(row.receipt_amount)||0;
+    const debits=Number(row.payment_amount)||0;
+    const contra=Number(row.contra_signed)||0;
+    const adjustments=0;
+    running=opening+credits-debits+contra+adjustments;
+    const monthRaw=String(row.reporting_month||'');
+    const normalized=monthRaw.match(/^([A-Za-z]{3,})[- ](\\d{4})$/);
+    const month=normalized?normalized[1].slice(0,3)+' '+normalized[2]:monthRaw;
+    const monthNames=['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+    const monthIndex=Math.max(0,monthNames.indexOf(month.slice(0,3)));
+    return {id:'view-'+rawAccountId+'-'+index,accountId,month,monthIndex,sourceOpeningBalance:opening,calculatedOpeningBalance:opening,openingDifference:0,credits,debits,contra,adjustments,calculatedClosingBalance:running,sourceClosingBalance:null,closingDifference:0,status:'Pending' as const,remarks:'Calculated from v_account_monthly_movement and Account Master opening balance. Statement balance has not been supplied.'};
    });
   });
- },[storedRecon,transactions,openingBalances,accountFilter]);
- const totalRecon=storedRecon.length?storedRecon:transactionReconFallback;
+ },[monthlyAccountMovements,openingBalances,accountFilter]);
+ const totalRecon=transactionReconFallback;
  const matched=totalRecon.filter(r=>r.status==='Matched'||r.status==='Reconciled'||r.status==='Mismatch Accepted').length;
  const unmatched=totalRecon.filter(r=>r.status==='Mismatch'||r.status==='Difference').length;
  const openSource=sourceRegister.filter(s=>String(s.status||'').toLowerCase().includes('pending')).length;
