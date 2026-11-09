@@ -133,7 +133,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   const loadAccountMovements=async()=>{
    setMonthlyAccountMovementsLoading(true);setMonthlyAccountMovementsError(null);
    const [movementRes,openingRes]=await Promise.all([
-    supabaseClient.from('v_account_monthly_movement').select('*').eq('financial_year','FY 2018-19').order('month_start',{ascending:true}),
+    supabaseClient.from('v_account_monthly_movement').select('account_id,account_name,reporting_month,month_start,receipt_amount,payment_amount,contra_signed,transaction_count').eq('financial_year','FY 2018-19').order('month_start',{ascending:true}),
     supabaseClient.from('v_account_financial_year_balance').select('account_id,account_name,opening_balance,source_opening_balance,closing_book_balance').eq('financial_year','FY 2018-19')
    ]);
    if(!active)return;
