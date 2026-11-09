@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ResponsiveContainer, ComposedChart, LineChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  PieChart, Pie, Cell, LabelList
+  PieChart, Pie, Cell
 } from 'recharts';
 import {
   AlertTriangle, ArrowDownRight, ArrowUpRight, Banknote, CalendarDays, CheckCircle2, Clock, Download,
