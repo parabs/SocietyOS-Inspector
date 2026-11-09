@@ -685,7 +685,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       // balance_register is a legacy register without society_id. Scope it
       // through the already tenant-filtered party_master IDs instead.
       const balRes=tenantPartyIds.length
-        ? await supabaseClient.from('balance_register').select('*').eq('financial_year','FY 2018-19').in('party_id',tenantPartyIds).abortSignal(sourceTimeout)
+        ? await supabaseClient.from('balance_register').select('*').in('party_id',tenantPartyIds).abortSignal(sourceTimeout)
         : {data:[],error:null};
       if (balRes.error) throw new Error(`balance_register: ${balRes.error.message}`);
 
