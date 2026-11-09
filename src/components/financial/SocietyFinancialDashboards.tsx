@@ -57,6 +57,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const [monthlyAccountOpeningBalances,setMonthlyAccountOpeningBalances]=useState<any[]>([]);
  const [monthlyAccountMovementsLoading,setMonthlyAccountMovementsLoading]=useState(false);
  const [monthlyAccountMovementsError,setMonthlyAccountMovementsError]=useState<string|null>(null);
+ const lastAccountMovementLoadKey=useRef<string|null>(null);
  const [reportRefreshKey,setReportRefreshKey]=useState(0);
  const [isRefreshingReports,setIsRefreshingReports]=useState(false);
  const refreshReports=async()=>{
