@@ -234,73 +234,88 @@ const VerificationContext = createContext<VerificationContextType | undefined>(u
 
 const STORAGE_KEY_PREFIX = 'varsha_nivas_state_v1_';
 
-// Purge any stale mock data from previous sessions
-try {
-  localStorage.removeItem(STORAGE_KEY_PREFIX + 'opening_balances');
-  localStorage.removeItem(STORAGE_KEY_PREFIX + 'transactions');
-  localStorage.removeItem(STORAGE_KEY_PREFIX + 'reconciliations');
-  localStorage.removeItem(STORAGE_KEY_PREFIX + 'issues');
-} catch (e) {
-  // ignore storage errors
-}
+// Keep the last successfully loaded workspace snapshot between browser visits.
+// Data is refreshed only on first load without a cache or when the user requests it.
+const WORKSPACE_CACHE_KEY = 'society_os_pearl_meadows_workspace_v1';
+const readWorkspaceCache = (): Record<string, any> => {
+  try {
+    const raw = localStorage.getItem(WORKSPACE_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+const CACHED_WORKSPACE = readWorkspaceCache();
+const HAS_WORKSPACE_CACHE = Boolean(CACHED_WORKSPACE.cachedAt);
 
 export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentScreen, setCurrentScreen] = useState<ScreenId>('verification-dashboard');
-  const [selectedAccountId, setSelectedAccountId] = useState<AccountId>('TDCC');
-  const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('All Months');
-  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+  const [currentScreen, setCurrentScreenState] = useState<ScreenId>(
+    () => CACHED_WORKSPACE.currentScreen || 'verification-dashboard'
+  );
+  const setCurrentScreen = useCallback((screen: ScreenId) => {
+    setCurrentScreenState(screen);
+  }, []);
+  const [selectedAccountId, setSelectedAccountId] = useState<AccountId>(
+    () => CACHED_WORKSPACE.selectedAccountId || 'TDCC'
+  );
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>(
+    () => CACHED_WORKSPACE.selectedMonthFilter || 'All Months'
+  );
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(
+    () => CACHED_WORKSPACE.selectedTransactionId || null
+  );
 
   // Data states - strictly driven by live Supabase database tables (empty by default)
-  const [openingBalances, setOpeningBalances] = useState<OpeningBalanceRecord[]>([]);
-  const [isLoadingOpeningBalances, setIsLoadingOpeningBalances] = useState<boolean>(true);
+  const [openingBalances, setOpeningBalances] = useState<OpeningBalanceRecord[]>(() => CACHED_WORKSPACE.openingBalances || []);
+  const [isLoadingOpeningBalances, setIsLoadingOpeningBalances] = useState<boolean>(!HAS_WORKSPACE_CACHE);
   const [openingBalancesError, setOpeningBalancesError] = useState<string | null>(null);
 
-  const [transactions, setTransactions] = useState<EnrichedTransaction[]>([]);
-  const [isLoadingTransactions, setIsLoadingTransactions] = useState<boolean>(true);
+  const [transactions, setTransactions] = useState<EnrichedTransaction[]>(() => CACHED_WORKSPACE.transactions || []);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState<boolean>(!HAS_WORKSPACE_CACHE);
   const [transactionsError, setTransactionsError] = useState<string | null>(null);
 
   const [reconciliations, setReconciliations] = useState<Record<AccountId, MonthlyReconciliationRecord[]>>({
-    TDCC: [],
-    BOM: [],
-    CASH: [],
+    TDCC: CACHED_WORKSPACE.reconciliations?.TDCC || [],
+    BOM: CACHED_WORKSPACE.reconciliations?.BOM || [],
+    CASH: CACHED_WORKSPACE.reconciliations?.CASH || [],
   });
   const [isLoadingReconciliation, setIsLoadingReconciliation] = useState<boolean>(false);
   const [reconciliationError, setReconciliationError] = useState<string | null>(null);
 
-  const [issues, setIssues] = useState<OutstandingIssue[]>([]);
+  const [issues, setIssues] = useState<OutstandingIssue[]>(() => CACHED_WORKSPACE.issues || []);
 
   // Additional Database Collections
-  const [memberOpeningBalances, setMemberOpeningBalances] = useState<DbMemberOpeningBalance[]>([]);
-  const [balanceRegister, setBalanceRegister] = useState<DbBalanceRegister[]>([]);
-  const [memberFinancialBalances, setMemberFinancialBalances] = useState<DbMemberFinancialYearBalance[]>([]);
-  const [partyFinancialBalances, setPartyFinancialBalances] = useState<DbPartyFinancialYearBalance[]>([]);
-  const [cumulativeOutstanding, setCumulativeOutstanding] = useState<DbMemberCumulativeOutstanding[]>([]);
-  const [demandRegister, setDemandRegister] = useState<DbDemandRegister[]>([]);
-  const [demandAdjustments, setDemandAdjustments] = useState<DbDemandAdjustment[]>([]);
-  const [demandAllocations, setDemandAllocations] = useState<DbDemandPaymentAllocation[]>([]);
-  const [partyMaster, setPartyMaster] = useState<DbPartyMaster[]>([]);
-  const [flatOwnerMaster, setFlatOwnerMaster] = useState<DbFlatOwnerMaster[]>([]);
-  const [categoryMaster, setCategoryMaster] = useState<DbCategoryMaster[]>([]);
-  const [rulesMaster, setRulesMaster] = useState<DbRulesMaster[]>([]);
-  const [sourceRegister, setSourceRegister] = useState<DbSourceRegister[]>([]);
+  const [memberOpeningBalances, setMemberOpeningBalances] = useState<DbMemberOpeningBalance[]>(() => CACHED_WORKSPACE.memberOpeningBalances || []);
+  const [balanceRegister, setBalanceRegister] = useState<DbBalanceRegister[]>(() => CACHED_WORKSPACE.balanceRegister || []);
+  const [memberFinancialBalances, setMemberFinancialBalances] = useState<DbMemberFinancialYearBalance[]>(() => CACHED_WORKSPACE.memberFinancialBalances || []);
+  const [partyFinancialBalances, setPartyFinancialBalances] = useState<DbPartyFinancialYearBalance[]>(() => CACHED_WORKSPACE.partyFinancialBalances || []);
+  const [cumulativeOutstanding, setCumulativeOutstanding] = useState<DbMemberCumulativeOutstanding[]>(() => CACHED_WORKSPACE.cumulativeOutstanding || []);
+  const [demandRegister, setDemandRegister] = useState<DbDemandRegister[]>(() => CACHED_WORKSPACE.demandRegister || []);
+  const [demandAdjustments, setDemandAdjustments] = useState<DbDemandAdjustment[]>(() => CACHED_WORKSPACE.demandAdjustments || []);
+  const [demandAllocations, setDemandAllocations] = useState<DbDemandPaymentAllocation[]>(() => CACHED_WORKSPACE.demandAllocations || []);
+  const [partyMaster, setPartyMaster] = useState<DbPartyMaster[]>(() => CACHED_WORKSPACE.partyMaster || []);
+  const [flatOwnerMaster, setFlatOwnerMaster] = useState<DbFlatOwnerMaster[]>(() => CACHED_WORKSPACE.flatOwnerMaster || []);
+  const [categoryMaster, setCategoryMaster] = useState<DbCategoryMaster[]>(() => CACHED_WORKSPACE.categoryMaster || []);
+  const [rulesMaster, setRulesMaster] = useState<DbRulesMaster[]>(() => CACHED_WORKSPACE.rulesMaster || []);
+  const [sourceRegister, setSourceRegister] = useState<DbSourceRegister[]>(() => CACHED_WORKSPACE.sourceRegister || []);
 
   // Module Loading & Error States
-  const [isLoadingMemberBalances, setIsLoadingMemberBalances] = useState<boolean>(true);
+  const [isLoadingMemberBalances, setIsLoadingMemberBalances] = useState<boolean>(!HAS_WORKSPACE_CACHE);
   const [memberBalancesError, setMemberBalancesError] = useState<string | null>(null);
 
-  const [isLoadingDemandRegister, setIsLoadingDemandRegister] = useState<boolean>(true);
+  const [isLoadingDemandRegister, setIsLoadingDemandRegister] = useState<boolean>(!HAS_WORKSPACE_CACHE);
   const [demandRegisterError, setDemandRegisterError] = useState<string | null>(null);
 
-  const [isLoadingMasters, setIsLoadingMasters] = useState<boolean>(true);
+  const [isLoadingMasters, setIsLoadingMasters] = useState<boolean>(!HAS_WORKSPACE_CACHE);
   const [mastersError, setMastersError] = useState<string | null>(null);
 
   // Supabase connection and synchronization tracking
   const [supabaseSync, setSupabaseSync] = useState<SupabaseSyncState>({
-    isConnected: false,
-    isLoading: true,
+    isConnected: HAS_WORKSPACE_CACHE,
+    isLoading: !HAS_WORKSPACE_CACHE,
     error: null,
-    lastSyncedAt: null,
-    tablesLoaded: {},
+    lastSyncedAt: CACHED_WORKSPACE.lastSyncedAt || null,
+    tablesLoaded: CACHED_WORKSPACE.tablesLoaded || {},
   });
 
   const INITIAL_CHANGE_LOGS: ChangeLogEntry[] = [
@@ -949,11 +964,51 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     fetchMasters,
   ]);
 
-  // Load database collections once when the verification workspace mounts.
-  // Society records are not streaming/live data: subsequent refreshes are user initiated.
+  // Hydrate from the saved workspace snapshot on return. Do not re-query Supabase
+  // when data has already been loaded; the Refresh control remains the explicit sync path.
   useEffect(() => {
-    void refetchAll();
+    if (!HAS_WORKSPACE_CACHE) void refetchAll();
   }, [refetchAll]);
+
+  // Persist loaded records and navigation state so returning to the app is immediate.
+  useEffect(() => {
+    try {
+      localStorage.setItem(WORKSPACE_CACHE_KEY, JSON.stringify({
+        cachedAt: HAS_WORKSPACE_CACHE ? (CACHED_WORKSPACE.cachedAt || new Date().toISOString()) : (supabaseSync.lastSyncedAt ? new Date().toISOString() : null),
+        currentScreen,
+        selectedAccountId,
+        selectedMonthFilter,
+        selectedTransactionId,
+        openingBalances,
+        transactions,
+        reconciliations,
+        issues,
+        memberOpeningBalances,
+        balanceRegister,
+        memberFinancialBalances,
+        partyFinancialBalances,
+        cumulativeOutstanding,
+        demandRegister,
+        demandAdjustments,
+        demandAllocations,
+        partyMaster,
+        flatOwnerMaster,
+        categoryMaster,
+        rulesMaster,
+        sourceRegister,
+        lastSyncedAt: supabaseSync.lastSyncedAt,
+        tablesLoaded: supabaseSync.tablesLoaded,
+      }));
+    } catch (error) {
+      console.warn('[SocietyOS] Workspace cache could not be saved:', error);
+    }
+  }, [
+    currentScreen, selectedAccountId, selectedMonthFilter, selectedTransactionId,
+    openingBalances, transactions, reconciliations, issues, memberOpeningBalances,
+    balanceRegister, memberFinancialBalances, partyFinancialBalances, cumulativeOutstanding,
+    demandRegister, demandAdjustments, demandAllocations, partyMaster, flatOwnerMaster,
+    categoryMaster, rulesMaster, sourceRegister, supabaseSync.lastSyncedAt, supabaseSync.tablesLoaded,
+  ]);
 
   // Persist locally for session resumption
   useEffect(() => {
@@ -1385,6 +1440,7 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       localStorage.removeItem(STORAGE_KEY_PREFIX + 'issues');
       localStorage.removeItem(STORAGE_KEY_PREFIX + 'changelogs');
       localStorage.removeItem(STORAGE_KEY_PREFIX + 'audit_notes');
+      localStorage.removeItem(WORKSPACE_CACHE_KEY);
     } catch (e) {}
 
     setOpeningBalances([]);
