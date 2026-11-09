@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ResponsiveContainer, ComposedChart, LineChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
@@ -139,6 +139,8 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
  const reportCounts=reportCategories.map(cat=>({name:cat,count:cat==='All Reports'?reportCatalog.length:reportCatalog.filter(r=>r.category===cat).length}));
  useEffect(()=>{
   if(screen!=='bank-reconciliation')return;
+  const loadKey=`${reportRefreshKey}:${supabaseSync.lastSyncedAt||'initial'}`;
+  if(lastAccountMovementLoadKey.current===loadKey)return;
   let active=true;
   const loadAccountMovements=async()=>{
    setMonthlyAccountMovementsLoading(true);setMonthlyAccountMovementsError(null);
@@ -147,6 +149,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
     supabaseClient.from('v_account_financial_year_balance').select('account_id,account_name,opening_balance,source_opening_balance,closing_book_balance').eq('financial_year','FY 2018-19')
    ]);
    if(!active)return;
+   lastAccountMovementLoadKey.current=loadKey;
    if(movementRes.error||openingRes.error){
     setMonthlyAccountMovementsError(movementRes.error?.message||openingRes.error?.message||'Unable to load account balances');
     setMonthlyAccountMovements([]);setMonthlyAccountOpeningBalances([]);
@@ -158,7 +161,7 @@ export const SocietyFinancialDashboards:React.FC<Props> = ({screen}) => {
   };
   void loadAccountMovements();
   return ()=>{active=false;};
- },[screen,reportRefreshKey]);
+ },[screen,reportRefreshKey,supabaseSync.lastSyncedAt]);
  const loading=isLoadingTransactions||isLoadingDemandRegister||isLoadingMasters;
  const titles:Record<string,{title:string;sub:string}> = {
   'financial-summary':{title:'Financial Summary',sub:'Consolidated financial position, collections, payments, demand and control exceptions.'},
