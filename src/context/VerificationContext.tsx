@@ -672,19 +672,25 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       // Load the authoritative tenant-scoped source registers first. Report
       // screens must not wait on optional, expensive aggregate views.
       const sourceTimeout = AbortSignal.timeout(20000);
-      const [opRes, balRes, partyRes, flatRes] = await Promise.all([
+      const [opRes, partyRes, flatRes] = await Promise.all([
         supabaseClient.from('member_opening_balances').select('*').eq('society_id', societyId).abortSignal(sourceTimeout),
-        supabaseClient.from('balance_register').select('*').eq('society_id', societyId).abortSignal(sourceTimeout),
         supabaseClient.from('party_master').select('party_id, party_name, party_type').eq('society_id', societyId).abortSignal(sourceTimeout),
         supabaseClient.from('flat_owner_master').select('flat_number_source_value, owner_name, owner_type, asset_type').eq('society_id', societyId).abortSignal(sourceTimeout),
       ]);
       if (opRes.error) throw new Error(`member_opening_balances: ${opRes.error.message}`);
-      if (balRes.error) throw new Error(`balance_register: ${balRes.error.message}`);
       if (partyRes.error) throw new Error(`party_master: ${partyRes.error.message}`);
+
+      const partyRows=(partyRes.data||[]) as any[];
+      const tenantPartyIds=partyRows.map((p:any)=>String(p.party_id||'')).filter(Boolean);
+      // balance_register is a legacy register without society_id. Scope it
+      // through the already tenant-filtered party_master IDs instead.
+      const balRes=tenantPartyIds.length
+        ? await supabaseClient.from('balance_register').select('*').eq('financial_year','FY 2018-19').in('party_id',tenantPartyIds).abortSignal(sourceTimeout)
+        : {data:[],error:null};
+      if (balRes.error) throw new Error(`balance_register: ${balRes.error.message}`);
 
       setMemberOpeningBalances((opRes.data as DbMemberOpeningBalance[]) || []);
       setBalanceRegister((balRes.data as DbBalanceRegister[]) || []);
-      const partyRows=(partyRes.data||[]) as any[];
       const flatRows=(flatRes.data||[]) as any[];
       const partyNames=new Map(partyRows.map((p:any)=>[String(p.party_id||''),String(p.party_name||'')]));
       const flatFor=(name:string)=>flatRows.find((f:any)=>String(f.owner_name||'').trim().toLowerCase()===String(name||'').trim().toLowerCase());
