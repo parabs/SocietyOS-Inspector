@@ -352,13 +352,28 @@ const exportRows=()=>{const x=selectedReportExport();downloadCsv('society-'+sele
    const id=String(r.party_id||'');if(id)openings.set(id,(openings.get(id)||0)+(Number(r.opening_balance)||0));
   });
   const demands=new Map<string,number>(),receipts=new Map<string,number>(),adjustments=new Map<string,number>();
-  const demandParty=new Map<string,string>();
+  const demandParty=new Map<string,string>(),memberIds=new Set(members.map((p:any)=>String(p.party_id||'')));
   (demandRegister||[]).filter((d:any)=>String(d.financial_year||'')===fy).forEach((d:any)=>{
    const partyId=String(d.party_id||''),demandId=String(d.demand_id||d.id||'');
-   if(!partyId||!members.some((p:any)=>String(p.party_id)===partyId))return;
+   if(!partyId||!memberIds.has(partyId))return;
    demands.set(partyId,(demands.get(partyId)||0)+(Number(d.demand_amount??d.total_demand)||0));
-   receipts.set(partyId,(receipts.get(partyId)||0)+(Number(d.net_collection_amount)||0));
    if(demandId)demandParty.set(demandId,partyId);
+  });
+  // Match the database financial-year balance rule: count only linked receipts
+  // (or approved allocation amounts), and reverse eligible bounced receipts.
+  const allocatedByTransaction=new Map<string,number>();
+  (demandAllocations||[]).forEach((a:any)=>{
+   const id=String(a.transaction_id||'');if(id)allocatedByTransaction.set(id,(allocatedByTransaction.get(id)||0)+(Number(a.allocated_amount)||0));
+  });
+  (transactions||[]).forEach((t:any)=>{
+   const partyId=String(t.partyId||t.party_id||''),date=String(t.date||t.transaction_date||'').slice(0,10);
+   if(!memberIds.has(partyId)||date<'2018-04-01'||date>'2019-03-31')return;
+   const demandId=String(transactionDemandId(t)||''),allocated=allocatedByTransaction.get(String(t.id||t.transaction_id||''))||0;
+   const linkedAmount=demandId?Math.abs(Number(t.amount)||0):Math.min(Math.abs(Number(t.amount)||0),allocated);
+   if(t.type==='Receipt'&&t.transactionClass!=='Contra')receipts.set(partyId,(receipts.get(partyId)||0)+linkedAmount);
+   else if(t.transactionClass==='Contra'&&Number(t.amount)<0&&/bounce/i.test(String(t.description||''))&&!/bank charge/i.test(String(t.description||''))){
+    receipts.set(partyId,(receipts.get(partyId)||0)-(demandId?Math.abs(Number(t.amount)||0):Math.min(Math.abs(Number(t.amount)||0),allocated)));
+   }
   });
   (demandAdjustments||[]).filter((a:any)=>a.is_approved===true).forEach((a:any)=>{
    const partyId=demandParty.get(String(a.demand_id||''));if(partyId)adjustments.set(partyId,(adjustments.get(partyId)||0)+(Number(a.amount??a.adjustment_amount)||0));
