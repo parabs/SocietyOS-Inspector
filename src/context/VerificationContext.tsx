@@ -364,8 +364,8 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     try {
       const [accRes, balRes, accountFyRes] = await Promise.all([
-        supabaseClient.from('account_master').select('*'),
-        supabaseClient.from('account_monthly_balance').select('*'),
+        supabaseClient.from('account_master').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+        supabaseClient.from('account_monthly_balance').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
         supabaseClient.from('v_account_financial_year_balance').select('*').eq('financial_year','FY 2018-19'),
       ]);
 
@@ -458,10 +458,10 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     try {
       const [txnRes, accountRes, partyRes, categoryRes] = await Promise.all([
-        supabaseClient.from('transactions').select('*', { count: 'exact' }),
-        supabaseClient.from('account_master').select('account_id, account_name'),
-        supabaseClient.from('party_master').select('party_id, party_name'),
-        supabaseClient.from('category_master').select('category_id, category_name, category_group'),
+        supabaseClient.from('transactions').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+        supabaseClient.from('account_master').select('account_id, account_name').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+        supabaseClient.from('party_master').select('party_id, party_name').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+        supabaseClient.from('category_master').select('category_id, category_name, category_group').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
       ]);
       if (txnRes.error) throw new Error(`transactions query failed: ${txnRes.error.message}`);
       if (accountRes.error) throw new Error(`account_master query failed: ${accountRes.error.message}`);
@@ -666,12 +666,12 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setMemberBalancesError(null);
     try {
       const [opRes, balRes, finRes, partyFinRes, cumRes, partyRes, flatRes] = await Promise.all([
-        supabaseClient.from('member_opening_balances').select('*'),
-        supabaseClient.from('balance_register').select('*'),
+        supabaseClient.from('member_opening_balances').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+        supabaseClient.from('balance_register').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
         supabaseClient.from('v_member_financial_year_balance').select('*'),
         supabaseClient.from('v_party_financial_year_balance').select('*'),
         supabaseClient.from('v_member_cumulative_outstanding').select('*'),
-        supabaseClient.from('party_master').select('party_id, party_name, party_type'),
+        supabaseClient.from('party_master').select('party_id, party_name, party_type').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
         supabaseClient.from('flat_owner_master').select('flat_number_source_value, owner_name, owner_type, asset_type'),
       ]);
 
@@ -742,10 +742,10 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const [demRes, reconRes, adjRes, allocRes, partyRes, flatRes] = await Promise.all([
         supabaseClient.from('demand_register').select('*'),
         supabaseClient.from('v_demand_transaction_reconciliation').select('*'),
-        supabaseClient.from('demand_adjustments').select('*'),
-        supabaseClient.from('demand_payment_allocations').select('*'),
+        supabaseClient.from('demand_adjustments').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+        supabaseClient.from('demand_payment_allocations').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
         supabaseClient.from('party_master').select('party_id, party_name, party_type'),
-        supabaseClient.from('flat_owner_master').select('flat_number_source_value, owner_name'),
+        supabaseClient.from('flat_owner_master').select('flat_number_source_value, owner_name').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
       ]);
 
       if (demRes.error) throw new Error(`demand_register: ${demRes.error.message}`);
@@ -801,11 +801,11 @@ export const VerificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setMastersError(null);
     try {
       const [partyRes, flatRes, catRes, rulesRes, srcRes] = await Promise.all([
-        supabaseClient.from('party_master').select('*'),
-        supabaseClient.from('flat_owner_master').select('*'),
-        supabaseClient.from('category_master').select('*'),
-        supabaseClient.from('rules_master').select('*'),
-        supabaseClient.from('source_register').select('*'),
+        supabaseClient.from('party_master').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+        supabaseClient.from('flat_owner_master').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+        supabaseClient.from('category_master').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+        supabaseClient.from('rules_master').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
+        supabaseClient.from('source_register').select('*').eq('society_id', '3cd459f5-2b6c-4104-86e1-b305f94ee0a7'),
       ]);
 
       if (partyRes.error) throw new Error(`party_master: ${partyRes.error.message}`);
