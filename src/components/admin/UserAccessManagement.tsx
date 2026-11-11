@@ -116,7 +116,7 @@ export const UserAccessManagement: React.FC = () => {
     event.preventDefault();
     if (!activeSociety || !selectedMemberId || !selectedPartyId) return;
     setSubmitting(true); setMessage(null);
-    const { error } = await supabaseClient.from('party_user_links').insert({
+    const { error } = await (supabaseClient as any).from('party_user_links').insert({
       society_id: activeSociety.society_id,
       user_id: selectedMemberId,
       party_id: selectedPartyId,
@@ -145,7 +145,7 @@ export const UserAccessManagement: React.FC = () => {
     const patch = status === 'verified'
       ? { status, verified_by: userResult.user.id, verified_at: new Date().toISOString() }
       : { status };
-    const { error } = await supabaseClient.from('party_user_links').update(patch)
+    const { error } = await (supabaseClient as any).from('party_user_links').update(patch)
       .eq('party_user_link_id', link.party_user_link_id)
       .eq('society_id', activeSociety.society_id);
     setMessage(error
