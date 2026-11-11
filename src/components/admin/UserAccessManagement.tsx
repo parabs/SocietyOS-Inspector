@@ -28,11 +28,18 @@ interface RoleOption {
   role_code: string;
   role_name: string;
 }
+interface PartyRecord { party_id: string; party_name: string; party_type: string; status: string | null; }
+interface PartyUserLink { party_user_link_id: string; user_id: string; party_id: string; relationship_code: string; status: 'pending' | 'verified' | 'revoked'; verified_at: string | null; }
 
 export const UserAccessManagement: React.FC = () => {
   const { activeSociety, hasPermission } = useSocietyAccess();
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [parties, setParties] = useState<PartyRecord[]>([]);
+  const [partyLinks, setPartyLinks] = useState<PartyUserLink[]>([]);
+  const [selectedMemberId, setSelectedMemberId] = useState('');
+  const [selectedPartyId, setSelectedPartyId] = useState('');
+  const [relationshipCode, setRelationshipCode] = useState('member');
   const [email, setEmail] = useState('');
   const [roleCode, setRoleCode] = useState('member');
   const [validUntil, setValidUntil] = useState('');
@@ -47,10 +54,14 @@ export const UserAccessManagement: React.FC = () => {
     if (!activeSociety || !canManage) return;
     setLoading(true);
     setMessage(null);
-    const [directory, roleResult] = await Promise.all([
+    const [directory, roleResult, partyResult, linkResult] = await Promise.all([
       callSocietyRpc('get_society_members_directory', { p_society_id: activeSociety.society_id }),
       supabaseClient.from('society_roles').select('role_code,role_name')
         .eq('society_id', activeSociety.society_id).order('role_name'),
+      supabaseClient.from('party_master').select('party_id,party_name,party_type,status')
+        .eq('society_id', activeSociety.society_id).eq('party_type', 'Member').order('party_name'),
+      supabaseClient.from('party_user_links').select('party_user_link_id,user_id,party_id,relationship_code,status,verified_at')
+        .eq('society_id', activeSociety.society_id).order('created_at', { ascending: false }),
     ]);
     if (directory.error) {
       setMessage({ kind: 'error', text: directory.error.message });
@@ -62,6 +73,10 @@ export const UserAccessManagement: React.FC = () => {
     } else {
       setRoles(roleResult.data ?? []);
     }
+    if (partyResult.error) setMessage({ kind: 'error', text: partyResult.error.message });
+    else setParties(partyResult.data ?? []);
+    if (linkResult.error) setMessage({ kind: 'error', text: linkResult.error.message });
+    else setPartyLinks(linkResult.data ?? []);
     setLoading(false);
   }, [activeSociety, canManage]);
 
@@ -95,6 +110,48 @@ export const UserAccessManagement: React.FC = () => {
       await refresh();
     }
     setSubmitting(false);
+  };
+
+  const createPartyLink = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!activeSociety || !selectedMemberId || !selectedPartyId) return;
+    setSubmitting(true); setMessage(null);
+    const { error } = await (supabaseClient as any).from('party_user_links').insert({
+      society_id: activeSociety.society_id,
+      user_id: selectedMemberId,
+      party_id: selectedPartyId,
+      relationship_code: relationshipCode,
+      status: 'pending',
+    });
+    if (error) setMessage({ kind: 'error', text: error.message });
+    else {
+      setMessage({ kind: 'success', text: 'Member-to-party mapping created as Pending. Verify the party/member relationship before activating it.' });
+      setSelectedMemberId(''); setSelectedPartyId(''); setRelationshipCode('member');
+      await refresh();
+    }
+    setSubmitting(false);
+  };
+
+  const updatePartyLinkStatus = async (link: PartyUserLink, status: 'verified' | 'revoked') => {
+    if (!activeSociety || !window.confirm(status === 'verified'
+      ? 'Confirm that this user is authorized for the selected member/party record?'
+      : 'Revoke this member-to-party mapping?')) return;
+    setSubmitting(true); setMessage(null);
+    const { data: userResult, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !userResult.user) {
+      setMessage({ kind: 'error', text: userError?.message || 'Authenticated user could not be verified.' });
+      setSubmitting(false); return;
+    }
+    const patch = status === 'verified'
+      ? { status, verified_by: userResult.user.id, verified_at: new Date().toISOString() }
+      : { status };
+    const { error } = await (supabaseClient as any).from('party_user_links').update(patch)
+      .eq('party_user_link_id', link.party_user_link_id)
+      .eq('society_id', activeSociety.society_id);
+    setMessage(error
+      ? { kind: 'error', text: error.message }
+      : { kind: 'success', text: status === 'verified' ? 'Member-to-party mapping verified.' : 'Member-to-party mapping revoked.' });
+    await refresh(); setSubmitting(false);
   };
 
   const revokeRole = async (member: MemberRecord, role: MemberRole) => {
@@ -174,6 +231,47 @@ export const UserAccessManagement: React.FC = () => {
           <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={250} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-900" />
         </div>
       </form>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+        <div className="mb-1 text-sm font-bold text-slate-900">Member-to-party mapping</div>
+        <p className="mb-3 text-xs leading-5 text-slate-600">Link an authenticated society member to an existing Member record only after checking the ownership / authorization evidence. New links remain Pending until explicitly verified.</p>
+        <form onSubmit={createPartyLink} className="grid gap-3 md:grid-cols-4">
+          <label className="text-[11px] font-semibold text-slate-700">Society user
+            <select required value={selectedMemberId} onChange={e=>setSelectedMemberId(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs">
+              <option value="">Select active member user</option>
+              {members.filter(m=>m.status==='active'&&m.roles.some(r=>r.role_code==='member'&&!r.revoked_at)).map(m=><option key={m.membership_id} value={m.user_id}>{m.display_name||m.email} · {m.email}</option>)}
+            </select>
+          </label>
+          <label className="text-[11px] font-semibold text-slate-700">Party / member record
+            <select required value={selectedPartyId} onChange={e=>setSelectedPartyId(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs">
+              <option value="">Select party record</option>
+              {parties.map(p=><option key={p.party_id} value={p.party_id}>{p.party_name} · {p.party_id}</option>)}
+            </select>
+          </label>
+          <label className="text-[11px] font-semibold text-slate-700">Relationship
+            <select value={relationshipCode} onChange={e=>setRelationshipCode(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs">
+              <option value="member">Member</option><option value="owner">Owner</option><option value="tenant">Tenant</option><option value="authorized_representative">Authorized representative</option>
+            </select>
+          </label>
+          <div className="flex items-end"><button type="submit" disabled={submitting||!selectedMemberId||!selectedPartyId} className="w-full rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Create pending link</button></div>
+        </form>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[680px] text-left text-xs">
+            <thead className="border-y bg-slate-50 text-slate-500"><tr><th className="p-2">User</th><th className="p-2">Party record</th><th className="p-2">Relationship</th><th className="p-2">Status</th><th className="p-2">Action</th></tr></thead>
+            <tbody>{partyLinks.map(link=>{
+              const member=members.find(m=>m.user_id===link.user_id);
+              const party=parties.find(p=>p.party_id===link.party_id);
+              return <tr key={link.party_user_link_id} className="border-b">
+                <td className="p-2"><div className="font-semibold">{member?.display_name||member?.email||link.user_id}</div><div className="text-[10px] text-slate-500">{member?.email||'Membership user'}</div></td>
+                <td className="p-2">{party?.party_name||link.party_id}<div className="text-[10px] text-slate-500">{link.party_id}</div></td>
+                <td className="p-2">{link.relationship_code}</td>
+                <td className="p-2"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${link.status==='verified'?'bg-emerald-50 text-emerald-700':link.status==='pending'?'bg-amber-50 text-amber-700':'bg-slate-100 text-slate-500'}`}>{link.status}</span></td>
+                <td className="p-2">{link.status==='pending'&&<button disabled={submitting} onClick={()=>void updatePartyLinkStatus(link,'verified')} className="mr-2 rounded border border-emerald-200 px-2 py-1 font-semibold text-emerald-700 disabled:opacity-50">Verify</button>}{link.status!=='revoked'&&<button disabled={submitting} onClick={()=>void updatePartyLinkStatus(link,'revoked')} className="rounded border border-rose-200 px-2 py-1 font-semibold text-rose-700 disabled:opacity-50">Revoke</button>}</td>
+              </tr>;
+            })}{!partyLinks.length&&<tr><td colSpan={5} className="p-4 text-center text-slate-500">No member-to-party links recorded.</td></tr>}</tbody>
+          </table>
+        </div>
+      </section>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
