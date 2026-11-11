@@ -177,7 +177,8 @@ export const ComplianceCommandCentre:React.FC=()=>{
  };
 
  const roleLabelByCode:Record<string,string>={chairman:'Chairman',secretary:'Secretary',treasurer:'Treasurer',society_admin:'Society Admin'};
- const activeRoleNames=(activeSociety?.roles||[]).map(role=>roleLabelByCode[role.role_code]||role.role_name);
+ const canRecordApproval=Boolean(activeSociety?.permissions.some(permission=>['governance.approve.delegated','governance.manage'].includes(permission)));
+ const activeRoleNames=canRecordApproval?(activeSociety?.roles||[]).map(role=>roleLabelByCode[role.role_code]||role.role_name):[];
  const approvalRoleFor=(task:Task)=>activeRoleNames.find(role=>role===task.approver_role||(task.approver_role==='Managing Committee'&&role==='Chairman'))||'';
  const recordApproval=async(t:Task,decision:'Approved'|'Rejected'|'Returned for Changes')=>{
   const approverRole=approvalRoleFor(t);
