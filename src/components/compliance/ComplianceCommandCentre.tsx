@@ -83,6 +83,7 @@ export const ComplianceCommandCentre:React.FC=()=>{
  const [obligationInstances,setObligationInstances]=useState<ObligationInstance[]>([]);
  const [complianceEvidence,setComplianceEvidence]=useState<ComplianceEvidence[]>([]);
  const [instanceDraft,setInstanceDraft]=useState({period_key:'',period_start:'',period_end:'',due_date:'',owner_name:'',owner_role:'',reviewer_name:''});
+ const [instanceEdits,setInstanceEdits]=useState<Record<string,Partial<ObligationInstance>>>({});
  const [approvals,setApprovals]=useState<Approval[]>([]);
  const [taskActivities,setTaskActivities]=useState<TaskActivity[]>([]);
  const [filterStage,setFilterStage]=useState('All');
@@ -226,12 +227,20 @@ export const ComplianceCommandCentre:React.FC=()=>{
   }catch(e:any){setError(e.message||'Could not create compliance period.');}
   finally{setBusy(false);}
  };
- const updateObligationInstance=async(instance:ObligationInstance,patch:Partial<ObligationInstance>)=>{
-  if(!canManageCompliance)return;
+ const updateObligationInstance=async(instance:ObligationInstance,patch:Partial<ObligationInstance>):Promise<boolean>=>{
+  if(!canManageCompliance||!activeSociety)return false;
   setBusy(true);setError('');setMessage('');
-  try{const r=await (supabaseClient as any).from('compliance_obligation_instances').update(patch).eq('instance_id',instance.instance_id).eq('society_id',activeSociety?.society_id);if(r.error)throw r.error;setMessage('Compliance instance updated.');await load();}
-  catch(e:any){setError(e.message||'Could not update compliance instance.');}
+  try{const r=await (supabaseClient as any).from('compliance_obligation_instances').update(patch).eq('instance_id',instance.instance_id).eq('society_id',activeSociety.society_id);if(r.error)throw r.error;setMessage('Compliance instance updated.');await load();return true;}
+  catch(e:any){setError(e.message||'Could not update compliance instance.');return false;}
   finally{setBusy(false);}
+ };
+ const saveInstanceDetails=async(instance:ObligationInstance)=>{
+  const patch=instanceEdits[instance.instance_id];
+  if(!patch||!Object.keys(patch).length)return;
+  if(await updateObligationInstance(instance,patch))setInstanceEdits(p=>({...p,[instance.instance_id]:{}}));
+ };
+ const setInstanceField=<K extends keyof ObligationInstance>(instance:ObligationInstance,field:K,value:ObligationInstance[K])=>{
+  setInstanceEdits(p=>({...p,[instance.instance_id]:{...p[instance.instance_id],[field]:value}}));
  };
  const uploadComplianceEvidence=async(instance:ObligationInstance,file:File)=>{
   if(!activeSociety||!canManageCompliance){setError('You need compliance.manage permission to upload evidence.');return;}
@@ -389,8 +398,14 @@ export const ComplianceCommandCentre:React.FC=()=>{
     <div className="flex flex-wrap items-start justify-between gap-2"><div><div className="text-xs font-bold">{instance.period_key}</div><div className="mt-1 text-[10px] text-slate-500">Period: {instance.period_start||'—'} to {instance.period_end||'—'} · Due: {instance.due_date||'Not set'}</div><div className="text-[10px] text-slate-500">Owner: {instance.owner_name||instance.owner_role||'Not assigned'} · Reviewer: {instance.reviewer_name||'Not assigned'}</div></div>
      <select aria-label="Compliance status" disabled={!canManageCompliance||busy} value={instance.status} onChange={e=>void updateObligationInstance(instance,{status:e.target.value})} className="rounded border bg-white px-2 py-1 text-[11px]"><option>Not Started</option><option>In Progress</option><option>Awaiting Approval</option><option>Submitted</option><option>Accepted</option><option>Overdue</option><option>Not Applicable</option><option>Exception</option></select>
     </div>
-    {instance.submission_reference&&<p className="mt-2 text-[11px]">Submission reference: {instance.submission_reference}</p>}
-    {instance.outcome_notes&&<p className="mt-1 text-[11px] text-slate-600">{instance.outcome_notes}</p>}
+    <div className="mt-3 grid gap-2 border-t pt-3 md:grid-cols-2">
+     <label className="text-[10px] font-semibold text-slate-600">Submission reference<input value={instanceEdits[instance.instance_id]?.submission_reference??instance.submission_reference??''} onChange={e=>setInstanceField(instance,'submission_reference',e.target.value||null)} disabled={!canManageCompliance||busy} className="mt-1 w-full rounded border bg-white px-2 py-2 text-xs font-normal text-slate-900" placeholder="Filing / acknowledgement / reference number"/></label>
+     <label className="text-[10px] font-semibold text-slate-600">Outcome notes<textarea rows={2} value={instanceEdits[instance.instance_id]?.outcome_notes??instance.outcome_notes??''} onChange={e=>setInstanceField(instance,'outcome_notes',e.target.value||null)} disabled={!canManageCompliance||busy} className="mt-1 w-full rounded border bg-white px-2 py-2 text-xs font-normal text-slate-900" placeholder="Record outcome or auditor / authority response"/></label>
+     <label className="text-[10px] font-semibold text-slate-600">Exception reason<textarea rows={2} value={instanceEdits[instance.instance_id]?.exception_reason??instance.exception_reason??''} onChange={e=>setInstanceField(instance,'exception_reason',e.target.value||null)} disabled={!canManageCompliance||busy} className="mt-1 w-full rounded border bg-white px-2 py-2 text-xs font-normal text-slate-900" placeholder="Explain any exception or why the item is overdue"/></label>
+     <label className="text-[10px] font-semibold text-slate-600">Next action<textarea rows={2} value={instanceEdits[instance.instance_id]?.next_action??instance.next_action??''} onChange={e=>setInstanceField(instance,'next_action',e.target.value||null)} disabled={!canManageCompliance||busy} className="mt-1 w-full rounded border bg-white px-2 py-2 text-xs font-normal text-slate-900" placeholder="Specific follow-up action"/></label>
+     <label className="text-[10px] font-semibold text-slate-600">Next action due date<input type="date" value={instanceEdits[instance.instance_id]?.next_action_due??instance.next_action_due??''} onChange={e=>setInstanceField(instance,'next_action_due',e.target.value||null)} disabled={!canManageCompliance||busy} className="mt-1 w-full rounded border bg-white px-2 py-2 text-xs font-normal text-slate-900"/></label>
+     <div className="flex items-end"><button onClick={()=>void saveInstanceDetails(instance)} disabled={!canManageCompliance||busy||!Object.keys(instanceEdits[instance.instance_id]||{}).length} className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Save compliance details</button></div>
+    </div>
     <div className="mt-3 border-t pt-2"><div className="text-[11px] font-bold">Evidence ({evidenceFor(instance.instance_id).length})</div>
      {evidenceFor(instance.instance_id).map(ev=><div key={ev.evidence_id} className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[11px]"><span>{ev.evidence_name} · {new Date(ev.uploaded_at).toLocaleDateString('en-IN')}</span>{ev.storage_path&&<button onClick={async()=>{const signed=await supabaseClient.storage.from('audit-evidence').createSignedUrl(ev.storage_path!,300);if(signed.error)setError(signed.error.message);else if(signed.data?.signedUrl)window.open(signed.data.signedUrl,'_blank','noopener,noreferrer');}} className="font-semibold text-blue-700">Open file</button>}</div>)}
      {canManageCompliance&&<label className="mt-2 block text-[11px] font-semibold">Upload supporting evidence (PDF, Office, CSV or image)<input type="file" accept=".pdf,.xlsx,.xls,.docx,.doc,.csv,.png,.jpg,.jpeg" disabled={busy} onChange={e=>{const file=e.target.files?.[0];if(file)void uploadComplianceEvidence(instance,file);e.currentTarget.value='';}} className="mt-1 block w-full text-[11px]"/></label>}
