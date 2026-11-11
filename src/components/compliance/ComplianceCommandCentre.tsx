@@ -15,6 +15,8 @@ type Task = {
   approver_role?:string; approval_status?:string; dependency_codes?:string[];
 };
 type Obligation = {obligation_id:string;obligation_code:string;title:string;domain:string;source_reference:string;requirement_summary:string;legal_status:string;applicability:string;owner_role:string|null;reviewer_role:string|null;active:boolean};
+type ObligationInstance = {instance_id:string;obligation_id:string;period_key:string;period_start:string|null;period_end:string|null;due_date:string|null;status:string;owner_name:string|null;owner_role:string|null;reviewer_name:string|null;completed_on:string|null;submission_reference:string|null;outcome_notes:string|null;exception_reason:string|null;next_action:string|null;next_action_due:string|null};
+type ComplianceEvidence = {evidence_id:string;instance_id:string;evidence_name:string;evidence_type:string;storage_path:string|null;external_reference:string|null;notes:string|null;uploaded_at:string};
 type Approval = {approval_id:string;checklist_id:string;decision:string;approver_role:string;approver_name:string;comments:string|null;decided_at:string};
 type TaskActivity = {activity_id:string;checklist_id:string;action:string;field_name:string|null;old_value:string|null;new_value:string|null;actor_user_id:string|null;created_at:string};
 
@@ -78,6 +80,9 @@ export const ComplianceCommandCentre:React.FC=()=>{
  const [fy,setFy]=useState('FY 2018-19');
  const [tasks,setTasks]=useState<Task[]>([]);
  const [obligations,setObligations]=useState<Obligation[]>([]);
+ const [obligationInstances,setObligationInstances]=useState<ObligationInstance[]>([]);
+ const [complianceEvidence,setComplianceEvidence]=useState<ComplianceEvidence[]>([]);
+ const [instanceDraft,setInstanceDraft]=useState({period_key:'',period_start:'',period_end:'',due_date:'',owner_name:'',owner_role:'',reviewer_name:''});
  const [approvals,setApprovals]=useState<Approval[]>([]);
  const [taskActivities,setTaskActivities]=useState<TaskActivity[]>([]);
  const [filterStage,setFilterStage]=useState('All');
@@ -106,17 +111,21 @@ export const ComplianceCommandCentre:React.FC=()=>{
   setBusy(true);setError('');
   try{
    const db:any=supabaseClient;
-   const [userResult,t,o]=await Promise.all([
+   const [userResult,t,o,instancesResult]=await Promise.all([
     supabaseClient.auth.getUser(),
     db.from('financial_year_checklist').select('*').eq('financial_year',fy).order('sequence_no'),
-    db.from('compliance_obligations').select('*').eq('active',true).order('domain').order('obligation_code')
+    db.from('compliance_obligations').select('*').eq('active',true).order('domain').order('obligation_code'),
+    db.from('compliance_obligation_instances').select('*').order('due_date',{ascending:true})
    ]);
-   if(t.error)throw t.error;if(o.error)throw o.error;
+   if(t.error)throw t.error;if(o.error)throw o.error;if(instancesResult.error)throw instancesResult.error;
    if(userResult.error)throw userResult.error;
    const userEmail=userResult.data.user?.email||'';
    setSignedInEmail(userEmail);
    const taskRows=(t.data||[]) as Task[];
    setObligations((o.data||[]) as Obligation[]);
+   const instanceRows=(instancesResult.data||[]) as ObligationInstance[];
+   setObligationInstances(instanceRows);
+   if(instanceRows.length){const ev=await db.from('compliance_evidence').select('*').in('instance_id',instanceRows.map(x=>x.instance_id)).order('uploaded_at',{ascending:false});if(ev.error)throw ev.error;setComplianceEvidence((ev.data||[]) as ComplianceEvidence[]);}else setComplianceEvidence([]);
    const ids=taskRows.map(x=>x.checklist_id);
    if(ids.length){
     const [a,h]=await Promise.all([
@@ -197,6 +206,50 @@ export const ComplianceCommandCentre:React.FC=()=>{
   finally{setBusy(false);}
  };
 
+ const canManageCompliance=Boolean(activeSociety?.permissions.includes('compliance.manage'));
+ const instancesFor=(id:string)=>obligationInstances.filter(x=>x.obligation_id===id);
+ const evidenceFor=(id:string)=>complianceEvidence.filter(x=>x.instance_id===id);
+ const createObligationInstance=async(obligation:Obligation)=>{
+  if(!activeSociety||!canManageCompliance){setError('You need compliance.manage permission in the active society.');return;}
+  if(!instanceDraft.period_key.trim()){setError('Enter a period key (for example FY 2026-27 or 2026-Q2).');return;}
+  setBusy(true);setError('');setMessage('');
+  try{
+   const r=await (supabaseClient as any).from('compliance_obligation_instances').insert({
+    society_id:activeSociety.society_id,obligation_id:obligation.obligation_id,period_key:instanceDraft.period_key.trim(),
+    period_start:instanceDraft.period_start||null,period_end:instanceDraft.period_end||null,due_date:instanceDraft.due_date||null,
+    owner_name:instanceDraft.owner_name.trim()||null,owner_role:instanceDraft.owner_role.trim()||null,
+    reviewer_name:instanceDraft.reviewer_name.trim()||null
+   });
+   if(r.error)throw r.error;
+   setInstanceDraft({period_key:'',period_start:'',period_end:'',due_date:'',owner_name:'',owner_role:'',reviewer_name:''});
+   setMessage('Compliance period created. No statutory date or owner was assumed.');await load();
+  }catch(e:any){setError(e.message||'Could not create compliance period.');}
+  finally{setBusy(false);}
+ };
+ const updateObligationInstance=async(instance:ObligationInstance,patch:Partial<ObligationInstance>)=>{
+  if(!canManageCompliance)return;
+  setBusy(true);setError('');setMessage('');
+  try{const r=await (supabaseClient as any).from('compliance_obligation_instances').update(patch).eq('instance_id',instance.instance_id).eq('society_id',activeSociety?.society_id);if(r.error)throw r.error;setMessage('Compliance instance updated.');await load();}
+  catch(e:any){setError(e.message||'Could not update compliance instance.');}
+  finally{setBusy(false);}
+ };
+ const uploadComplianceEvidence=async(instance:ObligationInstance,file:File)=>{
+  if(!activeSociety||!canManageCompliance){setError('You need compliance.manage permission to upload evidence.');return;}
+  const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const path=`${activeSociety.society_id}/${instance.instance_id}/${crypto.randomUUID()}-${safeName}`;
+  setBusy(true);setError('');setMessage('');
+  try{
+   const uploaded=await supabaseClient.storage.from('audit-evidence').upload(path,file,{contentType:file.type||'application/octet-stream',upsert:false});
+   if(uploaded.error)throw uploaded.error;
+   const saved=await (supabaseClient as any).from('compliance_evidence').insert({
+    society_id:activeSociety.society_id,instance_id:instance.instance_id,evidence_name:file.name,
+    evidence_type:file.type||'Document',storage_path:path,notes:null
+   });
+   if(saved.error){await supabaseClient.storage.from('audit-evidence').remove([path]);throw saved.error;}
+   setMessage(`Evidence uploaded: ${file.name}`);await load();
+  }catch(e:any){setError(e.message||'Could not upload compliance evidence.');}
+  finally{setBusy(false);}
+ };
  const taskStatusTone=(t:Task)=>{
   if(isDone(t))return 'border-emerald-200 bg-emerald-50 text-emerald-900';
   if(t.status==='In Progress')return 'border-blue-200 bg-blue-50 text-blue-900';
@@ -319,7 +372,34 @@ export const ComplianceCommandCentre:React.FC=()=>{
   </div>
   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] leading-5 text-amber-900"><AlertCircle className="mr-1 inline h-4 w-4"/>Legal caution: task windows are operational planning guidance, not certified statutory due dates. Legal applicability, notice periods, prescribed forms and filing deadlines must be confirmed against current MCS Act / Rules, registered society bye-laws and applicable Registrar directions before use.</div>
   {modalTask&&<div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-3" onMouseDown={e=>{if(e.target===e.currentTarget)setTaskModalId(null);}}><section role="dialog" aria-modal="true" className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl"><div className="sticky top-0 flex items-start justify-between border-b bg-white p-4"><div><div className="text-[10px] font-bold uppercase text-blue-700">Task update · {modalTask.task_code||'Additional task'}</div><h2 className="mt-1 text-lg font-bold">{modalTask.task}</h2><p className="text-xs text-slate-500">{modalTask.stage} · Reviewer: {modalTask.approver_role||'To be assigned'}</p></div><button onClick={()=>setTaskModalId(null)} className="rounded border p-2"><XCircle className="h-4 w-4"/></button></div><div className="grid gap-4 p-4 lg:grid-cols-2"><div className="space-y-3"><div className="rounded-xl bg-blue-50 p-3"><div className="text-xs font-bold">Task guidance</div><p className="mt-1 text-sm">{modalTask.guidance||'Follow the task checklist and record the work performed.'}</p><div className="mt-3 text-xs font-bold">Completion criteria</div><p className="mt-1 text-sm">{modalTask.completion_criteria||'Retain evidence and record reviewer acceptance.'}</p></div><div className="rounded-xl border p-3"><div className="text-xs font-bold">Recent activity</div>{activityFor(modalTask.checklist_id).length?activityFor(modalTask.checklist_id).map(a=><p key={a.activity_id} className="mt-2 border-t pt-2 text-xs"><strong>{a.action}</strong>{a.field_name?` · ${a.field_name}`:''}{a.old_value!==null||a.new_value!==null?` · ${a.old_value||'—'} → ${a.new_value||'—'}`:''}<span className="block text-[10px] text-slate-500">{a.actor_user_id?`User ${a.actor_user_id.slice(0,8)} · `:''}{new Date(a.created_at).toLocaleString()}</span></p>):<p className="mt-1 text-xs text-slate-500">No task changes recorded yet.</p>}<div className="mt-4 border-t pt-3"><div className="text-xs font-bold">Reviewer decisions</div>{approvalsFor(modalTask.checklist_id).length?approvalsFor(modalTask.checklist_id).map(a=><p key={a.approval_id} className="mt-2 border-t pt-2 text-xs"><strong>{a.decision}</strong> · {a.approver_name} ({a.approver_role}) · {a.comments||'No comment'}<span className="block text-[10px] text-slate-500">{new Date(a.decided_at).toLocaleString()}</span></p>):<p className="mt-1 text-xs text-slate-500">No reviewer decision recorded yet.</p>}</div></div></div><div className="space-y-3"><label className="block text-xs font-semibold">Status<select value={taskEdits[modalTask.checklist_id]?.status??modalTask.status} onChange={e=>setTaskEdits(p=>({...p,[modalTask.checklist_id]:{...p[modalTask.checklist_id],status:e.target.value}}))} className="mt-1 w-full rounded-lg border px-3 py-2.5 text-sm">{STATUS_OPTIONS.map(x=><option key={x}>{x}</option>)}</select></label><label className="block text-xs font-semibold">Assigned person<input value={taskEdits[modalTask.checklist_id]?.owner_name??modalTask.owner_name??''} onChange={e=>setTaskEdits(p=>({...p,[modalTask.checklist_id]:{...p[modalTask.checklist_id],owner_name:e.target.value}}))} className="mt-1 w-full rounded-lg border px-3 py-2.5 text-sm"/></label><label className="block text-xs font-semibold">Due date<input type="date" value={taskEdits[modalTask.checklist_id]?.due_date??modalTask.due_date??''} onChange={e=>setTaskEdits(p=>({...p,[modalTask.checklist_id]:{...p[modalTask.checklist_id],due_date:e.target.value||null}}))} className="mt-1 w-full rounded-lg border px-3 py-2.5 text-sm"/></label><label className="block text-xs font-semibold">Evidence / reference<input value={taskEdits[modalTask.checklist_id]?.evidence_reference??modalTask.evidence_reference??''} onChange={e=>setTaskEdits(p=>({...p,[modalTask.checklist_id]:{...p[modalTask.checklist_id],evidence_reference:e.target.value}}))} className="mt-1 w-full rounded-lg border px-3 py-2.5 text-sm"/></label><label className="block text-xs font-semibold">Progress notes<textarea rows={3} value={taskEdits[modalTask.checklist_id]?.remarks??modalTask.remarks??''} onChange={e=>setTaskEdits(p=>({...p,[modalTask.checklist_id]:{...p[modalTask.checklist_id],remarks:e.target.value}}))} className="mt-1 w-full rounded-lg border px-3 py-2.5 text-sm"/></label><button disabled={busy||!Object.keys(taskEdits[modalTask.checklist_id]||{}).length} onClick={()=>void updateTask(modalTask,taskEdits[modalTask.checklist_id])} className="w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white">Save task update</button><div className="rounded-xl border p-3"><div className="text-xs font-bold">Reviewer decision</div><div className="mt-2 rounded-lg bg-slate-50 p-2 text-xs"><div className="font-semibold text-slate-700">Signed in as</div><div className="mt-0.5 break-all text-slate-600">{signedInEmail||'No authenticated identity'}</div><div className="mt-1 text-slate-500">Authorized role for this task: {approvalRoleFor(modalTask)||'Not assigned to your membership'}</div></div><input value={approvalNote} onChange={e=>setApprovalNote(e.target.value)} placeholder="Review comment / return reason" className="mt-2 w-full rounded border px-2 py-2 text-xs"/><div className="mt-2 flex flex-wrap gap-2"><button disabled={busy||!approvalRoleFor(modalTask)||!signedInEmail} onClick={()=>void recordApproval(modalTask,'Approved')} className="rounded bg-emerald-700 px-3 py-2 text-xs text-white disabled:cursor-not-allowed disabled:opacity-40">Approve</button><button disabled={busy||!approvalRoleFor(modalTask)||!signedInEmail} onClick={()=>void recordApproval(modalTask,'Returned for Changes')} className="rounded border border-amber-300 px-3 py-2 text-xs text-amber-800 disabled:opacity-40">Return for changes</button><button disabled={busy||!approvalRoleFor(modalTask)||!signedInEmail} onClick={()=>void recordApproval(modalTask,'Rejected')} className="rounded border border-rose-300 px-3 py-2 text-xs text-rose-700 disabled:opacity-40">Reject</button></div><p className="mt-2 text-[10px] text-slate-500">Approver identity and role are taken from the authenticated session and active society membership, not manually selected values.</p></div></div></div></section></div>}
-  {modalControl&&<div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-3" onMouseDown={e=>{if(e.target===e.currentTarget)setControlModalId(null);}}><section role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl"><div className="flex items-start justify-between border-b p-4"><div><div className="text-[10px] font-bold uppercase text-blue-700">Control helper · {modalControl.obligation_code}</div><h2 className="mt-1 text-lg font-bold">{modalControl.title}</h2><p className="text-xs text-slate-500">{modalControl.domain} · {modalControl.applicability} · {modalControl.legal_status}</p></div><button onClick={()=>setControlModalId(null)} className="rounded border p-2"><XCircle className="h-4 w-4"/></button></div><div className="space-y-3 p-4"><div className="rounded-xl bg-blue-50 p-3"><div className="text-xs font-bold">What this control means</div><p className="mt-1 text-sm">{modalControl.requirement_summary}</p></div><div className="grid gap-3 sm:grid-cols-2"><div className="rounded-lg border p-3"><div className="text-xs font-bold">Source reference</div><p className="mt-1 text-sm">{modalControl.source_reference||'Not recorded'}</p></div><div className="rounded-lg border p-3"><div className="text-xs font-bold">Responsible roles</div><p className="mt-1 text-sm">{modalControl.owner_role||'Owner to confirm'} / {modalControl.reviewer_role||'Reviewer to confirm'}</p></div></div><div className="rounded-lg border p-3 text-xs text-slate-600">Legal validation: {modalControl.legal_status}. Applicability: {modalControl.applicability}. Verify the current Act, Rules, registered bye-laws and Registrar directions before treating this as mandatory.</div><button onClick={()=>setControlModalId(null)} className="rounded-lg bg-blue-700 px-4 py-2 text-xs font-semibold text-white">Close helper</button></div></section></div>}
+  {modalControl&&<div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-3" onMouseDown={e=>{if(e.target===e.currentTarget)setControlModalId(null);}}><section role="dialog" aria-modal="true" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl"><div className="flex items-start justify-between border-b p-4"><div><div className="text-[10px] font-bold uppercase text-blue-700">Control helper · {modalControl.obligation_code}</div><h2 className="mt-1 text-lg font-bold">{modalControl.title}</h2><p className="text-xs text-slate-500">{modalControl.domain} · {modalControl.applicability} · {modalControl.legal_status}</p></div><button onClick={()=>setControlModalId(null)} className="rounded border p-2"><XCircle className="h-4 w-4"/></button></div><div className="space-y-3 p-4"><div className="rounded-xl bg-blue-50 p-3"><div className="text-xs font-bold">What this control means</div><p className="mt-1 text-sm">{modalControl.requirement_summary}</p></div><div className="grid gap-3 sm:grid-cols-2"><div className="rounded-lg border p-3"><div className="text-xs font-bold">Source reference</div><p className="mt-1 text-sm">{modalControl.source_reference||'Not recorded'}</p></div><div className="rounded-lg border p-3"><div className="text-xs font-bold">Responsible roles</div><p className="mt-1 text-sm">{modalControl.owner_role||'Owner to confirm'} / {modalControl.reviewer_role||'Reviewer to confirm'}</p></div></div><div className="rounded-lg border p-3 text-xs text-slate-600">Legal validation: {modalControl.legal_status}. Applicability: {modalControl.applicability}. Verify the current Act, Rules, registered bye-laws and Registrar directions before treating this as mandatory.</div>
+  <section className="rounded-xl border p-3">
+   <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-bold">Compliance periods & evidence</h3><p className="text-[11px] text-slate-500">Create a period only after confirming its dates and accountable people. Definitions remain unchanged.</p></div><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px]">{instancesFor(modalControl.obligation_id).length} periods</span></div>
+   {canManageCompliance&&<div className="mt-3 grid gap-2 md:grid-cols-2">
+    <label className="text-[11px] font-semibold">Period key *<input value={instanceDraft.period_key} onChange={e=>setInstanceDraft(p=>({...p,period_key:e.target.value}))} placeholder="e.g. FY 2026-27 / 2026-Q2" className="mt-1 w-full rounded border px-2 py-2 text-xs"/></label>
+    <label className="text-[11px] font-semibold">Due date<input type="date" value={instanceDraft.due_date} onChange={e=>setInstanceDraft(p=>({...p,due_date:e.target.value}))} className="mt-1 w-full rounded border px-2 py-2 text-xs"/></label>
+    <label className="text-[11px] font-semibold">Period start<input type="date" value={instanceDraft.period_start} onChange={e=>setInstanceDraft(p=>({...p,period_start:e.target.value}))} className="mt-1 w-full rounded border px-2 py-2 text-xs"/></label>
+    <label className="text-[11px] font-semibold">Period end<input type="date" value={instanceDraft.period_end} onChange={e=>setInstanceDraft(p=>({...p,period_end:e.target.value}))} className="mt-1 w-full rounded border px-2 py-2 text-xs"/></label>
+    <label className="text-[11px] font-semibold">Owner name<input value={instanceDraft.owner_name} onChange={e=>setInstanceDraft(p=>({...p,owner_name:e.target.value}))} className="mt-1 w-full rounded border px-2 py-2 text-xs"/></label>
+    <label className="text-[11px] font-semibold">Owner role<input value={instanceDraft.owner_role} onChange={e=>setInstanceDraft(p=>({...p,owner_role:e.target.value}))} placeholder="Confirm responsible role" className="mt-1 w-full rounded border px-2 py-2 text-xs"/></label>
+    <label className="text-[11px] font-semibold md:col-span-2">Reviewer name<input value={instanceDraft.reviewer_name} onChange={e=>setInstanceDraft(p=>({...p,reviewer_name:e.target.value}))} className="mt-1 w-full rounded border px-2 py-2 text-xs"/></label>
+    <button disabled={busy||!instanceDraft.period_key.trim()} onClick={()=>void createObligationInstance(modalControl)} className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40 md:col-span-2">Create period instance</button>
+   </div>}
+   <div className="mt-3 space-y-3">{instancesFor(modalControl.obligation_id).map(instance=><article key={instance.instance_id} className="rounded-lg border bg-slate-50 p-3">
+    <div className="flex flex-wrap items-start justify-between gap-2"><div><div className="text-xs font-bold">{instance.period_key}</div><div className="mt-1 text-[10px] text-slate-500">Period: {instance.period_start||'—'} to {instance.period_end||'—'} · Due: {instance.due_date||'Not set'}</div><div className="text-[10px] text-slate-500">Owner: {instance.owner_name||instance.owner_role||'Not assigned'} · Reviewer: {instance.reviewer_name||'Not assigned'}</div></div>
+     <select aria-label="Compliance status" disabled={!canManageCompliance||busy} value={instance.status} onChange={e=>void updateObligationInstance(instance,{status:e.target.value})} className="rounded border bg-white px-2 py-1 text-[11px]"><option>Not Started</option><option>In Progress</option><option>Awaiting Approval</option><option>Submitted</option><option>Accepted</option><option>Overdue</option><option>Not Applicable</option><option>Exception</option></select>
+    </div>
+    {instance.submission_reference&&<p className="mt-2 text-[11px]">Submission reference: {instance.submission_reference}</p>}
+    {instance.outcome_notes&&<p className="mt-1 text-[11px] text-slate-600">{instance.outcome_notes}</p>}
+    <div className="mt-3 border-t pt-2"><div className="text-[11px] font-bold">Evidence ({evidenceFor(instance.instance_id).length})</div>
+     {evidenceFor(instance.instance_id).map(ev=><div key={ev.evidence_id} className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[11px]"><span>{ev.evidence_name} · {new Date(ev.uploaded_at).toLocaleDateString('en-IN')}</span>{ev.storage_path&&<button onClick={async()=>{const signed=await supabaseClient.storage.from('audit-evidence').createSignedUrl(ev.storage_path!,300);if(signed.error)setError(signed.error.message);else if(signed.data?.signedUrl)window.open(signed.data.signedUrl,'_blank','noopener,noreferrer');}} className="font-semibold text-blue-700">Open file</button>}</div>)}
+     {canManageCompliance&&<label className="mt-2 block text-[11px] font-semibold">Upload supporting evidence (PDF, Office, CSV or image)<input type="file" accept=".pdf,.xlsx,.xls,.docx,.doc,.csv,.png,.jpg,.jpeg" disabled={busy} onChange={e=>{const file=e.target.files?.[0];if(file)void uploadComplianceEvidence(instance,file);e.currentTarget.value='';}} className="mt-1 block w-full text-[11px]"/></label>}
+    </div>
+   </article>)}
+   {instancesFor(modalControl.obligation_id).length===0&&<p className="mt-3 text-xs text-slate-500">No period instances recorded. The 24-item obligation library is not automatically converted into dated obligations.</p>}
+   </div>
+  </section>
+  <button onClick={()=>setControlModalId(null)} className="rounded-lg bg-blue-700 px-4 py-2 text-xs font-semibold text-white">Close helper</button></div></section></div>}
 
  </div>;
 };
