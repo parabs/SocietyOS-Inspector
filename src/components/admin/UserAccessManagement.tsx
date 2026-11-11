@@ -239,7 +239,7 @@ export const UserAccessManagement: React.FC = () => {
           <label className="text-[11px] font-semibold text-slate-700">Society user
             <select required value={selectedMemberId} onChange={e=>setSelectedMemberId(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs">
               <option value="">Select active member user</option>
-              {members.filter(m=>m.status==='active').map(m=><option key={m.membership_id} value={m.user_id}>{m.display_name||m.email} · {m.email}</option>)}
+              {members.filter(m=>m.status==='active'&&m.roles.some(r=>r.role_code==='member'&&!r.revoked_at)).map(m=><option key={m.membership_id} value={m.user_id}>{m.display_name||m.email} · {m.email}</option>)}
             </select>
           </label>
           <label className="text-[11px] font-semibold text-slate-700">Party / member record
