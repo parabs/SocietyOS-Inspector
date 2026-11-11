@@ -186,8 +186,9 @@ export const ComplianceCommandCentre:React.FC=()=>{
   if(!signedInEmail){setError('A verified signed-in email is required to record an approval.');return;}
   setBusy(true);setError('');setMessage('');
   try{
+   if (!activeSociety) throw new Error('Select an active society before recording an approval.');
    const r=await (supabaseClient as any).from('governance_task_approvals').insert({
-    checklist_id:t.checklist_id,financial_year:fy,decision,approver_role:approverRole,
+    society_id:activeSociety.society_id,checklist_id:t.checklist_id,financial_year:fy,decision,approver_role:approverRole,
     approver_name:signedInEmail,comments:approvalNote||null
    });
    if(r.error)throw r.error;
