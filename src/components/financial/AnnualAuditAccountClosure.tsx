@@ -149,7 +149,8 @@ export const AnnualAuditAccountClosure: React.FC = () => {
       const { error: e } = await db.from('financial_year_audit_reconciliations').upsert(payload, { onConflict: 'financial_year,reconciliation_key' });
       if (e) throw e;
       const unresolved = payload.filter(x => x.resolution_status === 'Pending').length;
-      await db.from('financial_year_audit_closures').update({ balances_confirmed: unresolved === 0, confirmed_by: unresolved === 0 ? currentUserEmail : null, confirmed_at: unresolved === 0 ? new Date().toISOString() : null, system_figures: { account_rows: systemRows.length }, audited_figures: { entered_rows: payload.filter(x => x.audited_amount !== null).length } }).eq('financial_year', fy);
+      const closureUpdate = await db.from('financial_year_audit_closures').update({ balances_confirmed: unresolved === 0, confirmed_by: unresolved === 0 ? currentUserEmail : null, confirmed_at: unresolved === 0 ? new Date().toISOString() : null, system_figures: { account_rows: systemRows.length }, audited_figures: { entered_rows: payload.filter(x => x.audited_amount !== null).length } }).eq('financial_year', fy);
+      if (closureUpdate.error) throw closureUpdate.error;
       setNotice(unresolved ? `${unresolved} line item(s) still need an audited figure or a documented resolution.` : 'All account reconciliation lines are matched or have a documented resolution.');
       await load();
     } catch (e: any) { setError(e.message || 'Unable to save reconciliation.'); }
